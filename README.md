@@ -1,2 +1,2 @@
-# DWM1001_Distance_measurement_v2
+# DWM1001 Distributed localization DWM1001
 -
