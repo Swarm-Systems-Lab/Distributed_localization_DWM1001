@@ -20,9 +20,6 @@ int main(void)
     halInit();
     chSysInit();
 
-    palSetPad(IOPORT1, LED1);
-    palClearPad(IOPORT1, LED2);
-    palClearPad(IOPORT1, LED3);
     palSetPad(IOPORT1, LED4);
 
     chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO+1,
