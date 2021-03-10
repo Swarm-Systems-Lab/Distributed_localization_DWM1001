@@ -1,6 +1,3 @@
 [submodule "ext/ChibiOS"]
 	path = ext/ChibiOS
 	url = https://github.com/ChibiOS/ChibiOS.git
-[submodule "ext/ChibiOs-Contrib"]
-	path = ext/ChibiOS-Contrib/
-	url = https://github.com/UCM-237/ChibiOS-Contrib

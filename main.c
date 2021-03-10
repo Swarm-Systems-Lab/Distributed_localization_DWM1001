@@ -15,8 +15,6 @@ static THD_FUNCTION(Thread1, arg) {
     }
 }
 
-/**@brief Function for application main entry.
- */
 int main(void)
 {
     halInit();
