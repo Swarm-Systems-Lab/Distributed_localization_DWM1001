@@ -50,3 +50,9 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Built files
+build/
+
+# Swamp files
+*.swp
