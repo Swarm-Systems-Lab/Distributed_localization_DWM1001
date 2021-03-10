@@ -26,15 +26,16 @@ int main(void)
     halInit();
     chSysInit();
 
-    palClearPad(IOPORT1, GREEN_LED_D9);
-    palClearPad(IOPORT1, BLUE_LED_D10);
-    palClearPad(IOPORT1, RED_LED_D11);
-    palClearPad(IOPORT1, RED_LED_D12);
+    uint8_t green = GREEN_LED_D9;
+    uint8_t blue = BLUE_LED_D10;
+    uint8_t red1 = RED_LED_D11;
+    uint8_t red2 = RED_LED_D12;
 
-    //palSetPad(IOPORT1, GREEN_LED_D9);
-    //palSetPad(IOPORT1, BLUE_LED_D10);
-    palSetPad(IOPORT1, RED_LED_D11);
-    //palSetPad(IOPORT1, RED_LED_D12);
+    // Power off the leds.
+    palSetPad(IOPORT1, green); 
+    palSetPad(IOPORT1, blue);
+    palSetPad(IOPORT1, red1);
+    palSetPad(IOPORT1, red2);
 
     chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO+1,
       Thread1, NULL);
