@@ -71,7 +71,7 @@ endif
 
 # Enables the use of FPU on Cortex-M4 (no, softfp, hard).
 ifeq ($(USE_FPU),)
-  USE_FPU = no
+  USE_FPU = hard
 endif
 
 #
@@ -83,11 +83,15 @@ endif
 #
 
 # Define project name here
-PROJECT = ch
+PROJECT = dis_loc_dwm1001
 
 # Imported source files and paths
-CHIBIOS         = ./ext/ChibiOS
-CHIBIOS_CONTRIB = ./ext/ChibiOS-Contrib
+CHIBIOS         := ./ext/ChibiOS
+CHIBIOS_CONTRIB := ./ext/ChibiOS-Contrib
+CONFDIR         := ./cfg
+BUILDDIR        := ./build
+DEPDIR          := ./.dep
+
 # Licensing files.
 include $(CHIBIOS)/os/license/license.mk
 # Startup files.
@@ -144,8 +148,7 @@ TCPPSRC =
 ASMSRC = $(ALLASMSRC)
 ASMXSRC = $(ALLXASMSRC)
 
-INCDIR = $(ALLINC) $(TESTINC) \
-         $(TESTHAL)
+INCDIR = $(CONFDIR) $(ALLINC) $(TESTINC) $(TESTHAL)
 
 #
 # Project, sources and paths
