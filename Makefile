@@ -84,13 +84,16 @@ endif
 
 # Define project name here
 PROJECT = dis_loc_dwm1001
+PROJECT_FOLDER = Distributed_localization_DWM1001
+
+PROJECT_DIRECTORY := $(shell find / -name $(PROJECT_FOLDER) 2>/dev/null | grep -v ".metadata")
 
 # Imported source files and paths
-CHIBIOS         := ./ext/ChibiOS
-CHIBIOS_CONTRIB := ./ext/ChibiOS-Contrib
-CONFDIR         := ./cfg
-BUILDDIR        := ./build
-DEPDIR          := ./.dep
+CHIBIOS         := $(PROJECT_DIRECTORY)/ext/ChibiOS
+CHIBIOS_CONTRIB := $(PROJECT_DIRECTORY)/ext/ChibiOS-Contrib
+CONFDIR         := $(PROJECT_DIRECTORY)/cfg
+BUILDDIR        := $(PROJECT_DIRECTORY)/build
+DEPDIR          := $(PROJECT_DIRECTORY)/.dep
 
 # Licensing files.
 include $(CHIBIOS)/os/license/license.mk
@@ -118,7 +121,7 @@ LDSCRIPT= $(STARTUPLD_CONTRIB)/NRF52832.ld
 # setting.
 CSRC = $(ALLCSRC) \
        $(TESTSRC) \
-       main.c
+       $(PROJECT_DIRECTORY)/src/main.c
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
