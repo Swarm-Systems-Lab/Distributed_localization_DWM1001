@@ -84,9 +84,12 @@ endif
 
 # Define project name here
 PROJECT = dis_loc_dwm1001
-PROJECT_FOLDER = Distributed_localization_DWM1001
 
-PROJECT_DIRECTORY := $(shell find / -name $(PROJECT_FOLDER) 2>/dev/null | grep -v ".metadata")
+# WARNING!
+# In case of using eclipse, it is necessary that this variable contains the path
+# to the path Distributed_localization_DWM1001 project. In case of executing make
+# manually, this variable must be empty.
+PROJECT_DIRECTORY := /home/developer/ChibiOS-eclipse-workspace/Distributed_localization_DWM1001
 
 # Imported source files and paths
 CHIBIOS         := $(PROJECT_DIRECTORY)/ext/ChibiOS
@@ -121,7 +124,9 @@ LDSCRIPT= $(STARTUPLD_CONTRIB)/NRF52832.ld
 # setting.
 CSRC = $(ALLCSRC) \
        $(TESTSRC) \
-       $(PROJECT_DIRECTORY)/src/main.c
+       $(PROJECT_DIRECTORY)/src/main.c \
+       $(PROJECT_DIRECTORY)/src/driver/led/led.c \
+       $(PROJECT_DIRECTORY)/src/util/thread/thread.c
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
@@ -151,7 +156,9 @@ TCPPSRC =
 ASMSRC = $(ALLASMSRC)
 ASMXSRC = $(ALLXASMSRC)
 
-INCDIR = $(CONFDIR) $(ALLINC) $(TESTINC) $(TESTHAL)
+INCDIR = $(CONFDIR) $(ALLINC) $(TESTINC) $(TESTHAL)\
+		 $(PROJECT_DIRECTORY)/src/driver/led\
+		 $(PROJECT_DIRECTORY)/src/util/thread
 
 #
 # Project, sources and paths
@@ -225,8 +232,6 @@ include $(RULESPATH)/rules.mk
 OHEX = $(BUILDDIR)/$(PROJECT).hex
 OELF = $(BUILDDIR)/$(PROJECT).elf
 OBIN = $(BUILDDIR)/$(PROJECT).bin
-
-
 
 include $(CHIBIOS_CONTRIB)/os/various/jlink.mk
 include $(CHIBIOS_CONTRIB)/os/various/gdb.mk
