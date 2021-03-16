@@ -30,7 +30,7 @@ THD_FUNCTION(event_blinker_function, arg) {
 
 		do {
 
-			// Wait until attached events happens.
+			// Wait until attached events happen.
 			chEvtWaitAny(ALL_EVENTS);
 
 			for(i = 0; i < eba->lds.num_leds; ++i) {
