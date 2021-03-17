@@ -10,7 +10,6 @@ THD_FUNCTION(conditional_blinker_function, arg) {
 	if(cba->b_lds.leds.num_leds > 0 && cba->b_lds.leds.num_leds < NUMBER_OF_LEDS) {
 		while((cba->cond_funct)(cba->conf_funct_args)) {
 			blink(cba->b_lds);
-			chThdSleepMilliseconds(cba->b_lds.delay);
 		}
 	}
 }
