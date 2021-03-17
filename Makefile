@@ -126,6 +126,8 @@ CSRC = $(ALLCSRC) \
        $(TESTSRC) \
        $(PROJECT_DIRECTORY)/src/main.c \
        $(PROJECT_DIRECTORY)/src/driver/led/led.c \
+       $(PROJECT_DIRECTORY)/src/driver/spi/spi.c \
+       $(PROJECT_DIRECTORY)/src/driver/button/button.c \
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
@@ -155,8 +157,10 @@ TCPPSRC =
 ASMSRC = $(ALLASMSRC)
 ASMXSRC = $(ALLXASMSRC)
 
-INCDIR = $(CONFDIR) $(ALLINC) $(TESTINC) $(TESTHAL)\
-		 $(PROJECT_DIRECTORY)/src/driver/led\
+INCDIR = $(CONFDIR) $(ALLINC) $(TESTINC) $(TESTHAL) \
+		 $(PROJECT_DIRECTORY)/src/driver/led \
+		 $(PROJECT_DIRECTORY)/src/driver/spi \
+		 $(PROJECT_DIRECTORY)/src/driver/button \
 
 #
 # Project, sources and paths
