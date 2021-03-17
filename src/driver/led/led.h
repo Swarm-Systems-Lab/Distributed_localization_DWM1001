@@ -94,7 +94,7 @@ thread_t* conditional_blink(const conditional_blink_arguments* args, const tprio
  *
  * 				blink_leds_struct bls = {ls, 400};
  *
- * 				event_blink_arguments eba = {bls, &function, function_args};
+ * 				event_blink_arguments eba = {bls, &function, &function_args};
  * 				conditional_blink(&eba, NORMALPRIO+1, "blinker_green_led");
  *
  * @note: You must define a function with this header -> void function(void* args);
