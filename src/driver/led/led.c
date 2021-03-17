@@ -26,7 +26,6 @@ THD_FUNCTION(event_blinker_function, arg) {
 		do {
 			chEvtWaitAny(ALL_EVENTS); // Wait until attached events happen.
 			blink(eba->b_lds);
-			chThdSleepMilliseconds(eba->b_lds.delay);
 		}while(true);
 	}
 }
@@ -35,6 +34,7 @@ void blink(const blink_leds_struct leds) {
 	leds_on(leds.leds);
 	chThdSleepMilliseconds(leds.delay);
 	leds_off(leds.leds);
+	chThdSleepMilliseconds(leds.delay);
 }
 
 thread_t* conditional_blink(const conditional_blink_arguments* args, const tprio_t prio, const char *th_name) {
