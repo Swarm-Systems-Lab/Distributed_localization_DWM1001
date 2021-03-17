@@ -52,7 +52,7 @@ typedef struct {
  * @param[in] leds: Leds to make blink.
  *
  */
-void blink(blink_leds_struct leds);
+void blink(const blink_leds_struct leds);
 
 /**
  * @brief Makes blink LEDs while function provided return false.
@@ -76,7 +76,7 @@ void blink(blink_leds_struct leds);
  * @note: You must define a function with this header -> bool function(void* args);
  *
  */
-thread_t* conditional_blink(conditional_blink_arguments* args, const tprio_t prio, const char *th_name);
+thread_t* conditional_blink(const conditional_blink_arguments* args, const tprio_t prio, const char *th_name);
 
 /**
  * @brief Makes blink a LEDs when some event/events happen.
@@ -101,7 +101,7 @@ thread_t* conditional_blink(conditional_blink_arguments* args, const tprio_t pri
  * @note: In this function, you must attach the thread to the events.
  *
  */
-thread_t* event_blink(event_blink_arguments* args, const tprio_t prio, const char *th_name);
+thread_t* event_blink(const event_blink_arguments* args, const tprio_t prio, const char *th_name);
 
 /**
  * @brief Power off a specific led.

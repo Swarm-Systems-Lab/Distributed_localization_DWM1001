@@ -10,6 +10,7 @@ THD_FUNCTION(conditional_blinker_function, arg) {
 	if(cba->b_lds.leds.num_leds > 0 && cba->b_lds.leds.num_leds < NUMBER_OF_LEDS) {
 		while((cba->cond_funct)(cba->conf_funct_args)) {
 			blink(cba->b_lds);
+			chThdSleepMilliseconds(cba->b_lds.delay);
 		}
 	}
 }
@@ -25,23 +26,23 @@ THD_FUNCTION(event_blinker_function, arg) {
 		do {
 			chEvtWaitAny(ALL_EVENTS); // Wait until attached events happen.
 			blink(eba->b_lds);
+			chThdSleepMilliseconds(eba->b_lds.delay);
 		}while(true);
 	}
 }
 
-void blink(blink_leds_struct leds) {
+void blink(const blink_leds_struct leds) {
 	leds_on(leds.leds);
 	chThdSleepMilliseconds(leds.delay);
 	leds_off(leds.leds);
-	chThdSleepMilliseconds(leds.delay);
 }
 
-thread_t* conditional_blink(conditional_blink_arguments* args, const tprio_t prio, const char *th_name) {
+thread_t* conditional_blink(const conditional_blink_arguments* args, const tprio_t prio, const char *th_name) {
 	return chThdCreateFromHeap(NULL, THD_WORKING_AREA_SIZE(sizeof(conditional_blinker_function)),
 			th_name, prio, conditional_blinker_function, (void*)args);
 }
 
-thread_t* event_blink(event_blink_arguments* args, const tprio_t prio, const char *th_name) {
+thread_t* event_blink(const event_blink_arguments* args, const tprio_t prio, const char *th_name) {
 	return chThdCreateFromHeap(NULL, THD_WORKING_AREA_SIZE(sizeof(event_blinker_function)),
 			th_name, prio, event_blinker_function, (void*)args);
 }
