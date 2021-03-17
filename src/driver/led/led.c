@@ -7,14 +7,9 @@ THD_FUNCTION(conditional_blinker_function, arg) {
 
 	conditional_blink_arguments* cba = (conditional_blink_arguments*) arg;
 
-	if(cba->lds.num_leds > 0 && cba->lds.num_leds < NUMBER_OF_LEDS) {
-		int i;
+	if(cba->b_lds.leds.num_leds > 0 && cba->b_lds.leds.num_leds < NUMBER_OF_LEDS) {
 		while((cba->cond_funct)(cba->conf_funct_args)) {
-
-			for(i = 0; i < cba->lds.num_leds; ++i) {
-				toggle_led(cba->lds.l[i]);
-			}
-			chThdSleepMilliseconds(cba->delay);
+			blink(cba->b_lds);
 		}
 	}
 }
@@ -23,28 +18,22 @@ THD_FUNCTION(event_blinker_function, arg) {
 
 	event_blink_arguments* eba = (event_blink_arguments*) arg;
 
-	if(eba->lds.num_leds > 0 && eba->lds.num_leds < NUMBER_OF_LEDS) {
+	if(eba->b_lds.leds.num_leds > 0 && eba->b_lds.leds.num_leds < NUMBER_OF_LEDS) {
 
 		eba->register_events_funct(eba->register_events_funct_args);
-		int i;
 
 		do {
-
-			// Wait until attached events happen.
-			chEvtWaitAny(ALL_EVENTS);
-
-			for(i = 0; i < eba->lds.num_leds; ++i) {
-				led_on(eba->lds.l[i]);
-			}
-
-			chThdSleepMilliseconds(eba->delay);
-
-			for(i = 0; i < eba->lds.num_leds; ++i) {
-				led_off(eba->lds.l[i]);
-			}
-
+			chEvtWaitAny(ALL_EVENTS); // Wait until attached events happen.
+			blink(eba->b_lds);
 		}while(true);
 	}
+}
+
+void blink(blink_leds_struct leds) {
+	leds_on(leds.leds);
+	chThdSleepMilliseconds(leds.delay);
+	leds_off(leds.leds);
+	chThdSleepMilliseconds(leds.delay);
 }
 
 thread_t* conditional_blink(conditional_blink_arguments* args, const tprio_t prio, const char *th_name) {
@@ -65,14 +54,14 @@ void led_on(const led l) {
 	palClearPad(IOPORT1, l);
 }
 
-void leds_off(leds_struct leds) {
+void leds_off(const leds_struct leds) {
 	int i;
 	for(i = 0; i < leds.num_leds; ++i) {
 		led_off(leds.l[i]);
 	}
 }
 
-void leds_on(leds_struct leds) {
+void leds_on(const leds_struct leds) {
 	int i;
 	for(i = 0; i < leds.num_leds; ++i) {
 		led_on(leds.l[i]);
