@@ -19,31 +19,31 @@ typedef enum {
 extern const led LEDS[NUMBER_OF_LEDS];
 
 // Structure that contains an array of LEDs.
-typedef struct  {
-	int num_leds; // Number of LEDs to control.
-	const led* l; // LEDs to control.
+typedef struct {
+    int num_leds; // Number of LEDs to control.
+    const led *l; // LEDs to control.
 } leds_struct;
 
 // Structure for blink function.
-typedef struct  {
-	leds_struct leds; // Number of LEDs to control.
-	int delay; // Delay in milliseconds between turn off and turn LEDs.
+typedef struct {
+    leds_struct leds; // Number of LEDs to control.
+    int delay; // Delay in milliseconds between turn off and turn LEDs.
 } blink_leds_struct;
 
 extern const leds_struct ALL_LEDS;
 
 // Structure for conditional_blink function.
 typedef struct {
-	blink_leds_struct b_lds; // Information of the blinking LEDs to control.
-	bool (*cond_funct)(void*); // Makes blink a led until this function return false.
-	void* conf_funct_args; // Arguments that conditional function receives.
+    blink_leds_struct b_lds; // Information of the blinking LEDs to control.
+    bool (*cond_funct)(void*); // Makes blink a led until this function return false.
+    void *conf_funct_args; // Arguments that conditional function receives.
 } conditional_blink_arguments;
 
 // Structure for event_blink function.
 typedef struct {
-	blink_leds_struct b_lds; // Information of the blinking LEDs to control.
-	void (*register_events_funct)(void*); // Function where the thread will attached to the required events.
-	void* register_events_funct_args; // Arguments of the register_events_funct.
+    blink_leds_struct b_lds; // Information of the blinking LEDs to control.
+    void (*register_events_funct)(void*); // Function where the thread will attached to the required events.
+    void *register_events_funct_args; // Arguments of the register_events_funct.
 } event_blink_arguments;
 
 /**
@@ -76,7 +76,8 @@ void blink(const blink_leds_struct leds);
  * @note: You must define a function with this header -> bool function(void* args);
  *
  */
-thread_t* conditional_blink(const conditional_blink_arguments* args, const tprio_t prio, const char *th_name);
+thread_t* conditional_blink(const conditional_blink_arguments *args,
+        const tprio_t prio, const char *th_name);
 
 /**
  * @brief Makes blink a LEDs when some event/events happen.
@@ -101,7 +102,8 @@ thread_t* conditional_blink(const conditional_blink_arguments* args, const tprio
  * @note: In this function, you must attach the thread to the events.
  *
  */
-thread_t* event_blink(const event_blink_arguments* args, const tprio_t prio, const char *th_name);
+thread_t* event_blink(const event_blink_arguments *args, const tprio_t prio,
+        const char *th_name);
 
 /**
  * @brief Power off a specific led.
