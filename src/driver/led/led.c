@@ -9,7 +9,9 @@ THD_FUNCTION( conditional_blinker_function, arg) {
 
     if (cba->b_lds.leds.num_leds
             > 0&& cba->b_lds.leds.num_leds < NUMBER_OF_LEDS) {
-        while ((cba->cond_funct)(cba->conf_funct_args)) {
+
+        while ((cba->cond_funct)(cba->cond_funct_args)
+                && !chThdShouldTerminateX()) {
             blink(cba->b_lds);
         }
     }
@@ -27,7 +29,7 @@ THD_FUNCTION( event_blinker_function, arg) {
         do {
             chEvtWaitAny(ALL_EVENTS); // Wait until attached events happen.
             blink(eba->b_lds);
-        } while (true);
+        } while (!chThdShouldTerminateX());
     }
 }
 
@@ -78,4 +80,14 @@ void leds_on(const leds_struct leds) {
 
 void toggle_led(const led l) {
     palTogglePad(IOPORT1, l);
+}
+
+/**
+ * @brief Unbind previously binded button cb function.
+ *
+ * @param[in] cb_thread: Pointer to the cb thread.
+ *
+ */
+void unbind_blinker_function(thread_t *blinker_thread) {
+    chThdTerminate(blinker_thread);
 }

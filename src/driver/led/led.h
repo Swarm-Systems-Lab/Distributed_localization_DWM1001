@@ -36,7 +36,7 @@ extern const leds_struct ALL_LEDS;
 typedef struct {
     blink_leds_struct b_lds; // Information of the blinking LEDs to control.
     bool (*cond_funct)(void*); // Makes blink a led until this function return false.
-    void *conf_funct_args; // Arguments that conditional function receives.
+    void *cond_funct_args; // Arguments that conditional function receives.
 } conditional_blink_arguments;
 
 // Structure for event_blink function.
@@ -47,9 +47,9 @@ typedef struct {
 } event_blink_arguments;
 
 /**
- * @brief Makes LEDs blink.
+ * @brief Make LEDs blink.
  *
- * @param[in] leds: Leds to make blink.
+ * @param[in] leds: LEDs to make blink.
  *
  */
 void blink(const blink_leds_struct leds);
@@ -74,6 +74,8 @@ void blink(const blink_leds_struct leds);
  * 				conditional_blink(&cba, NORMALPRIO+1, "blinker_green_blue_leds");
  *
  * @note: You must define a function with this header -> bool function(void* args);
+ * @note: If you want to detach the function of the LEDs, you must
+ *        store the return value of this function. See unbind_blinker_function function.
  *
  */
 thread_t* conditional_blink(const conditional_blink_arguments *args,
@@ -100,6 +102,8 @@ thread_t* conditional_blink(const conditional_blink_arguments *args,
  *
  * @note: You must define a function with this header -> void function(void* args);
  * @note: In this function, you must attach the thread to the events.
+ * @note: If you want to detach the function of the LEDs, you must
+ *        store the return value of this function. See unbind_blinker_function function.
  *
  */
 thread_t* event_blink(const event_blink_arguments *args, const tprio_t prio,
@@ -142,5 +146,13 @@ void leds_on(const leds_struct leds);
  *
  */
 void toggle_led(const led l);
+
+/**
+ * @brief Unbind previously binded LEDs function.
+ *
+ * @param[in] blinker_thread: Pointer to the thread.
+ *
+ */
+void unbind_blinker_function(thread_t* blinker_thread);
 
 #endif // _LED_
