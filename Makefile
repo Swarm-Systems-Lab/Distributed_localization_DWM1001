@@ -88,8 +88,8 @@ PROJECT = dis_loc_dwm1001
 # WARNING!
 # In case of using eclipse, it is necessary that this variable contains the path
 # to the path Distributed_localization_DWM1001 project. In case of executing make
-# manually, this variable must be empty.
-PROJECT_DIRECTORY := /home/developer/ChibiOS-eclipse-workspace/Distributed_localization_DWM1001
+# manually try 'makefile PROJECT_DIRECTORY=./'
+PROJECT_DIRECTORY ?= /home/developer/ChibiOS-eclipse-workspace/Distributed_localization_DWM1001
 
 # Imported source files and paths
 CHIBIOS         := $(PROJECT_DIRECTORY)/ext/ChibiOS
