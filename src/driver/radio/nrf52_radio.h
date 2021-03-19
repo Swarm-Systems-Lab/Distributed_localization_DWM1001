@@ -16,6 +16,13 @@
  *
  */
 
+#include <stdint.h>
+#include <stdbool.h>
+
+#include "nrf52.h"
+#include "nrf52_bitfields.h"
+#include "ch.h"
+
 #ifndef NRF52_RADIO_H_
 #define NRF52_RADIO_H_
 
@@ -46,13 +53,13 @@
 
 
 typedef enum {
-	NRF52_SUCCESS,                                        /* Call was successful.                  */
-	NRF52_INVALID_STATE,                                  /* Module is not initialized.            */
-	NRF52_ERROR_BUSY,                                     /* Module was not in idle state.         */
-	NRF52_ERROR_NULL,                                     /* Required parameter was NULL.          */
-	NRF52_ERROR_INVALID_PARAM,                            /* Required parameter is invalid         */
-	NRF52_ERROR_NOT_SUPPORTED,                            /* p_payload->noack was false while selective ack was not enabled. */
-	NRF52_ERROR_INVALID_LENGTH,                           /* Payload length was invalid (zero or larger than max allowed).   */
+    NRF52_SUCCESS,                                        /* Call was successful.                  */
+    NRF52_INVALID_STATE,                                  /* Module is not initialized.            */
+    NRF52_ERROR_BUSY,                                     /* Module was not in idle state.         */
+    NRF52_ERROR_NULL,                                     /* Required parameter was NULL.          */
+    NRF52_ERROR_INVALID_PARAM,                            /* Required parameter is invalid         */
+    NRF52_ERROR_NOT_SUPPORTED,                            /* p_payload->noack was false while selective ack was not enabled. */
+    NRF52_ERROR_INVALID_LENGTH,                           /* Payload length was invalid (zero or larger than max allowed).   */
 } nrf52_error_t;
 
 // Internal radio module state.
@@ -75,9 +82,9 @@ typedef enum {
 
 // Interrupt flags
 typedef enum {
-	NRF52_INT_TX_SUCCESS_MSK = 0x01,  /**< The flag used to indicate a success since last event. */
-	NRF52_INT_TX_FAILED_MSK  = 0x02,  /**< The flag used to indicate a failiure since last event. */
-	NRF52_INT_RX_DR_MSK 	 = 0x04,  /**< The flag used to indicate a received packet since last event. */
+    NRF52_INT_TX_SUCCESS_MSK = 0x01,  /**< The flag used to indicate a success since last event. */
+    NRF52_INT_TX_FAILED_MSK  = 0x02,  /**< The flag used to indicate a failiure since last event. */
+    NRF52_INT_RX_DR_MSK      = 0x04,  /**< The flag used to indicate a received packet since last event. */
 } nrf52_int_flags_t;
 
 /**Macro to create initializer for a TX data packet.

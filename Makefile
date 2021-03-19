@@ -112,10 +112,10 @@ include $(CHIBIOS)/os/hal/lib/streams/streams.mk
 include $(CHIBIOS)/os/rt/rt.mk
 include $(CHIBIOS)/os/common/ports/ARMCMx/compilers/GCC/mk/port_v7m.mk
 # Other files (optional).
-include $(CHIBIOS)/test/lib/test.mk
-include $(CHIBIOS)/test/rt/rt_test.mk
-include $(CHIBIOS)/test/oslib/oslib_test.mk
-include $(CHIBIOS)/os/various/shell/shell.mk
+#include $(CHIBIOS)/test/lib/test.mk
+#include $(CHIBIOS)/test/rt/rt_test.mk
+#include $(CHIBIOS)/test/oslib/oslib_test.mk
+#include $(CHIBIOS)/os/various/shell/shell.mk
 
 # Define linker script file here
 LDSCRIPT= $(STARTUPLD_CONTRIB)/NRF52832.ld
@@ -128,6 +128,7 @@ CSRC = $(ALLCSRC) \
        $(PROJECT_DIRECTORY)/src/driver/led/led.c \
        $(PROJECT_DIRECTORY)/src/driver/spi/spi.c \
        $(PROJECT_DIRECTORY)/src/driver/button/button.c \
+       $(PROJECT_DIRECTORY)/src/driver/radio/nrf52_radio.c \
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
@@ -158,9 +159,10 @@ ASMSRC = $(ALLASMSRC)
 ASMXSRC = $(ALLXASMSRC)
 
 INCDIR = $(CONFDIR) $(ALLINC) $(TESTINC) $(TESTHAL) \
-		 $(PROJECT_DIRECTORY)/src/driver/led \
-		 $(PROJECT_DIRECTORY)/src/driver/spi \
-		 $(PROJECT_DIRECTORY)/src/driver/button \
+         $(PROJECT_DIRECTORY)/src/driver/led \
+         $(PROJECT_DIRECTORY)/src/driver/spi \
+         $(PROJECT_DIRECTORY)/src/driver/button \
+         $(PROJECT_DIRECTORY)/src/driver/radio \
 
 #
 # Project, sources and paths
@@ -238,10 +240,8 @@ OBIN = $(BUILDDIR)/$(PROJECT).bin
 include $(CHIBIOS_CONTRIB)/os/various/jlink.mk
 include $(CHIBIOS_CONTRIB)/os/various/gdb.mk
 
-
 pin-reset: jlink-pin-reset
 flash: all jlink-flash
 debug: gdb-debug
 erase-all: jlink-erase-all
 debug-server: jlink-debug-server
-
