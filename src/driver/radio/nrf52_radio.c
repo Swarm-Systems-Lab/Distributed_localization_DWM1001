@@ -944,7 +944,7 @@ nrf52_error_t radio_read_rx_payload(nrf52_payload_t * p_payload) {
 
 nrf52_error_t radio_start_tx(void) {
     if (RFD1.state != NRF52_STATE_IDLE)
-    	return NRF52_ERROR_BUSY;
+        return NRF52_ERROR_BUSY;
 
     if (tx_fifo.count == 0) {
         return NRF52_ERROR_INVALID_LENGTH;
@@ -957,7 +957,7 @@ nrf52_error_t radio_start_tx(void) {
 
 nrf52_error_t radio_start_rx(void) {
     if (RFD1.state != NRF52_STATE_IDLE)
-    	return NRF52_ERROR_BUSY;
+        return NRF52_ERROR_BUSY;
 
     NRF_RADIO->INTENCLR = 0xFFFFFFFF;
     NRF_RADIO->EVENTS_DISABLED = 0;

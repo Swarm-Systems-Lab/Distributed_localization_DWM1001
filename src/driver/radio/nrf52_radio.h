@@ -68,7 +68,7 @@
 #ifndef RADIO_ESB_PRIMARY_RECEIVER                        /* By default, the device with ESB is always Primary Transmitter */
 #define RADIO_ESB_MODE NRF52_MODE_PTX
 #elif
-#define RADIO_ESB_MODE NRF52_MODE_RTX
+#define RADIO_ESB_MODE NRF52_MODE_PRX
 #endif
 
 #define RADIO_ESB_NUM_PIPES 2
