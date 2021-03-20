@@ -20,21 +20,21 @@ int main(void) {
     leds_off(ALL_LEDS);
 
     // Init radio with the ESB protocol
-    nrf52_address_t nrf52_address = {NRF52_RADIO_BASE_ADDR_P0,
-        NRF52_RADIO_BASE_ADDR_P1,
-        NRF52_RADIO_PIPE_PREFIXES,
-        NRF52_RADIO_NUM_PIPES,
-        NRF52_RADIO_ADDR_LENGTH,
-        NRF52_RADIO_RX_PIPES,
-        NRF52_RADIO_RF_CHANNEL};
+    nrf52_address_t nrf52_address = {RADIO_ESB_BASE_ADDR_P0,
+        RADIO_ESB_BASE_ADDR_P1,
+        RADIO_ESB_PIPE_PREFIXES,
+        RADIO_ESB_NUM_PIPES,
+        RADIO_ESB_ADDR_LENGTH,
+        RADIO_ESB_RX_PIPES,
+        RADIO_ESB_RF_CHANNEL};
 
-    nrf52_retransmit_t nrf52_retransmit = {NRF52_RADIO_RETRANSMIT_DELAY,
-        NRF52_RADIO_RETRANSMIT_COUNT};
+    nrf52_retransmit_t nrf52_retransmit = {RADIO_ESB_RETRANSMIT_DELAY,
+        RADIO_ESB_RETRANSMIT_COUNT};
 
     nrf52_config_t nrf52_conf_init =
-      {NRF52_PROTOCOL_ESB, ESB_RADIO_MODE, NRF52_BITRATE_1MBPS,
-      NRF52_CRC_OFF, NRF52_TX_POWER_0DBM, NRF52_TXMODE_MANUAL,
-      false, nrf52_retransmit, 1, nrf52_address};
+      {NRF52_PROTOCOL_ESB, RADIO_ESB_MODE, NRF52_BITRATE_1MBPS,
+      NRF52_CRC_8BIT, NRF52_TX_POWER_0DBM, NRF52_TXMODE_AUTO,
+      false, nrf52_retransmit, RADIO_ESB_STATIC_PAYLOAD_LENGTH, nrf52_address};
 
     if(NRF52_SUCCESS == radio_init(&nrf52_conf_init))
         led_on(green);
