@@ -14,6 +14,8 @@
  *
  * ported on: 25/10/2018, by andru
  *
+ * extended on: 20/03/2021, by HG de Marina
+ *
  */
 
 #include <stdint.h>
@@ -51,6 +53,25 @@
 #define NRF52_RADIO_PPI_RX_TIMEOUT          12                  /**< The PPI channel used for RX timeout. */
 #define NRF52_RADIO_PPI_TX_START            13                  /**< The PPI channel used for starting TX. */
 
+#ifndef NRF52_RADIO_BASE_ADDR_P0
+#define NRF52_RADIO_BASE_ADDR_P0 {0x00, 0x00, 0x00, 0x00}
+#endif
+
+#ifndef NRF52_RADIO_BASE_ADDR_P1
+#define NRF52_RADIO_BASE_ADDR_P1 {0x00, 0x00, 0x00, 0x01}
+#endif
+
+#ifndef NRF52_RADIO_PIPE_PREFIXES
+#define NRF52_RADIO_PIPE_PREFIXES {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07}
+#endif
+
+#define NRF52_RADIO_NUM_PIPES 2
+#define NRF52_RADIO_ADDR_LENGTH 1
+#define NRF52_RADIO_RX_PIPES 8
+#define NRF52_RADIO_RF_CHANNEL 15
+
+#define NRF52_RADIO_RETRANSMIT_DELAY 100
+#define NRF52_RADIO_RETRANSMIT_COUNT 2
 
 typedef enum {
     NRF52_SUCCESS,                                        /* Call was successful.                  */
