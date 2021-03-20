@@ -49,7 +49,7 @@ int main(void) {
     nrf52_retransmit_t nrf52_retransmit = {RADIO_ESB_RETRANSMIT_DELAY,
         RADIO_ESB_RETRANSMIT_COUNT};
 
-    nrf52_config_t nrf52_conf_init = {NRF52_PROTOCOL_ESB,
+    nrf52_config_t nrf52_conf_init = {NRF52_PROTOCOL_ESB_DPL,
         RADIO_ESB_MODE,
         NRF52_BITRATE_1MBPS,
         NRF52_CRC_8BIT,
