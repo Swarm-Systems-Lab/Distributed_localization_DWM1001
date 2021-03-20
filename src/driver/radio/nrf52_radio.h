@@ -65,10 +65,10 @@
 #define NRF52_RADIO_PIPE_PREFIXES {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07}
 #endif
 
-#ifndef RADIO_PRIMARY_RECEIVER
-#define RADIO_MODE NRF52_MODE_PTX
+#ifndef ESB_RADIO_PRIMARY_RECEIVER                        /* By default, the device with ESB is always Primary Transmitter */
+#define ESB_RADIO_MODE NRF52_MODE_PTX
 #elif
-#define RADIO_MODE NRF52_MODE_RTX
+#define ESB_RADIO_MODE NRF52_MODE_RTX
 #endif
 
 #define NRF52_RADIO_NUM_PIPES 2

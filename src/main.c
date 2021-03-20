@@ -32,7 +32,7 @@ int main(void) {
         NRF52_RADIO_RETRANSMIT_COUNT};
 
     nrf52_config_t nrf52_conf_init =
-      {NRF52_PROTOCOL_ESB, RADIO_MODE, NRF52_BITRATE_1MBPS,
+      {NRF52_PROTOCOL_ESB, ESB_RADIO_MODE, NRF52_BITRATE_1MBPS,
       NRF52_CRC_OFF, NRF52_TX_POWER_0DBM, NRF52_TXMODE_MANUAL,
       false, nrf52_retransmit, 1, nrf52_address};
 
