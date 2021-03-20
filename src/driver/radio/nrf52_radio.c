@@ -543,9 +543,9 @@ static void on_radio_disabled_tx_noack(RFDriver *rfp) {
     rfp->flags |= NRF52_INT_TX_SUCCESS_MSK;
     tx_fifo_remove_last();
 
-	chBSemSignal(&events_sem);
+    chBSemSignal(&events_sem);
 
-	if (tx_fifo.count == 0) {
+    if (tx_fifo.count == 0) {
         rfp->state = NRF52_STATE_IDLE;
     }
     else {
@@ -915,9 +915,9 @@ nrf52_error_t radio_write_payload(nrf52_payload_t const * p_payload) {
 
 nrf52_error_t radio_read_rx_payload(nrf52_payload_t * p_payload) {
     if (RFD1.state == NRF52_STATE_UNINIT)
-    	return NRF52_INVALID_STATE;
+      return NRF52_INVALID_STATE;
     if (p_payload == NULL)
-    	return NRF52_ERROR_NULL;
+      return NRF52_ERROR_NULL;
 
     if (rx_fifo.count == 0) {
         return NRF52_ERROR_INVALID_LENGTH;
@@ -1004,7 +1004,7 @@ nrf52_error_t radio_stop_rx(void) {
 
 nrf52_error_t radio_flush_tx(void) {
     if (RFD1.state == NRF52_STATE_UNINIT)
-    	return NRF52_INVALID_STATE;
+      return NRF52_INVALID_STATE;
 
     nvicDisableVector(RADIO_IRQn);
 
@@ -1019,9 +1019,9 @@ nrf52_error_t radio_flush_tx(void) {
 
 nrf52_error_t radio_pop_tx(void) {
     if (RFD1.state == NRF52_STATE_UNINIT)
-    	return NRF52_INVALID_STATE;
+      return NRF52_INVALID_STATE;
     if (tx_fifo.count == 0)
-    	return NRF52_ERROR_INVALID_LENGTH;
+      return NRF52_ERROR_INVALID_LENGTH;
 
     nvicDisableVector(RADIO_IRQn);
 
@@ -1037,7 +1037,7 @@ nrf52_error_t radio_pop_tx(void) {
 
 nrf52_error_t radio_flush_rx(void) {
     if (RFD1.state == NRF52_STATE_UNINIT)
-    	return NRF52_INVALID_STATE;
+      return NRF52_INVALID_STATE;
 
     nvicDisableVector(RADIO_IRQn);
 
@@ -1054,9 +1054,9 @@ nrf52_error_t radio_flush_rx(void) {
 
 nrf52_error_t radio_set_base_address_0(uint8_t const * p_addr) {
     if (RFD1.state != NRF52_STATE_IDLE)
-    	return NRF52_ERROR_BUSY;
+      return NRF52_ERROR_BUSY;
     if (p_addr == NULL)
-        return NRF52_ERROR_NULL;
+      return NRF52_ERROR_NULL;
 
     memcpy(RFD1.config.address.base_addr_p0, p_addr, 4);
     set_addresses(&RFD1, NRF52_ADDR_UPDATE_MASK_BASE0);
@@ -1066,9 +1066,9 @@ nrf52_error_t radio_set_base_address_0(uint8_t const * p_addr) {
 
 nrf52_error_t radio_set_base_address_1(uint8_t const * p_addr) {
     if (RFD1.state != NRF52_STATE_IDLE)
-    	return NRF52_ERROR_BUSY;
+      return NRF52_ERROR_BUSY;
     if (p_addr == NULL)
-        return NRF52_ERROR_NULL;
+      return NRF52_ERROR_NULL;
 
     memcpy(RFD1.config.address.base_addr_p1, p_addr, 4);
     set_addresses(&RFD1, NRF52_ADDR_UPDATE_MASK_BASE1);
@@ -1078,11 +1078,11 @@ nrf52_error_t radio_set_base_address_1(uint8_t const * p_addr) {
 
 nrf52_error_t radio_set_prefixes(uint8_t const * p_prefixes, uint8_t num_pipes) {
     if (RFD1.state != NRF52_STATE_IDLE)
-    	return NRF52_ERROR_BUSY;
+      return NRF52_ERROR_BUSY;
     if (p_prefixes == NULL)
-        return NRF52_ERROR_NULL;
+      return NRF52_ERROR_NULL;
     if (num_pipes > 8)
-    	return NRF52_ERROR_INVALID_PARAM;
+      return NRF52_ERROR_INVALID_PARAM;
 
     memcpy(RFD1.config.address.pipe_prefixes, p_prefixes, num_pipes);
     RFD1.config.address.num_pipes = num_pipes;
@@ -1095,9 +1095,9 @@ nrf52_error_t radio_set_prefixes(uint8_t const * p_prefixes, uint8_t num_pipes) 
 
 nrf52_error_t radio_set_prefix(uint8_t pipe, uint8_t prefix) {
     if (RFD1.state != NRF52_STATE_IDLE)
-    	return NRF52_ERROR_BUSY;
+      return NRF52_ERROR_BUSY;
     if (pipe > 8)
-    	return NRF52_ERROR_INVALID_PARAM;
+      return NRF52_ERROR_INVALID_PARAM;
 
     RFD1.config.address.pipe_prefixes[pipe] = prefix;
 

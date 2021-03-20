@@ -54,15 +54,15 @@
 #define NRF52_RADIO_PPI_TX_START            13                  /**< The PPI channel used for starting TX. */
 
 #ifndef RADIO_ESB_BASE_ADDR_P0
-#define RADIO_ESB_BASE_ADDR_P0 {0x00, 0x00, 0x00, 0x00}
+#define RADIO_ESB_BASE_ADDR_P0 {0xE7, 0xE7, 0xE7, 0xE7}
 #endif
 
 #ifndef RADIO_ESB_BASE_ADDR_P1
-#define RADIO_ESB_BASE_ADDR_P1 {0x00, 0x00, 0x00, 0x01}
+#define RADIO_ESB_BASE_ADDR_P1 {0xC2, 0xC2, 0xC2, 0xC2}
 #endif
 
 #ifndef RADIO_ESB_PIPE_PREFIXES
-#define RADIO_ESB_PIPE_PREFIXES {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07}
+#define RADIO_ESB_PIPE_PREFIXES {0xE7, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, 0xC7, 0xC8}
 #endif
 
 #ifndef RADIO_ESB_PRIMARY_RECEIVER                        /* By default, the device with ESB is always Primary Transmitter */
@@ -71,9 +71,9 @@
 #define RADIO_ESB_MODE NRF52_MODE_PRX
 #endif
 
-#define RADIO_ESB_NUM_PIPES 2
+#define RADIO_ESB_NUM_PIPES 8
 #define RADIO_ESB_ADDR_LENGTH 1
-#define RADIO_ESB_RX_PIPES 8
+#define RADIO_ESB_RX_PIPES 0xFF
 #define RADIO_ESB_RF_CHANNEL 15
 
 #define RADIO_ESB_RETRANSMIT_DELAY 100
