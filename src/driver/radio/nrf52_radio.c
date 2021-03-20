@@ -159,7 +159,7 @@ static uint8_t                    rx_payload_buffer[NRF52_MAX_PAYLOAD_LENGTH + 2
 static uint8_t                    pids[NRF52_PIPE_COUNT];
 static pipe_info_t                rx_pipe_info[NRF52_PIPE_COUNT];
 
- // disable and events semaphores.
+// disable and events semaphores.
 static binary_semaphore_t disable_sem;
 static binary_semaphore_t events_sem;
 

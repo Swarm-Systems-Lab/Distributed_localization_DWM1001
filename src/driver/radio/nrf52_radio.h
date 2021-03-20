@@ -162,7 +162,7 @@ typedef struct {
     uint8_t pipe_prefixes[8];       /**< Address prefix for pipe P0 to P7. */
     uint8_t num_pipes;              /**< Number of pipes available. */
     uint8_t addr_length;            /**< Length of address including prefix */
-    uint8_t rx_pipes;		        /**< Bitfield for enabled RX pipes. */
+    uint8_t rx_pipes;               /**< Bitfield for enabled RX pipes. */
     uint8_t rf_channel;             /**< Which channel is to be used. Must be in range 0 and 125 to be valid. */
 } nrf52_address_t;
 
@@ -194,7 +194,7 @@ typedef struct {
     // General RF parameters
     nrf52_bitrate_t       bitrate;                /**< Enhanced ShockBurst bitrate mode. */
     nrf52_crc_t           crc;                    /**< Enhanced ShockBurst CRC mode. */
-    nrf52_tx_power_t      tx_power;   		      /**< Enhanced ShockBurst radio transmission power mode.*/
+    nrf52_tx_power_t      tx_power;               /**< Enhanced ShockBurst radio transmission power mode.*/
 
     // Control settings
     nrf52_tx_mode_t       tx_mode;                /**< Enhanced ShockBurst transmit mode. */
@@ -205,7 +205,7 @@ typedef struct {
 
     uint8_t               payload_length;         /**< Enhanced ShockBurst static payload length */
 
-    nrf52_address_t    	  address;                /**< Address parameters structure */
+    nrf52_address_t       address;                /**< Address parameters structure */
 } nrf52_config_t;
 
 typedef struct {
@@ -228,7 +228,7 @@ typedef struct {
   /**
    * @brief Interrupts flag.
    */
-  nrf52_int_flags_t	      flags;
+  nrf52_int_flags_t       flags;
   /**
    * @brief TX attempt number.
    */
