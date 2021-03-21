@@ -4,40 +4,49 @@
 #include "button.h"
 #include "nrf52_radio.h"
 
+static nrf52_payload_t tx_msg;
+static nrf52_payload_t rx_msg;
+
 void radio_test_send_msg(void* args) {
     uint8_t data = 0xFE;
 
-    nrf52_payload_t tx_msg;
     tx_msg.length = 1;
-    tx_msg.pipe = 0;
+    tx_msg.pipe = 1;
     tx_msg.noack = 1;
-    tx_msg.pid = 1;
+    //tx_msg.pid = 0xCA;
     tx_msg.data[0] = data;
 
-    nrf52_error_t error = radio_write_payload(&tx_msg);
-    if(error == NRF52_SUCCESS)
-        led_on(blue);
+    radio_stop_rx();
+    radio_write_payload(&tx_msg);
+    radio_start_tx();
 }
 
 static THD_WORKING_AREA(waRadioListenerThread, 128);
 static THD_FUNCTION(RadioListenerThread, arg) {
+
     event_listener_t radio_listener;
-    //chEvtRegisterMaskWithFlags(&RFD1.eventsrc,
-    //                       &radio_listener,
-    //                       EVENT_MASK(0),
-    //                       NRF52_EVENT_RX_RECEIVED);
-    chEvtRegisterMask(&RFD1.eventsrc,
-                           &radio_listener,
-                           EVENT_MASK(0));
+    chEvtRegisterMask(&RFD1.eventsrc, &radio_listener, EVENT_MASK(0));
+
+    chRegSetThreadName("radioListener");
 
     while(true){
-      eventmask_t evt = chEvtWaitAny(ALL_EVENTS);
-      led_on(blue);
-      if(evt & EVENT_MASK(0)) {
-        nrf52_payload_t rx_msg;
+      chEvtWaitAny(ALL_EVENTS);
+
+      eventflags_t flags = chEvtGetAndClearFlags(&radio_listener);
+
+      if(flags & NRF52_EVENT_TX_FAILED){
+        radio_start_rx();
+        toggle_led(red2);
+      }
+
+      if(flags & NRF52_EVENT_TX_SUCCESS){
+        radio_start_rx();
+        toggle_led(green);
+      }
+
+      if(flags & NRF52_EVENT_RX_RECEIVED){
         radio_read_rx_payload(&rx_msg);
-        if(rx_msg.data[0] == 0xFE)
-          led_on(green);
+        led_on(blue);
       }
     }
 }
@@ -66,16 +75,19 @@ int main(void) {
         NRF52_BITRATE_1MBPS,
         NRF52_CRC_8BIT,
         NRF52_TX_POWER_0DBM,
-        NRF52_TXMODE_AUTO,
+        NRF52_TXMODE_MANUAL_START,
         true,
         nrf52_retransmit,
         RADIO_ESB_STATIC_PAYLOAD_LENGTH,
         nrf52_address};
 
     radio_init(&nrf52_conf_init);
+    radio_flush_tx();
+    radio_flush_rx();
+    radio_start_rx();
 
-    (void) chThdCreateStatic(waRadioListenerThread, sizeof(waRadioListenerThread),
-                                  NORMALPRIO + 3, RadioListenerThread, NULL);
+    chThdCreateStatic(waRadioListenerThread, sizeof(waRadioListenerThread),
+                                  NORMALPRIO, RadioListenerThread, NULL);
 
     button_cb_arguments bca = {bt1, radio_test_send_msg, NULL};
     button_cb_arguments bca2 = {bt2, radio_test_send_msg, NULL};

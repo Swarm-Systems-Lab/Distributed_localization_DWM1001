@@ -245,8 +245,8 @@ static void serve_radio_interrupt(RFDriver *rfp) {
         NRF_RADIO->EVENTS_DISABLED = 0;
         (void) NRF_RADIO->EVENTS_DISABLED;
         chSysLockFromISR();
-       	chBSemSignalI(&disable_sem);
-       	chSysUnlockFromISR();
+        chBSemSignalI(&disable_sem);
+        chSysUnlockFromISR();
     }
 }
 
@@ -265,7 +265,7 @@ OSAL_IRQ_HANDLER(Vector44) {
 }
 
 static void set_rf_payload_format_esb_dpl(RFDriver *rfp, uint32_t payload_length) {
-	(void)payload_length;
+  (void)payload_length;
 #if (NRF52_MAX_PAYLOAD_LENGTH <= 32)
     // Using 6 bits for length
     NRF_RADIO->PCNF0 = (0 << RADIO_PCNF0_S0LEN_Pos) |
@@ -608,7 +608,7 @@ static void on_radio_disabled_tx_wait_for_ack(RFDriver *rfp) {
             }
         }
 
-    	chBSemSignal(&events_sem);
+        chBSemSignal(&events_sem);
 
         if ((tx_fifo.count == 0) || (rfp->config.tx_mode == NRF52_TXMODE_MANUAL)) {
             rfp->state = NRF52_STATE_IDLE;
