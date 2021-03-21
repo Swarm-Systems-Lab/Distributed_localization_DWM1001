@@ -9,31 +9,35 @@ void radio_test_send_msg(void* args) {
 
     nrf52_payload_t tx_msg;
     tx_msg.length = 1;
-    tx_msg.pipe = 1;
+    tx_msg.pipe = 0;
     tx_msg.noack = 1;
     tx_msg.pid = 1;
     tx_msg.data[0] = data;
 
-    radio_write_payload(&tx_msg);
+    nrf52_error_t error = radio_write_payload(&tx_msg);
+    if(error == NRF52_SUCCESS)
+        led_on(blue);
 }
 
 static THD_WORKING_AREA(waRadioListenerThread, 128);
 static THD_FUNCTION(RadioListenerThread, arg) {
     event_listener_t radio_listener;
-    chEvtRegisterMaskWithFlags(&RFD1.eventsrc,
+    //chEvtRegisterMaskWithFlags(&RFD1.eventsrc,
+    //                       &radio_listener,
+    //                       EVENT_MASK(0),
+    //                       NRF52_EVENT_RX_RECEIVED);
+    chEvtRegisterMask(&RFD1.eventsrc,
                            &radio_listener,
-                           EVENT_MASK(0),
-                           NRF52_EVENT_RX_RECEIVED);
+                           EVENT_MASK(0));
+
     while(true){
       eventmask_t evt = chEvtWaitAny(ALL_EVENTS);
+      led_on(blue);
       if(evt & EVENT_MASK(0)) {
-          eventflags_t flags = chEvtGetAndClearFlags(&radio_listener);
-          if(flags & NRF52_EVENT_RX_RECEIVED){
-            nrf52_payload_t rx_msg;
-            radio_read_rx_payload(&rx_msg);
-              if(rx_msg.data[0] == 0xFE)
-                toggle_led(green);
-          }
+        nrf52_payload_t rx_msg;
+        radio_read_rx_payload(&rx_msg);
+        if(rx_msg.data[0] == 0xFE)
+          led_on(green);
       }
     }
 }
