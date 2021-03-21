@@ -8,13 +8,11 @@ static nrf52_payload_t tx_msg;
 static nrf52_payload_t rx_msg;
 
 void radio_test_send_msg(void* args) {
-    uint8_t data = 0xFE;
-
     tx_msg.length = 1;
     tx_msg.pipe = 1;
     tx_msg.noack = 1;
-    //tx_msg.pid = 0xCA;
-    tx_msg.data[0] = data;
+    tx_msg.pid = 0x01;
+    tx_msg.data[0] = 0xDE;
 
     radio_stop_rx();
     radio_write_payload(&tx_msg);
@@ -30,8 +28,7 @@ static THD_FUNCTION(RadioListenerThread, arg) {
     chRegSetThreadName("radioListener");
 
     while(true){
-      chEvtWaitAny(ALL_EVENTS);
-
+      chEvtWaitAny(EVENT_MASK(0));
       eventflags_t flags = chEvtGetAndClearFlags(&radio_listener);
 
       if(flags & NRF52_EVENT_TX_FAILED){
@@ -73,8 +70,8 @@ int main(void) {
     nrf52_config_t nrf52_conf_init = {NRF52_PROTOCOL_ESB_DPL,
         RADIO_ESB_MODE,
         NRF52_BITRATE_1MBPS,
-        NRF52_CRC_8BIT,
-        NRF52_TX_POWER_0DBM,
+        NRF52_CRC_OFF,
+        NRF52_TX_POWER_4DBM,
         NRF52_TXMODE_MANUAL_START,
         true,
         nrf52_retransmit,

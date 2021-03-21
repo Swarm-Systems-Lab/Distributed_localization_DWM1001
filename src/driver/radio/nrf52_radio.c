@@ -12,6 +12,8 @@
  *
  *  ported on: 25/10/2018, by andru
  *
+ *  extended on: 20/03/2021, by HG de Marina
+ *
  */
 
 #include <string.h>
@@ -587,7 +589,6 @@ static void on_radio_disabled_tx(RFDriver *rfp) {
 
 static void on_radio_disabled_tx_wait_for_ack(RFDriver *rfp) {
     // This marks the completion of a TX_RX sequence (TX with ACK)
-
     // Make sure the timer will not deactivate the radio if a packet is received
     NRF_PPI->CHENCLR = (1 << NRF52_RADIO_PPI_TIMER_START) |
                        (1 << NRF52_RADIO_PPI_RX_TIMEOUT)  |

@@ -39,8 +39,8 @@
 #define NRF52_RX_FIFO_SIZE                  8                   /**< The size of the reception first in first out buffer. */
 
 #define NRF52_RADIO_USE_TIMER0              FALSE               /**< TIMER0 will be used by the module. */
-#define NRF52_RADIO_USE_TIMER1              TRUE                /**< TIMER1 will be used by the module. */
-#define NRF52_RADIO_USE_TIMER2              FALSE               /**< TIMER2 will be used by the module. */
+#define NRF52_RADIO_USE_TIMER1              FALSE               /**< TIMER1 will be used by the module.*/
+#define NRF52_RADIO_USE_TIMER2              TRUE                /**< TIMER2 will be used by the module. */
 #define NRF52_RADIO_USE_TIMER3              FALSE               /**< TIMER3 will be used by the module. */
 #define NRF52_RADIO_USE_TIMER4              FALSE               /**< TIMER4 will be used by the module. */
 
@@ -62,19 +62,19 @@
 #endif
 
 #ifndef RADIO_ESB_PIPE_PREFIXES
-#define RADIO_ESB_PIPE_PREFIXES {0xF3, 0x3F}
+#define RADIO_ESB_PIPE_PREFIXES {0xF3, 0x3F, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6}
 #endif
 
-#ifndef RADIO_ESB_PRIMARY_TRANSMITTER                        /* By default, the device with ESB is always Primary Transmitter */
+#ifndef RADIO_ESB_PRIMARY_TRANSMITTER                        /* By default, the device with ESB is always Primary Receiver */
 #define RADIO_ESB_MODE NRF52_MODE_PRX
 #else
 #define RADIO_ESB_MODE NRF52_MODE_PTX
 #endif
 
-#define RADIO_ESB_NUM_PIPES 2
+#define RADIO_ESB_NUM_PIPES 8
 #define RADIO_ESB_ADDR_LENGTH 5
-#define RADIO_ESB_RX_PIPES 1 << 0
-#define RADIO_ESB_RF_CHANNEL 1
+#define RADIO_ESB_RX_PIPES 0xFF
+#define RADIO_ESB_RF_CHANNEL 56
 
 #define RADIO_ESB_RETRANSMIT_DELAY 1000
 #define RADIO_ESB_RETRANSMIT_COUNT 3
