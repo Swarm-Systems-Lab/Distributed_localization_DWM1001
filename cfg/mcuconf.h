@@ -18,14 +18,12 @@
 #define _MCUCONF_H_
 
 /*
- * Board setting
- */
-
-#define NRF5_SOFTDEVICE_LFCLK_SOURCE   NRF_CLOCK_LF_SRC_XTAL
-#define NRF5_SOFTDEVICE_LFCLK_ACCURACY NRF_CLOCK_LF_XTAL_ACCURACY_20_PPM
-
-/*
  * HAL driver system settings.
  */
+
+#define NRF5_SERIAL_USE_UART0             TRUE
+#define NRF5_ST_USE_RTC0                  TRUE
+#define NRF5_ST_USE_RTC1                  FALSE
+#define NRF5_ST_USE_TIMER0                FALSE
 
 #endif /* _MCUCONF_H_ */

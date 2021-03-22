@@ -4,19 +4,29 @@
 
 #include "ch.h"
 #include "hal.h"
+#include "chprintf.h"
 
 #include "nrf52_radio.h"
 
-#include "led.h"
+static SerialConfig serial_config = {
+    .speed   = 38400,
+    .tx_pad  = UART_TX,
+    .rx_pad  = UART_RX,
+#if NRF5_SERIAL_USE_HWFLOWCTRL	== TRUE
+    .rts_pad = UART_RTS,
+    .cts_pad = UART_CTS,
+#endif
+};
 
 static THD_WORKING_AREA(waLEDThread, 64);
 static THD_FUNCTION(LEDThread, arg) {
     (void)arg;
-
+    
     chRegSetThreadName("blinker");
+    palSetPadMode(IOPORT1, LED1, PAL_MODE_OUTPUT_PUSHPULL);
 
     while (1) {
-      toggle_led(red1);
+      palTogglePad(IOPORT1, LED1);
       chThdSleepMilliseconds(500);
     }
 }
@@ -71,7 +81,6 @@ static THD_FUNCTION(RadioThread, arg) {
     	if (flags & NRF52_EVENT_RX_RECEIVED) {
     		memset(rx_payload.data, 0, 32);
     		radio_read_rx_payload(&rx_payload);
-            toggle_led(blue);
     	}
     }
 }
@@ -83,7 +92,7 @@ int main(void) {
     halInit();
     chSysInit();
 
-    leds_off(ALL_LEDS);
+    sdStart(&SD1, &serial_config);
 
     chThdCreateStatic(waLEDThread, sizeof(waLEDThread), NORMALPRIO, LEDThread, NULL);
     chThdCreateStatic(waRadioThread, sizeof(waRadioThread), NORMALPRIO, RadioThread, NULL);
@@ -97,12 +106,15 @@ int main(void) {
 
     while (true) {
     	memset(tx_payload.data, 0, 32);
+    	sprintf((char*)tx_payload.data, "counter value=%d" , cnt++);
     	tx_payload.length = strlen((char *)tx_payload.data);
     	radio_stop_rx();
         radio_write_payload(&tx_payload);
     	radio_start_tx();
+    	chprintf((BaseSequentialStream *)&SD1, "packets: good=%d, fail=%d, sent=%s\r\n", good_pkt, fail_pkt, tx_payload.data);
     	chThdSleepMilliseconds(500);
     	if (strlen((char*) rx_payload.data)) {
+    		chprintf((BaseSequentialStream *)&SD1, "rssi=%d, received=%s\r\n",	rx_payload.rssi, rx_payload.data);
     		rx_payload.data[0] = 0;
     	}
     }
