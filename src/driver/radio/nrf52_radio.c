@@ -22,6 +22,8 @@
 #include "ch.h"
 #include "hal.h"
 
+#include "led.h"
+
 #define BIT_MASK_UINT_8(x)  (0xFF >> (8 - (x)))
 #define NRF52_PIPE_COUNT  9
 

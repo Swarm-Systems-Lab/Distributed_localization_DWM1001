@@ -1,1 +1,1 @@
-make clean all PROJECT_DIRECTORY=./
+make all TXRX=rx

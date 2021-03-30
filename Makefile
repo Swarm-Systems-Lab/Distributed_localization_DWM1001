@@ -5,7 +5,7 @@
 
 # Compiler options here.
 ifeq ($(USE_OPT),)
-  USE_OPT = -Os -ggdb -fomit-frame-pointer -falign-functions=16 -std=c11
+  USE_OPT = -Og -ggdb -gdwarf-4 -g3 -fomit-frame-pointer -falign-functions=16 -std=c11 -fvar-tracking-assignments
 endif
 
 # C specific options here (added to USE_OPT).
@@ -20,7 +20,7 @@ endif
 
 # Enable this if you want the linker to remove unused code and data
 ifeq ($(USE_LINK_GC),)
-  USE_LINK_GC = yes
+  USE_LINK_GC = no
 endif
 
 # Linker extra options here.
@@ -30,7 +30,7 @@ endif
 
 # Enable this if you want link time optimizations (LTO)
 ifeq ($(USE_LTO),)
-  USE_LTO = yes
+  USE_LTO = no
 endif
 
 # If enabled, this option allows to compile the application in THUMB mode.
@@ -40,13 +40,13 @@ endif
 
 # Enable this if you want to see the full log while compiling.
 ifeq ($(USE_VERBOSE_COMPILE),)
-  USE_VERBOSE_COMPILE = no
+  USE_VERBOSE_COMPILE = yes
 endif
 
 # If enabled, this option makes the build process faster by not compiling
 # modules not used in the current configuration.
 ifeq ($(USE_SMART_BUILD),)
-  USE_SMART_BUILD = yes
+  USE_SMART_BUILD = no
 endif
 
 #
@@ -83,20 +83,20 @@ endif
 #
 
 # Define project name here
-PROJECT = dis_loc_dwm1001
+PROJECT = dis_loc_dwm1001_$(TXRX)
 
 # WARNING!
 # In case of using eclipse, it is necessary that this variable contains the path
 # to the path Distributed_localization_DWM1001 project. In case of executing make
 # manually try 'makefile PROJECT_DIRECTORY=./'
-PROJECT_DIRECTORY ?= /home/developer/ChibiOS-eclipse-workspace/Distributed_localization_DWM1001
+#PROJECT_DIRECTORY ?= /home/developer/ChibiOS-eclipse-workspace/Distributed_localization_DWM1001
 
 # Imported source files and paths
-CHIBIOS         := $(PROJECT_DIRECTORY)/ext/ChibiOS
-CHIBIOS_CONTRIB := $(PROJECT_DIRECTORY)/ext/ChibiOS-Contrib
-CONFDIR         := $(PROJECT_DIRECTORY)/cfg
-BUILDDIR        := $(PROJECT_DIRECTORY)/build
-DEPDIR          := $(PROJECT_DIRECTORY)/.dep
+CHIBIOS         := ./ext/ChibiOS
+CHIBIOS_CONTRIB := ./ext/ChibiOS-Contrib
+CONFDIR         := ./cfg
+BUILDDIR        := ./build
+DEPDIR          := ./.dep
 
 # Licensing files.
 include $(CHIBIOS)/os/license/license.mk
@@ -124,11 +124,11 @@ LDSCRIPT= $(STARTUPLD_CONTRIB)/NRF52832.ld
 # setting.
 CSRC = $(ALLCSRC) \
        $(TESTSRC) \
-       $(PROJECT_DIRECTORY)/src/main.c \
-       $(PROJECT_DIRECTORY)/src/driver/led/led.c \
-       $(PROJECT_DIRECTORY)/src/driver/spi/spi.c \
-       $(PROJECT_DIRECTORY)/src/driver/button/button.c \
-       $(PROJECT_DIRECTORY)/src/driver/radio/nrf52_radio.c \
+       ./src/main_$(TXRX).c \
+       ./src/driver/led/led.c \
+       ./src/driver/spi/spi.c \
+       ./src/driver/button/button.c \
+       ./src/driver/radio/nrf52_radio.c \
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
@@ -159,10 +159,10 @@ ASMSRC = $(ALLASMSRC)
 ASMXSRC = $(ALLXASMSRC)
 
 INCDIR = $(CONFDIR) $(ALLINC) $(TESTINC) $(TESTHAL) \
-         $(PROJECT_DIRECTORY)/src/driver/led \
-         $(PROJECT_DIRECTORY)/src/driver/spi \
-         $(PROJECT_DIRECTORY)/src/driver/button \
-         $(PROJECT_DIRECTORY)/src/driver/radio \
+         ./src/driver/led \
+         ./src/driver/spi \
+         ./src/driver/button \
+         ./src/driver/radio \
 
 #
 # Project, sources and paths
@@ -239,9 +239,3 @@ OBIN = $(BUILDDIR)/$(PROJECT).bin
 
 include $(CHIBIOS_CONTRIB)/os/various/jlink.mk
 include $(CHIBIOS_CONTRIB)/os/various/gdb.mk
-
-pin-reset: jlink-pin-reset
-flash: all jlink-flash
-debug: gdb-debug
-erase-all: jlink-erase-all
-debug-server: jlink-debug-server

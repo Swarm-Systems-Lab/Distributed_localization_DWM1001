@@ -61,7 +61,7 @@ static THD_FUNCTION(RadioThread, arg) {
       chEvtWaitAny(EVENT_MASK(0));
       eventflags_t flags = chEvtGetAndClearFlags(&el);
       if (flags & NRF52_EVENT_TX_SUCCESS) {
-          radio_start_rx();
+            radio_start_rx();
             toggle_led(red2);
             good_pkt++;
       }

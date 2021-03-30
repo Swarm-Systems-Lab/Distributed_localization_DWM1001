@@ -18,15 +18,15 @@
  *
  */
 
+#ifndef NRF52_RADIO_H_
+#define NRF52_RADIO_H_
+
 #include <stdint.h>
 #include <stdbool.h>
 
 #include "nrf52.h"
 #include "nrf52_bitfields.h"
 #include "ch.h"
-
-#ifndef NRF52_RADIO_H_
-#define NRF52_RADIO_H_
 
 // Hard coded parameters - change if necessary
 #ifndef NRF52_MAX_PAYLOAD_LENGTH
@@ -39,8 +39,8 @@
 #define NRF52_RX_FIFO_SIZE                  8                   /**< The size of the reception first in first out buffer. */
 
 #define NRF52_RADIO_USE_TIMER0              FALSE               /**< TIMER0 will be used by the module. */
-#define NRF52_RADIO_USE_TIMER1              FALSE               /**< TIMER1 will be used by the module.*/
-#define NRF52_RADIO_USE_TIMER2              TRUE                /**< TIMER2 will be used by the module. */
+#define NRF52_RADIO_USE_TIMER1              TRUE                /**< TIMER1 will be used by the module.*/
+#define NRF52_RADIO_USE_TIMER2              FALSE               /**< TIMER2 will be used by the module. */
 #define NRF52_RADIO_USE_TIMER3              FALSE               /**< TIMER3 will be used by the module. */
 #define NRF52_RADIO_USE_TIMER4              FALSE               /**< TIMER4 will be used by the module. */
 
