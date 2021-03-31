@@ -74,9 +74,9 @@
 
 #define RADIO_ESB_STATIC_PAYLOAD_LENGTH 0
 
-// Dummy network, by default ID 0
+// Dummy network, by default ID 1. We reserve 0 for broadcast
 #ifndef RADIO_MY_ID
-#define RADIO_MY_ID 0
+#define RADIO_MY_ID 1
 #endif
 
 typedef enum {

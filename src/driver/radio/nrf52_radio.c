@@ -235,6 +235,7 @@ static THD_FUNCTION(rfPostThread, arg) {
         radio_read_rx_payload(&rx_payload);
         // Here we process the payload
         // if(rx_payload.pipe == RADIO_MY_ID) // It is for me
+        // if(rx_payload.pipe == 0) // It is for everybody broadcast
         // switch / case for the rx_payload.data[0] to check the Packet ID and decode the rest
 
         toggle_led(green);

@@ -28,7 +28,7 @@ int main(void) {
         chThdSleepMilliseconds(500);
 
         // example of dummy transmission (it is configured so that there is ACK)
-        uint8_t neighborh_id = 1; // Destination between 0 and 7
+        uint8_t neighborh_id = 0; // Destination between 0 and 7, we reserver 0 for broadcast
         tx_payload.pipe = neighborh_id;
         tx_payload.noack = 0;
         tx_payload.data[0] = 0x03; // Packet ID
