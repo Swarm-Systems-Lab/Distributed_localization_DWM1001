@@ -44,6 +44,27 @@
 #define NRF52_RADIO_PPI_RX_TIMEOUT          12                  /**< The PPI channel used for RX timeout. */
 #define NRF52_RADIO_PPI_TX_START            13                  /**< The PPI channel used for starting TX. */
 
+#ifndef RADIO_ESB_BASE_ADDR_P0
+#define RADIO_ESB_BASE_ADDR_P0 {0xF3, 0xF3, 0xF3, 0xF3}
+#endif
+
+#ifndef RADIO_ESB_BASE_ADDR_P1
+#define RADIO_ESB_BASE_ADDR_P1 {0x3F, 0x3F, 0x3F, 0x3F}
+#endif
+
+#ifndef RADIO_ESB_PIPE_PREFIXES
+#define RADIO_ESB_PIPE_PREFIXES {0xF3, 0x3F, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6}
+#endif
+
+#define RADIO_ESB_NUM_PIPES 8
+#define RADIO_ESB_ADDR_LENGTH 5
+#define RADIO_ESB_RX_PIPES 0xFF
+#define RADIO_ESB_RF_CHANNEL 56
+
+#define RADIO_ESB_RETRANSMIT_DELAY 1000
+#define RADIO_ESB_RETRANSMIT_COUNT 3
+
+#define RADIO_ESB_STATIC_PAYLOAD_LENGTH 0
 
 typedef enum {
 	NRF52_SUCCESS,                                        /* Call was successful.                  */
