@@ -19,6 +19,13 @@
 #ifndef NRF52_RADIO_H_
 #define NRF52_RADIO_H_
 
+#include <stdint.h>
+#include <stdbool.h>
+
+#include "nrf52.h"
+#include "nrf52_bitfields.h"
+#include "ch.h"
+
 // Hard coded parameters - change if necessary
 #ifndef NRF52_MAX_PAYLOAD_LENGTH
 #define NRF52_MAX_PAYLOAD_LENGTH            32                  /**< The max size of the payload. Valid values are 1 to 252 */
@@ -36,6 +43,7 @@
 #define NRF52_RADIO_USE_TIMER4              FALSE               /**< TIMER4 will be used by the module. */
 
 #define NRF52_RADIO_IRQ_PRIORITY            3                   /**< RADIO interrupt priority. */
+#define NRF52_RADIO_POSTTHD_PRIORITY        (NORMALPRIO+3)      /**< Postprocess TXRX thread priority. */
 #define NRF52_RADIO_INTTHD_PRIORITY         (NORMALPRIO+2)      /**< Interrupts handle thread priority. */
 #define NRF52_RADIO_EVTTHD_PRIORITY         (NORMALPRIO+1)      /**< Events handle thread priority */
 
@@ -59,21 +67,26 @@
 #define RADIO_ESB_NUM_PIPES 8
 #define RADIO_ESB_ADDR_LENGTH 5
 #define RADIO_ESB_RX_PIPES 0xFF
-#define RADIO_ESB_RF_CHANNEL 56
+#define RADIO_ESB_RF_CHANNEL 1
 
 #define RADIO_ESB_RETRANSMIT_DELAY 1000
 #define RADIO_ESB_RETRANSMIT_COUNT 3
 
 #define RADIO_ESB_STATIC_PAYLOAD_LENGTH 0
 
+// Dummy network, by default ID 0
+#ifndef RADIO_MY_ID
+#define RADIO_MY_ID 0
+#endif
+
 typedef enum {
-	NRF52_SUCCESS,                                        /* Call was successful.                  */
-	NRF52_INVALID_STATE,                                  /* Module is not initialized.            */
-	NRF52_ERROR_BUSY,                                     /* Module was not in idle state.         */
-	NRF52_ERROR_NULL,                                     /* Required parameter was NULL.          */
-	NRF52_ERROR_INVALID_PARAM,                            /* Required parameter is invalid         */
-	NRF52_ERROR_NOT_SUPPORTED,                            /* p_payload->noack was false while selective ack was not enabled. */
-	NRF52_ERROR_INVALID_LENGTH,                           /* Payload length was invalid (zero or larger than max allowed).   */
+  NRF52_SUCCESS,                                        /* Call was successful.                  */
+  NRF52_INVALID_STATE,                                  /* Module is not initialized.            */
+  NRF52_ERROR_BUSY,                                     /* Module was not in idle state.         */
+  NRF52_ERROR_NULL,                                     /* Required parameter was NULL.          */
+  NRF52_ERROR_INVALID_PARAM,                            /* Required parameter is invalid         */
+  NRF52_ERROR_NOT_SUPPORTED,                            /* p_payload->noack was false while selective ack was not enabled. */
+  NRF52_ERROR_INVALID_LENGTH,                           /* Payload length was invalid (zero or larger than max allowed).   */
 } nrf52_error_t;
 
 // Internal radio module state.
@@ -96,9 +109,9 @@ typedef enum {
 
 // Interrupt flags
 typedef enum {
-	NRF52_INT_TX_SUCCESS_MSK = 0x01,  /**< The flag used to indicate a success since last event. */
-	NRF52_INT_TX_FAILED_MSK  = 0x02,  /**< The flag used to indicate a failiure since last event. */
-	NRF52_INT_RX_DR_MSK 	 = 0x04,  /**< The flag used to indicate a received packet since last event. */
+  NRF52_INT_TX_SUCCESS_MSK = 0x01,  /**< The flag used to indicate a success since last event. */
+  NRF52_INT_TX_FAILED_MSK  = 0x02,  /**< The flag used to indicate a failiure since last event. */
+  NRF52_INT_RX_DR_MSK      = 0x04,  /**< The flag used to indicate a received packet since last event. */
 } nrf52_int_flags_t;
 
 /**Macro to create initializer for a TX data packet.
@@ -176,7 +189,7 @@ typedef struct {
     uint8_t pipe_prefixes[8];       /**< Address prefix for pipe P0 to P7. */
     uint8_t num_pipes;              /**< Number of pipes available. */
     uint8_t addr_length;            /**< Length of address including prefix */
-    uint8_t rx_pipes;		        /**< Bitfield for enabled RX pipes. */
+    uint8_t rx_pipes;               /**< Bitfield for enabled RX pipes. */
     uint8_t rf_channel;             /**< Which channel is to be used. Must be in range 0 and 125 to be valid. */
 } nrf52_address_t;
 
@@ -208,7 +221,7 @@ typedef struct {
     // General RF parameters
     nrf52_bitrate_t       bitrate;                /**< Enhanced ShockBurst bitrate mode. */
     nrf52_crc_t           crc;                    /**< Enhanced ShockBurst CRC mode. */
-    nrf52_tx_power_t      tx_power;   		      /**< Enhanced ShockBurst radio transmission power mode.*/
+    nrf52_tx_power_t      tx_power;               /**< Enhanced ShockBurst radio transmission power mode.*/
 
     // Control settings
     nrf52_tx_mode_t       tx_mode;                /**< Enhanced ShockBurst transmit mode. */
@@ -219,7 +232,7 @@ typedef struct {
 
     uint8_t               payload_length;         /**< Enhanced ShockBurst static payload length */
 
-    nrf52_address_t    	  address;                /**< Address parameters structure */
+    nrf52_address_t       address;                /**< Address parameters structure */
 } nrf52_config_t;
 
 typedef struct {
@@ -242,7 +255,7 @@ typedef struct {
   /**
    * @brief Interrupts flag.
    */
-  nrf52_int_flags_t	      flags;
+  nrf52_int_flags_t       flags;
   /**
    * @brief TX attempt number.
    */
@@ -257,8 +270,13 @@ typedef struct {
   event_source_t eventsrc;
 } RFDriver;
 
+// Global variables. They are not thread-safe.
 extern RFDriver RFD1;
+extern nrf52_payload_t tx_payload;
+extern nrf52_payload_t rx_payload;
+extern nrf52_config_t radiocfg;
 
+// Radio services
 nrf52_error_t radio_init(nrf52_config_t const *config);
 nrf52_error_t radio_disable(void);
 nrf52_error_t radio_write_payload(nrf52_payload_t const * p_payload);

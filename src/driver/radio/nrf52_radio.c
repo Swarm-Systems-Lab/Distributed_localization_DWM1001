@@ -14,13 +14,14 @@
  *
  */
 
-#include "../../driver/radio/nrf52_radio.h"
+#include "nrf52_radio.h"
 
 #include <stdint.h>
 #include <string.h>
 
 #include "ch.h"
 #include "hal.h"
+#include "led.h"
 
 
 
@@ -96,6 +97,10 @@
 #error "Event thread priority need to be defined"
 #endif
 
+#ifndef NRF52_RADIO_POSTTHD_PRIORITY
+#error "Post-process RXTX thread priority need to be defined"
+#endif
+
 #define VERIFY_PAYLOAD_LENGTH(p)                            \
 do                                                          \
 {                                                           \
@@ -163,11 +168,35 @@ static uint8_t                    rx_payload_buffer[NRF52_MAX_PAYLOAD_LENGTH + 2
 static uint8_t                    pids[NRF52_PIPE_COUNT];
 static pipe_info_t                rx_pipe_info[NRF52_PIPE_COUNT];
 
+// Global variables. They are not thread-safe
+nrf52_payload_t tx_payload;
+nrf52_payload_t rx_payload;
+RFDriver RFD1;
+
+nrf52_config_t radiocfg = {
+  .protocol = NRF52_PROTOCOL_ESB_DPL,
+  .mode = NRF52_MODE_PRX,
+  .bitrate = NRF52_BITRATE_1MBPS,
+  .crc = NRF52_CRC_8BIT,
+  .tx_power = NRF52_TX_POWER_0DBM,
+  .tx_mode = NRF52_TXMODE_MANUAL_START,
+  .selective_auto_ack = true,
+  .retransmit = { RADIO_ESB_RETRANSMIT_DELAY, RADIO_ESB_RETRANSMIT_COUNT},
+  .payload_length = RADIO_ESB_STATIC_PAYLOAD_LENGTH,
+  .address = {
+    .base_addr_p0 = RADIO_ESB_BASE_ADDR_P0,
+    .base_addr_p1 = RADIO_ESB_BASE_ADDR_P1,
+    .pipe_prefixes = RADIO_ESB_PIPE_PREFIXES,
+    .num_pipes = RADIO_ESB_NUM_PIPES,
+    .addr_length = RADIO_ESB_ADDR_LENGTH,
+    .rx_pipes = RADIO_ESB_RX_PIPES,
+    .rf_channel = RADIO_ESB_RF_CHANNEL,
+  },
+};
+
  // disable and events semaphores.
 static binary_semaphore_t disable_sem;
 static binary_semaphore_t events_sem;
-
-RFDriver RFD1;
 
 // Function to do bytewise bit-swap on a unsigned 32 bit value
 static uint32_t bytewise_bit_swap(uint8_t const * p_inp) {
@@ -181,6 +210,38 @@ static uint32_t addr_conv(uint8_t const* p_addr) {
     return __REV(bytewise_bit_swap(p_addr)); //lint -esym(628, __rev) -esym(526, __rev) */
 }
 
+// Radio threads
+static thread_t *rfPostThread_p;
+static THD_WORKING_AREA(waRFPostThread, 256);
+static THD_FUNCTION(rfPostThread, arg) {
+    (void)arg;
+
+    event_listener_t el;
+    chEvtRegisterMask(&RFD1.eventsrc, &el, EVENT_MASK(0));
+
+    chRegSetThreadName("rfPostproTXRX");
+
+    while (1) {
+      chEvtWaitAny(EVENT_MASK(0));
+      eventflags_t flags = chEvtGetAndClearFlags(&el);
+      if (flags & NRF52_EVENT_TX_SUCCESS) {
+          radio_start_rx();
+      }
+      if (flags & NRF52_EVENT_TX_FAILED) {
+          radio_start_rx();
+      }
+      if (flags & NRF52_EVENT_RX_RECEIVED) {
+        memset(rx_payload.data, 0, NRF52_MAX_PAYLOAD_LENGTH);
+        radio_read_rx_payload(&rx_payload);
+        // Here we process the payload
+        // if(rx_payload.pipe == RADIO_MY_ID) // It is for me
+        // switch / case for the rx_payload.data[0] to check the Packet ID and decode the rest
+
+        toggle_led(green);
+      }
+    }
+}
+
 static thread_t *rfEvtThread_p;
 static THD_WORKING_AREA(waRFEvtThread, 64);
 static THD_FUNCTION(rfEvtThread, arg) {
@@ -189,19 +250,19 @@ static THD_FUNCTION(rfEvtThread, arg) {
     chRegSetThreadName("rfevent");
 
     while (!chThdShouldTerminateX()) {
-    	chBSemWait(&events_sem);
+      chBSemWait(&events_sem);
 
-    	nrf52_int_flags_t interrupts = RFD1.flags;
-        RFD1.flags = 0;
+      nrf52_int_flags_t interrupts = RFD1.flags;
+      RFD1.flags = 0;
 
         if (interrupts & NRF52_INT_TX_SUCCESS_MSK) {
-            chEvtBroadcastFlags(&RFD1.eventsrc, (eventflags_t) NRF52_EVENT_TX_SUCCESS);
+          chEvtBroadcastFlags(&RFD1.eventsrc, (eventflags_t) NRF52_EVENT_TX_SUCCESS);
         }
         if (interrupts & NRF52_INT_TX_FAILED_MSK) {
-        	chEvtBroadcastFlags(&RFD1.eventsrc, (eventflags_t) NRF52_EVENT_TX_FAILED);
+          chEvtBroadcastFlags(&RFD1.eventsrc, (eventflags_t) NRF52_EVENT_TX_FAILED);
         }
         if (interrupts & NRF52_INT_RX_DR_MSK) {
-        	chEvtBroadcastFlags(&RFD1.eventsrc, (eventflags_t) NRF52_EVENT_RX_RECEIVED);
+          chEvtBroadcastFlags(&RFD1.eventsrc, (eventflags_t) NRF52_EVENT_RX_RECEIVED);
         }
     }
     chThdExit((msg_t) 0);
@@ -214,33 +275,33 @@ static THD_FUNCTION(rfIntThread, arg) {
 
     chRegSetThreadName("rfint");
 
-    while (!chThdShouldTerminateX()) {
-    	chBSemWait(&disable_sem);
-    	switch (RFD1.state) {
-    	  case NRF52_STATE_PTX_TX:
-    		  on_radio_disabled_tx_noack(&RFD1);
-    		  break;
-    	  case NRF52_STATE_PTX_TX_ACK:
-    		  on_radio_disabled_tx(&RFD1);
-    		  break;
-    	  case NRF52_STATE_PTX_RX_ACK:
-    		  on_radio_disabled_tx_wait_for_ack(&RFD1);
-    		  break;
-    	  case NRF52_STATE_PRX:
-    		  on_radio_disabled_rx(&RFD1);
-    		  break;
-    	  case NRF52_STATE_PRX_SEND_ACK:
-    		  on_radio_disabled_rx_ack(&RFD1);
-    		  break;
-    	  default:
-    		  break;
-    	}
+    while (!chThdShouldTerminateX()){
+      chBSemWait(&disable_sem);
+      switch (RFD1.state) {
+        case NRF52_STATE_PTX_TX:
+          on_radio_disabled_tx_noack(&RFD1);
+          break;
+        case NRF52_STATE_PTX_TX_ACK:
+          on_radio_disabled_tx(&RFD1);
+          break;
+        case NRF52_STATE_PTX_RX_ACK:
+          on_radio_disabled_tx_wait_for_ack(&RFD1);
+          break;
+        case NRF52_STATE_PRX:
+          on_radio_disabled_rx(&RFD1);
+          break;
+        case NRF52_STATE_PRX_SEND_ACK:
+          on_radio_disabled_rx_ack(&RFD1);
+          break;
+        default:
+          break;
+      }
     }
-	chThdExit((msg_t) 0);
+  chThdExit((msg_t) 0);
 }
 
 static void serve_radio_interrupt(RFDriver *rfp) {
-	(void) rfp;
+    (void) rfp;
     if ((NRF_RADIO->INTENSET & RADIO_INTENSET_READY_Msk) && NRF_RADIO->EVENTS_READY) {
         NRF_RADIO->EVENTS_READY = 0;
         (void) NRF_RADIO->EVENTS_READY;
@@ -612,7 +673,7 @@ static void on_radio_disabled_tx_wait_for_ack(RFDriver *rfp) {
             }
         }
 
-    	chBSemSignal(&events_sem);
+        chBSemSignal(&events_sem);
 
         if ((tx_fifo.count == 0) || (rfp->config.tx_mode == NRF52_TXMODE_MANUAL)) {
             rfp->state = NRF52_STATE_IDLE;
@@ -813,21 +874,21 @@ nrf52_error_t radio_disable(void) {
 
 //
 nrf52_error_t radio_init(nrf52_config_t const *config) {
-	osalDbgAssert(config != NULL,
-		"config must be defined");
-	osalDbgAssert(&config->address != NULL,
-		"address must be defined");
-	osalDbgAssert(NRF52_RADIO_IRQ_PRIORITY <= 7,
-		"wrong radio irq priority");
+    osalDbgAssert(config != NULL,
+      "config must be defined");
+    osalDbgAssert(&config->address != NULL,
+      "address must be defined");
+    osalDbgAssert(NRF52_RADIO_IRQ_PRIORITY <= 7,
+      "wrong radio irq priority");
 
     if (RFD1.state != NRF52_STATE_UNINIT) {
-    	nrf52_error_t err = radio_disable();
+      nrf52_error_t err = radio_disable();
         if (err != NRF52_SUCCESS)
             return err;
     }
 
     RFD1.radio = NRF_RADIO;
-	RFD1.config = *config;
+    RFD1.config = *config;
     RFD1.flags    = 0;
 
     init_fifo();
@@ -864,11 +925,15 @@ nrf52_error_t radio_init(nrf52_config_t const *config) {
 
     // interrupt handle thread
     rfIntThread_p = chThdCreateStatic(waRFIntThread, sizeof(waRFIntThread),
-    		NRF52_RADIO_INTTHD_PRIORITY, rfIntThread, NULL);
+        NRF52_RADIO_INTTHD_PRIORITY, rfIntThread, NULL);
 
     // events handle thread
     rfEvtThread_p = chThdCreateStatic(waRFEvtThread, sizeof(waRFEvtThread),
-    		NRF52_RADIO_EVTTHD_PRIORITY, rfEvtThread, NULL);
+        NRF52_RADIO_EVTTHD_PRIORITY, rfEvtThread, NULL);
+
+    // post RX TX
+    rfPostThread_p = chThdCreateStatic(waRFPostThread, sizeof(waRFPostThread),
+        NRF52_RADIO_POSTTHD_PRIORITY, rfPostThread, NULL);
 
     nvicEnableVector(RADIO_IRQn, NRF52_RADIO_IRQ_PRIORITY);
 
@@ -879,17 +944,17 @@ nrf52_error_t radio_init(nrf52_config_t const *config) {
 
 nrf52_error_t radio_write_payload(nrf52_payload_t const * p_payload) {
     if (RFD1.state == NRF52_STATE_UNINIT)
-    	return NRF52_INVALID_STATE;
+      return NRF52_INVALID_STATE;
     if(p_payload == NULL)
-    	return NRF52_ERROR_NULL;
+      return NRF52_ERROR_NULL;
     VERIFY_PAYLOAD_LENGTH(p_payload);
     if (tx_fifo.count >= NRF52_TX_FIFO_SIZE)
-    	return NRF52_ERROR_INVALID_LENGTH;
+      return NRF52_ERROR_INVALID_LENGTH;
 
     if (RFD1.config.mode == NRF52_MODE_PTX &&
         p_payload->noack && !RFD1.config.selective_auto_ack )
     {
-        return NRF52_ERROR_NOT_SUPPORTED;
+      return NRF52_ERROR_NOT_SUPPORTED;
     }
 
     nvicDisableVector(RADIO_IRQn);
@@ -919,9 +984,9 @@ nrf52_error_t radio_write_payload(nrf52_payload_t const * p_payload) {
 
 nrf52_error_t radio_read_rx_payload(nrf52_payload_t * p_payload) {
     if (RFD1.state == NRF52_STATE_UNINIT)
-    	return NRF52_INVALID_STATE;
+      return NRF52_INVALID_STATE;
     if (p_payload == NULL)
-    	return NRF52_ERROR_NULL;
+      return NRF52_ERROR_NULL;
 
     if (rx_fifo.count == 0) {
         return NRF52_ERROR_INVALID_LENGTH;
@@ -948,7 +1013,7 @@ nrf52_error_t radio_read_rx_payload(nrf52_payload_t * p_payload) {
 
 nrf52_error_t radio_start_tx(void) {
     if (RFD1.state != NRF52_STATE_IDLE)
-    	return NRF52_ERROR_BUSY;
+      return NRF52_ERROR_BUSY;
 
     if (tx_fifo.count == 0) {
         return NRF52_ERROR_INVALID_LENGTH;
@@ -961,7 +1026,7 @@ nrf52_error_t radio_start_tx(void) {
 
 nrf52_error_t radio_start_rx(void) {
     if (RFD1.state != NRF52_STATE_IDLE)
-    	return NRF52_ERROR_BUSY;
+      return NRF52_ERROR_BUSY;
 
     NRF_RADIO->INTENCLR = 0xFFFFFFFF;
     NRF_RADIO->EVENTS_DISABLED = 0;
@@ -1008,7 +1073,7 @@ nrf52_error_t radio_stop_rx(void) {
 
 nrf52_error_t radio_flush_tx(void) {
     if (RFD1.state == NRF52_STATE_UNINIT)
-    	return NRF52_INVALID_STATE;
+      return NRF52_INVALID_STATE;
 
     nvicDisableVector(RADIO_IRQn);
 
@@ -1023,9 +1088,9 @@ nrf52_error_t radio_flush_tx(void) {
 
 nrf52_error_t radio_pop_tx(void) {
     if (RFD1.state == NRF52_STATE_UNINIT)
-    	return NRF52_INVALID_STATE;
+      return NRF52_INVALID_STATE;
     if (tx_fifo.count == 0)
-    	return NRF52_ERROR_INVALID_LENGTH;
+      return NRF52_ERROR_INVALID_LENGTH;
 
     nvicDisableVector(RADIO_IRQn);
 
@@ -1041,7 +1106,7 @@ nrf52_error_t radio_pop_tx(void) {
 
 nrf52_error_t radio_flush_rx(void) {
     if (RFD1.state == NRF52_STATE_UNINIT)
-    	return NRF52_INVALID_STATE;
+      return NRF52_INVALID_STATE;
 
     nvicDisableVector(RADIO_IRQn);
 
@@ -1058,7 +1123,7 @@ nrf52_error_t radio_flush_rx(void) {
 
 nrf52_error_t radio_set_base_address_0(uint8_t const * p_addr) {
     if (RFD1.state != NRF52_STATE_IDLE)
-    	return NRF52_ERROR_BUSY;
+      return NRF52_ERROR_BUSY;
     if (p_addr == NULL)
         return NRF52_ERROR_NULL;
 
@@ -1070,7 +1135,7 @@ nrf52_error_t radio_set_base_address_0(uint8_t const * p_addr) {
 
 nrf52_error_t radio_set_base_address_1(uint8_t const * p_addr) {
     if (RFD1.state != NRF52_STATE_IDLE)
-    	return NRF52_ERROR_BUSY;
+      return NRF52_ERROR_BUSY;
     if (p_addr == NULL)
         return NRF52_ERROR_NULL;
 
@@ -1082,11 +1147,11 @@ nrf52_error_t radio_set_base_address_1(uint8_t const * p_addr) {
 
 nrf52_error_t radio_set_prefixes(uint8_t const * p_prefixes, uint8_t num_pipes) {
     if (RFD1.state != NRF52_STATE_IDLE)
-    	return NRF52_ERROR_BUSY;
+      return NRF52_ERROR_BUSY;
     if (p_prefixes == NULL)
         return NRF52_ERROR_NULL;
     if (num_pipes > 8)
-    	return NRF52_ERROR_INVALID_PARAM;
+      return NRF52_ERROR_INVALID_PARAM;
 
     memcpy(RFD1.config.address.pipe_prefixes, p_prefixes, num_pipes);
     RFD1.config.address.num_pipes = num_pipes;
@@ -1099,9 +1164,9 @@ nrf52_error_t radio_set_prefixes(uint8_t const * p_prefixes, uint8_t num_pipes) 
 
 nrf52_error_t radio_set_prefix(uint8_t pipe, uint8_t prefix) {
     if (RFD1.state != NRF52_STATE_IDLE)
-    	return NRF52_ERROR_BUSY;
+      return NRF52_ERROR_BUSY;
     if (pipe > 8)
-    	return NRF52_ERROR_INVALID_PARAM;
+      return NRF52_ERROR_INVALID_PARAM;
 
     RFD1.config.address.pipe_prefixes[pipe] = prefix;
 
