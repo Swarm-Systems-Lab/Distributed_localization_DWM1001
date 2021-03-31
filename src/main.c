@@ -1,51 +1,43 @@
 #include "ch.h"
 #include "hal.h"
 
-static THD_WORKING_AREA(waThread1, 64);
-
-static THD_FUNCTION(Thread1, arg) {
-
-    (void)arg;
-    //uint8_t green = GREEN_LED_D9;
-    //uint8_t blue = BLUE_LED_D10;
-    uint8_t red1 = RED_LED_D11;
-    //uint8_t red2 = RED_LED_D12;
-
-    chRegSetThreadName("blinker");
-
-    while (1) {
-      //palTogglePad(IOPORT1, green);
-      //palTogglePad(IOPORT1, blue);
-      palTogglePad(IOPORT1, red1);
-      //palTogglePad(IOPORT1, red2);
-      chThdSleepMilliseconds(100);
-    }
-}
+#include "led.h"
+#include "nrf52_radio.h"
 
 int main(void) {
 
     halInit();
     chSysInit();
 
-    uint8_t green = GREEN_LED_D9;
-    uint8_t blue = BLUE_LED_D10;
-    uint8_t red1 = RED_LED_D11;
-    uint8_t red2 = RED_LED_D12;
+//  Leds off
+    leds_off(ALL_LEDS);
+//  LED SUMMARY
+//  Blue for the heartbeep
+//  Green for PCK_RECEIVED between internal radios
 
-    // Power off the leds.
-    palSetPad(IOPORT1, green); 
-    palSetPad(IOPORT1, blue);
-    palSetPad(IOPORT1, red1);
-    palSetPad(IOPORT1, red2);
-
-    chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO+1,
-      Thread1, NULL);
+//  Internal radio nrf52 init
+    radio_init(&radiocfg);
+    radio_flush_tx();
+    radio_flush_rx();
+    radio_start_rx();
 
     chThdSleep(2);
 
-//    NRF_P0->DETECTMODE = 0;
-
     while (true) {
-        chThdSleepMilliseconds(250);
+        toggle_led(blue);
+        chThdSleepMilliseconds(500);
+
+        // example of dummy transmission (it is configured so that there is ACK)
+        uint8_t neighborh_id = 0; // Destination between 0 and 7, we reserver 0 for broadcast
+        tx_payload.pipe = neighborh_id;
+        tx_payload.noack = 0;
+        tx_payload.data[0] = 0x03; // Packet ID
+        tx_payload.data[1] = 0x33; // Payload
+        tx_payload.length = 2;
+
+        radio_stop_rx();
+        // tx_payload and rx_payload are GLOBAL and they are not thread-safe now
+        radio_write_payload(&tx_payload);
+        radio_start_tx(); // Either fail or success TX (with or w/o ACK), the radio_start_rx is called afterward
     }
 }
