@@ -4,5 +4,5 @@
 	branch = stable_21.11.x
 [submodule "ext/ChibiOS-Contrib"]
 	path = ext/ChibiOS-Contrib
-	url = https://github.com/ChibiOS/ChibiOS-Contrib.git
+	url = https://github.com/UCM-237/ChibiOS-Contrib.git
 	branch = chibios-21.11.x
