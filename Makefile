@@ -83,7 +83,7 @@ endif
 #
 
 # Define project name here
-PROJECT = dis_loc_dwm1001_$(TXRX)
+PROJECT = dis_loc_dwm1001
 
 # WARNING!
 # In case of using eclipse, it is necessary that this variable contains the path
@@ -123,12 +123,9 @@ LDSCRIPT= $(STARTUPLD_CONTRIB)/NRF52832.ld
 # C sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
 CSRC = $(ALLCSRC) \
-       $(TESTSRC) \
-       ./src/main_$(TXRX).c \
-       ./src/driver/led/led.c \
-       ./src/driver/spi/spi.c \
-       ./src/driver/button/button.c \
-       ./src/driver/radio/nrf52_radio.c \
+	$(TESTSRC) \
+	$(wildcard src/*.c) \
+	$(wildcard src/driver/*/*.c) \
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
@@ -158,11 +155,7 @@ TCPPSRC =
 ASMSRC = $(ALLASMSRC)
 ASMXSRC = $(ALLXASMSRC)
 
-INCDIR = $(CONFDIR) $(ALLINC) $(TESTINC) $(TESTHAL) \
-         ./src/driver/led \
-         ./src/driver/spi \
-         ./src/driver/button \
-         ./src/driver/radio \
+INCDIR = $(CONFDIR) $(ALLINC) $(TESTINC) $(TESTHAL) $(wildcard src/driver/*)
 
 #
 # Project, sources and paths
@@ -212,7 +205,7 @@ CPPWARN = -Wall -Wextra -Wundef
 #
 
 # List all user C define here, like -D_DEBUG=1
-UDEFS = 
+UDEFS = -DRADIO_ESB_PRIMARY_TRANSMITTER
 
 # Define ASM defines here
 UADEFS =
@@ -225,6 +218,9 @@ ULIBDIR =
 
 # List all user libraries here
 ULIBS =
+
+# Terminal
+TERM = konsole
 
 #
 # End of user defines
@@ -239,3 +235,50 @@ OBIN = $(BUILDDIR)/$(PROJECT).bin
 
 include $(CHIBIOS_CONTRIB)/os/various/jlink.mk
 include $(CHIBIOS_CONTRIB)/os/various/gdb.mk
+
+.PHONY: openocd-flash openocd-debug-server openocd-debug
+
+pin-reset: jlink-pin-reset
+flash: all jlink-flash
+
+openocd-flash:
+	# Gets the serial numbers of all DWM1001 boards
+	$(shell export SERIAL_NUMBERS=`lsusb -v | grep -C 20 'SEGGER J-Link' | grep "iSerial" | awk '{print $$NF}'` ; \
+	for serial_number in $$SERIAL_NUMBERS ; do \
+		sed -i "s/adapter serial .*/adapter serial $$serial_number/g" openocd/flash_dwm1001.cfg ; \
+		openocd -f openocd/flash_dwm1001.cfg ; \
+	done)
+
+debug: gdb-debug
+
+openocd-debug:
+	$(shell export DEVICE_NUMBER=`lsusb -v | grep -C 20 'SEGGER J-Link' | grep "iSerial" | wc -l` ; \
+	export OPENOCD_GDB_PORT=3333 ; \
+	for i in `seq 1 $$DEVICE_NUMBER` ; do \
+		sed -i "s/target extended-remote :.*/target extended-remote :$$((i+OPENOCD_GDB_PORT-1))/g" gdb/dwm1001.gdb ; \
+		$$TERM -e "arm-none-eabi-gdb -tui --command=./gdb/dwm1001.gdb" & \
+		sleep 1 ; \
+	done)
+
+erase-all: jlink-erase-all
+debug-server: jlink-debug-server
+
+openocd-debug-server:
+	$(shell export SERIAL_NUMBERS=`lsusb -v | grep -C 20 'SEGGER J-Link' | grep "iSerial" | awk '{print $$NF}'` ; \
+	export COUNTER=0 ; \
+	export OPENOCD_GDB_PORT=3333 ; \
+	export OPENOCD_TELNET_PORT=4444 ; \
+	export OPENOCD_TCL_PORT=6666 ; \
+	for serial_number in $$SERIAL_NUMBERS ; do \
+		sed -i "s/adapter serial .*/adapter serial $$serial_number/g" openocd/dwm1001.cfg ; \
+		sed -i "s/gdb_port .*/gdb_port $$((COUNTER+OPENOCD_GDB_PORT))/g" openocd/dwm1001.cfg ; \
+		sed -i "s/telnet_port .*/telnet_port $$((COUNTER+OPENOCD_TELNET_PORT))/g" openocd/dwm1001.cfg ; \
+		sed -i "s/tcl_port .*/tcl_port $$((COUNTER+OPENOCD_TCL_PORT))/g" openocd/dwm1001.cfg ; \
+		if [[ $$COUNTER -eq 0 ]]; then \
+			openocd -f openocd/dwm1001.cfg & \
+		else \
+			$$TERM -e "openocd -f openocd/dwm1001.cfg" & \
+		fi ; \
+		sleep 1 ; \
+		COUNTER=$$((COUNTER+1)) ; \
+	done)

@@ -94,7 +94,7 @@ int main(void) {
 
     cnt = good_pkt = fail_pkt = 0;
 
-    tx_payload.data[0] = 0x03;
+    tx_payload.data[0] = 0x04;
     tx_payload.data[1] = 0x33;
     tx_payload.length = 2;
 
