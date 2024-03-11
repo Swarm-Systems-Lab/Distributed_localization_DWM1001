@@ -97,6 +97,8 @@ CHIBIOS_CONTRIB := ./ext/ChibiOS-Contrib
 CONFDIR         := ./cfg
 BUILDDIR        := ./build
 DEPDIR          := ./.dep
+PSRCDIR        := ./src
+PINCDIR        := ./include
 
 # Licensing files.
 include $(CHIBIOS)/os/license/license.mk
@@ -124,8 +126,7 @@ LDSCRIPT= $(STARTUPLD_CONTRIB)/NRF52832.ld
 # setting.
 CSRC = $(ALLCSRC) \
 	$(TESTSRC) \
-	$(wildcard src/*.c) \
-	$(wildcard src/driver/*/*.c) \
+	$(wildcard $(PSRCDIR)/*.c) \
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
@@ -155,7 +156,7 @@ TCPPSRC =
 ASMSRC = $(ALLASMSRC)
 ASMXSRC = $(ALLXASMSRC)
 
-INCDIR = $(CONFDIR) $(ALLINC) $(TESTINC) $(TESTHAL) $(wildcard src/driver/*)
+INCDIR = $(CONFDIR) $(ALLINC) $(TESTINC) $(TESTHAL) $(PINCDIR)
 
 #
 # Project, sources and paths

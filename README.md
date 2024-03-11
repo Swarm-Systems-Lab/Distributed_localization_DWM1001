@@ -41,7 +41,7 @@
 <br />
 <div align="center">
   <a href="https://github.com/UCM-237/Distributed_localization_DWM1001">
-    <img src="https://lh5.googleusercontent.com/TQ-S7dGe0BksXoz7WDug6wXFOwrq2ZM4ulpftXcZwXZ7fG6WSJa5c7iHVymqFiFVQmxl3SPCH_l6CMX7YKZKc-0rw0FRhPVFi-n6zSKeEqRPjGPnCooehczFI80BUquHkw=w1280" alt="Logo" width="80" height="80">
+    <img src="docs/assets/logo_ssl2.png" alt="Logo" width="80" height="80">
   </a>
 
 <h3 align="center">Distributed localization | DWM1001</h3>
