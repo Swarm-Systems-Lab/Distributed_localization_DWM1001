@@ -80,7 +80,7 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-This project aims to develop a distributed localization system in the Decawave DWM-1001 board using UWB communications. It is based in ChibiOS in order to use its RTOS.
+This project aims to develop a distributed localization system in the Decawave DWM1001 board using UWB communications and ranging. It is based in ChibiOS in order to use RTOS functionality.
 
 [Documentation](https://github.com/UCM-237/Distributed_localization_DWM1001)
 
@@ -93,6 +93,8 @@ This project aims to develop a distributed localization system in the Decawave D
 * [![ChibiOS][ChibiOS]][ChibiOS-url]
 * [![ChibiOS-Contrib][Contrib]][ChibiOS-url]
 * [![Jlink][Jlink]][Jlink-url]
+* [![OpenOCD][OpenOCD]][OpenOCD-url]
+* [![GDB][GDB]][GDB-url]
 * [![Decawave Examples][Decawave]][Decawave-url]
 
 
@@ -103,19 +105,34 @@ This project aims to develop a distributed localization system in the Decawave D
 <!-- GETTING STARTED -->
 ### Prerequisites
 
-Prerequites are mostly inherited from ChibiOS and related to the architecture of the board
+Prerequites are mostly inherited from ChibiOS and related to the architecture of the board, OS for development and debugging should be GNU/Linux or al least a POSIX compliant shell and GNU utilities
+
+* **arm-none-eabi toolchain**
+  
+  GNU Embedded toolchain used to compile, link and debug the code for embedded devices.
+
+* **OpenOCD**
+  
+  Used to connect to the board and flash or debug the code. [OpenOCD](https://openocd.org/)
+
 * **Jlink**
   
   Download from the official site, [Segger](https://www.segger.com/downloads/jlink/).
   
   For Linux, if the tar package is chosen, the path of the installation should be appended to system **PATH** variable.
 
-* Compiler **arm-none-eabi-gcc**
 
 ### Flashing
 
-1. Plug the board through USB and make sure it is detected as a device.
-2. Run ```make flash```
+1. Plug the board through USB and make sure it is detected as a device through lsusb.
+2. Run ```make flash``` to flash with J-link or ```make openocd-flash```
+
+### Debugging
+
+1. Start the GDB server with ```make openocd-debug-server```
+2. Open a GDB session with ```make openocd-debug```
+
+A GBD server or session is created for each DWM1001-DEV board connected
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -126,7 +143,7 @@ Prerequites are mostly inherited from ChibiOS and related to the architecture of
 
 The main use of this project is to allow swarms of drones to be aware of their position using distributed localization.
 
-_For more examples, please refer to the [Documentation](https://github.com/UCM-237/Distributed_localization_DWM1001)_
+_For more examples, please refer to the [Documentation](https://github.com/UCM-237/Distributed_localization_DWM1001/docs)_
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -184,5 +201,9 @@ Project Link: [https://github.com/UCM-237/Distributed_localization_DWM1001](http
 [Contrib-url]: https://github.com/UCM-237/ChibiOS-Contrib/tree/chibios-21.11.x
 [Jlink]: https://img.shields.io/badge/Jlink-blue
 [Jlink-url]: https://www.segger.com/downloads/jlink/
+[OpenOCD]: https://img.shields.io/badge/OpenOCD-blue
+[OpenOCD-url]: https://openocd.org/
+[GDB]: https://img.shields.io/badge/GDB-blue
+[GDB-url]: https://www.sourceware.org/gdb/
 [Decawave]: https://img.shields.io/badge/DWM1001_Examples-blue
 [Decawave-url]: https://github.com/Decawave/dwm1001-examples

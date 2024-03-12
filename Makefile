@@ -242,8 +242,8 @@ include $(CHIBIOS_CONTRIB)/os/various/gdb.mk
 pin-reset: jlink-pin-reset
 flash: all jlink-flash
 
+# Gets the serial numbers of all DWM1001 boards and flashes each board
 openocd-flash:
-	# Gets the serial numbers of all DWM1001 boards
 	$(shell export SERIAL_NUMBERS=`lsusb -v | grep -C 20 'SEGGER J-Link' | grep "iSerial" | awk '{print $$NF}'` ; \
 	for serial_number in $$SERIAL_NUMBERS ; do \
 		sed -i "s/adapter serial .*/adapter serial $$serial_number/g" openocd/flash_dwm1001.cfg ; \
@@ -252,6 +252,7 @@ openocd-flash:
 
 debug: gdb-debug
 
+# Opens a GDB sessions for each board connected
 openocd-debug:
 	$(shell export DEVICE_NUMBER=`lsusb -v | grep -C 20 'SEGGER J-Link' | grep "iSerial" | wc -l` ; \
 	export OPENOCD_GDB_PORT=3333 ; \
@@ -264,6 +265,8 @@ openocd-debug:
 erase-all: jlink-erase-all
 debug-server: jlink-debug-server
 
+# Opens a openocd GDB server for each board connected
+### SERVER IS RUN IN PARALLEL SO CTRL+C MAY NOT KILL THE PROCESS AND KEEP OPENOCD USED, pkill openocd can be used
 openocd-debug-server:
 	$(shell export SERIAL_NUMBERS=`lsusb -v | grep -C 20 'SEGGER J-Link' | grep "iSerial" | awk '{print $$NF}'` ; \
 	export COUNTER=0 ; \
