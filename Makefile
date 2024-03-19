@@ -5,12 +5,13 @@
 
 # Compiler options here.
 ifeq ($(USE_OPT),)
-  USE_OPT = -Og -ggdb -gdwarf-4 -g3 -fomit-frame-pointer -falign-functions=16 -std=c11 -fvar-tracking-assignments
+  # Warning, if you want to debug the code, substitute -Os to -O0
+  USE_OPT = -O0 -ggdb -fomit-frame-pointer -falign-functions=16 -std=c11 
 endif
 
 # C specific options here (added to USE_OPT).
 ifeq ($(USE_COPT),)
-  USE_COPT =
+  USE_COPT = 
 endif
 
 # C++ specific options here (added to USE_OPT).
@@ -60,7 +61,7 @@ endif
 # Stack size to be allocated to the Cortex-M process stack. This stack is
 # the stack used by the main() thread.
 ifeq ($(USE_PROCESS_STACKSIZE),)
-  USE_PROCESS_STACKSIZE = 0x400
+  USE_PROCESS_STACKSIZE = 0x800
 endif
 
 # Stack size to the allocated to the Cortex-M main/exceptions stack. This
@@ -125,8 +126,8 @@ LDSCRIPT= $(STARTUPLD_CONTRIB)/NRF52832.ld
 # C sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
 CSRC = $(ALLCSRC) \
-	$(TESTSRC) \
-	$(wildcard $(PSRCDIR)/*.c) \
+       $(TESTSRC) \
+       $(wildcard $(PSRCDIR)/*.c) \
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
@@ -186,7 +187,7 @@ BIN  = $(CP) -O binary
 SREC = $(CP) -O srec
 
 # ARM-specific options here
-AOPT =
+AOPT = 
 
 # THUMB-specific options here
 TOPT = -mthumb -DTHUMB
@@ -206,7 +207,7 @@ CPPWARN = -Wall -Wextra -Wundef
 #
 
 # List all user C define here, like -D_DEBUG=1
-UDEFS = -DRADIO_ESB_PRIMARY_TRANSMITTER
+UDEFS = -DRADIO_ESB_PRIMARY_TRANSMITTER 
 
 # Define ASM defines here
 UADEFS =
@@ -258,6 +259,7 @@ openocd-debug:
 	export OPENOCD_GDB_PORT=3333 ; \
 	for i in `seq 1 $$DEVICE_NUMBER` ; do \
 		sed -i "s/target extended-remote :.*/target extended-remote :$$((i+OPENOCD_GDB_PORT-1))/g" gdb/dwm1001.gdb ; \
+		sleep 1 ; \
 		$$TERM -e "arm-none-eabi-gdb -tui --command=./gdb/dwm1001.gdb" & \
 		sleep 1 ; \
 	done)

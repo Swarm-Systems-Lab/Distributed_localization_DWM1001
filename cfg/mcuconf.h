@@ -21,14 +21,24 @@
 #define NRF5_SOFTDEVICE_LFCLK_SOURCE   NRF_CLOCK_LF_SRC_XTAL
 #define NRF5_SOFTDEVICE_LFCLK_ACCURACY NRF_CLOCK_LF_XTAL_ACCURACY_20_PPM
 
-
 /*
  * HAL driver system settings.
  */
+#define NRF_SERIES                 52
 
 #define NRF5_SERIAL_USE_UART0             TRUE
-#define NRF5_ST_USE_RTC0                  TRUE
-#define NRF5_ST_USE_RTC1                  FALSE
-#define NRF5_ST_USE_TIMER0                FALSE
+#define NRF5_SERIAL_USE_HWFLOWCTRL        TRUE
+#define NRF5_RNG_USE_RNG0                 TRUE
+#define NRF5_GPT_USE_TIMER0               TRUE
+
+#define NRF5_QEI_USE_QDEC0 TRUE
+#define NRF5_QEI_USE_LED   FALSE
+
+#define WDG_USE_TIMEOUT_CALLBACK    TRUE
+
+/* SPI */
+#define NRF5_SPI_USE_SPI0          TRUE
+#define NRF5_SPI_USE_SPI1          FALSE
+#define SPI_SUPPORTS_CIRCULAR      FALSE
 
 #endif /* _MCUCONF_H_ */

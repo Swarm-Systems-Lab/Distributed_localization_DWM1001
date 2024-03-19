@@ -9,73 +9,121 @@
 
 #include "led.h"
 
-static THD_WORKING_AREA(waLEDThread, 64);
-static THD_FUNCTION(LEDThread, arg) {
-    (void)arg;
+SPIConfig spi_cfg = { .end_cb = NULL, .ssport = IOPORT1, .sspad = SPI_SS,
+        .freq = NRF5_SPI_FREQ_8MBPS, .sckpad = SPI_SCK, .mosipad = SPI_MOSI,
+        .misopad = SPI_MISO, .lsbfirst = false, .mode = 2};
 
-    chRegSetThreadName("blinker");
+void send_message() {
+	uint8_t header[3] = {0b10001001, 0X00, 0X00};
+	size_t header_size = 1;
+	size_t data_size = 10;
 
-    while (1) {
-      toggle_led(blue);
-      chThdSleepMilliseconds(500);
-    }
+	uint8_t sendtx[4] = {0x2,0x0,0x0,0x2};
+	
+	uint8_t data[10] = {0xde,0xad,0xbe,0xef,0xef,0xbe,0xad,0xde,0x0,0x0};
+	uint8_t message[20];
+
+	spiAcquireBus(&SPID1);
+	spiSelect(&SPID1);
+
+	memcpy(message, header, header_size);
+	memcpy(message+header_size, data, data_size);
+	spiSend(&SPID1, header_size+data_size, message);
+
+	spiUnselect(&SPID1);
+	spiReleaseBus(&SPID1);
+
+	header[0] = 0b10001101;
+
+	spiAcquireBus(&SPID1);
+	spiSelect(&SPID1);
+
+	memcpy(message, header, header_size);
+	memcpy(message+header_size, sendtx, 4);
+	spiSend(&SPID1, header_size+4, message);
+
+	spiUnselect(&SPID1);
+	spiReleaseBus(&SPID1);
+
+	toggle_led(blue);
 }
 
-static nrf52_config_t radiocfg = {
-.protocol = NRF52_PROTOCOL_ESB_DPL,
-.mode = NRF52_MODE_PRX,
-.bitrate = NRF52_BITRATE_1MBPS,
-.crc = NRF52_CRC_8BIT,
-.tx_power = NRF52_TX_POWER_0DBM,
-.tx_mode = NRF52_TXMODE_MANUAL_START,
-.selective_auto_ack = false,
-.retransmit = { 1000, 3 },
-.payload_length = 0,
-.address = {
-  .base_addr_p0 = { 0xF3, 0xF3, 0xF3, 0x01 },
-  .base_addr_p1 = { 0x3F, 0x3F, 0x3F, 0x01 },
-  .pipe_prefixes = { 0xF3, 0x3F, },
-  .num_pipes = 2,
-  .addr_length = 5,
-  .rx_pipes = 1 << 0,
-  .rf_channel = 1,
-  },
-};
+void recv_message() {
+	size_t header_size = 1;
+	size_t data_size = 10;
 
-static uint16_t cnt, fail_pkt, good_pkt;
-static nrf52_payload_t tx_payload = {
-  .pipe = 0,
-};
-static nrf52_payload_t rx_payload;
+	uint8_t sendrx[4] = {0x0,0x1,0x1,0x0};
+	
+	uint8_t received = 0;
+	uint8_t data[10];
+
+
+
+	uint32_t count=0;
+	uint8_t header[3] = {0b10001101, 0X00, 0X00};
+
+	while (!received && count<100) {
+
+		uint8_t message[20];
+
+		header[0] = 0b10001101;
+
+		spiAcquireBus(&SPID1);
+		spiSelect(&SPID1);
+
+		memcpy(message, header, header_size);
+		memcpy(message+header_size, sendrx, 4);
+		spiSend(&SPID1, header_size+4, message);
+
+		spiUnselect(&SPID1);
+		spiReleaseBus(&SPID1);
+
+		header[0] = 0xF;
+		uint8_t rx[5];
+		size_t rx_size = 5;
+
+		spiAcquireBus(&SPID1);
+		spiSelect(&SPID1);
+
+		spiSend(&SPID1, header_size, &header);
+		spiReceive(&SPID1, rx_size, rx);
+
+		spiUnselect(&SPID1);
+		spiReleaseBus(&SPID1);
+
+		received=((rx[1]>>5)&0x1);
+		count++;
+		chThdSleepMilliseconds(1);
+	}
+
+	header[0] = 0x11;
+	header_size = 1;
+
+
+	uint8_t rx2[10]={0,0,0,0,0,0,0,0,0,0};
+	size_t rx2_size = 10;
+
+	spiAcquireBus(&SPID1);
+	spiSelect(&SPID1);
+
+	spiSend(&SPID1, header_size, &header);
+	spiReceive(&SPID1, rx2_size, rx2);
+
+	spiUnselect(&SPID1);
+	spiReleaseBus(&SPID1);
+
+	if (received)
+		toggle_led(green);
+	else 
+		toggle_led(red2);
+
+}
 
 static THD_WORKING_AREA(waRadioThread, 256);
 static THD_FUNCTION(RadioThread, arg) {
     (void)arg;
 
-    event_listener_t el;
-    chEvtRegisterMask(&RFD1.eventsrc, &el, EVENT_MASK(0));
-
-    chRegSetThreadName("radio");
-
-    while (1) {
-      chEvtWaitAny(EVENT_MASK(0));
-      eventflags_t flags = chEvtGetAndClearFlags(&el);
-      if (flags & NRF52_EVENT_TX_SUCCESS) {
-          radio_start_rx();
-            toggle_led(red2);
-            good_pkt++;
-      }
-      if (flags & NRF52_EVENT_TX_FAILED) {
-          radio_start_rx();
-          toggle_led(red1);
-          fail_pkt++;
-      }
-      if (flags & NRF52_EVENT_RX_RECEIVED) {
-        memset(rx_payload.data, 0, 32);
-        radio_read_rx_payload(&rx_payload);
-        toggle_led(green);
-      }
-    }
+	recv_message();
 }
 
 int main(void) {
@@ -84,29 +132,44 @@ int main(void) {
 
     leds_off(ALL_LEDS);
 
-    radio_init(&radiocfg);
-    radio_flush_tx();
-    radio_flush_rx();
-    radio_start_rx();
+	dw_reset();
 
-    chThdCreateStatic(waLEDThread, sizeof(waLEDThread), NORMALPRIO, LEDThread, NULL);
-    chThdCreateStatic(waRadioThread, sizeof(waRadioThread), NORMALPRIO, RadioThread, NULL);
+	spiStart(&SPID1, &spi_cfg);
 
-    cnt = good_pkt = fail_pkt = 0;
+	// send_message();
+	// chThdSleepMilliseconds(20);
 
-    tx_payload.data[0] = 0x04;
-    tx_payload.data[1] = 0x33;
-    tx_payload.length = 2;
+	//chThdCreateStatic(waRadioThread, sizeof(waRadioThread), NORMALPRIO, RadioThread, NULL);
 
-    int contador = 0;
 
-    while (true) {
-      contador = contador + 1;
-      radio_stop_rx();
-      radio_write_payload(&tx_payload);
-      radio_start_tx();
-      chThdSleepMilliseconds(500);
-      if (strlen((char*) rx_payload.data))
-        rx_payload.data[0] = 0;
+	//uint16_t header  = 0b0000100000000000;
+	uint8_t header[3] = {0, 0X00, 0X00};
+	size_t header_size = 1;
+	size_t data_size = 10;
+
+	uint8_t sendtx[4] = {0x0,0x0,0x0,0x1};
+	
+	uint8_t data[10] = {0xde,0xad,0xbe,0xef,0xef,0xbe,0xad,0xde,0x0,0x0};
+
+	uint8_t read = 1;
+
+	uint8_t rx[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+	uint8_t rx2[4];
+	size_t rx_size = 4;
+
+	spiAcquireBus(&SPID1);
+	spiSelect(&SPID1);
+
+	spiSend(&SPID1, header_size, &header);
+	spiReceive(&SPID1, rx_size, rx);
+
+	spiUnselect(&SPID1);
+	spiReleaseBus(&SPID1);
+
+    while (true) {	
+		send_message();
+		chThdSleepMilliseconds(20);
+		recv_message();
+		chThdSleepMilliseconds(20);
     }
 }
