@@ -8,6 +8,7 @@
 #include "nrf52_radio.h"
 
 #include "led.h"
+#include "dw1000_hal.h"
 
 SPIConfig spi_cfg = { .end_cb = NULL, .ssport = IOPORT1, .sspad = SPI_SS,
         .freq = NRF5_SPI_FREQ_8MBPS, .sckpad = SPI_SCK, .mosipad = SPI_MOSI,
@@ -123,7 +124,12 @@ static THD_WORKING_AREA(waRadioThread, 256);
 static THD_FUNCTION(RadioThread, arg) {
     (void)arg;
 
-	recv_message();
+	 while (true) {	
+		send_message();
+		chThdSleepMilliseconds(20);
+		recv_message();
+		chThdSleepMilliseconds(20);
+    }
 }
 
 int main(void) {
@@ -132,14 +138,16 @@ int main(void) {
 
     leds_off(ALL_LEDS);
 
-	dw_reset();
+	dw_power_off();
+	chThdSleepMilliseconds(10);
+	dw_power_on();
 
 	spiStart(&SPID1, &spi_cfg);
 
 	// send_message();
 	// chThdSleepMilliseconds(20);
 
-	//chThdCreateStatic(waRadioThread, sizeof(waRadioThread), NORMALPRIO, RadioThread, NULL);
+	chThdCreateStatic(waRadioThread, sizeof(waRadioThread), NORMALPRIO, RadioThread, NULL);
 
 
 	//uint16_t header  = 0b0000100000000000;
@@ -153,7 +161,7 @@ int main(void) {
 
 	uint8_t read = 1;
 
-	uint8_t rx[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+	dev_id_t rx;
 	uint8_t rx2[4];
 	size_t rx_size = 4;
 
@@ -161,15 +169,16 @@ int main(void) {
 	spiSelect(&SPID1);
 
 	spiSend(&SPID1, header_size, &header);
-	spiReceive(&SPID1, rx_size, rx);
+	spiReceive(&SPID1, DW_REG_INFO.DEV_ID.size, rx.reg);
 
 	spiUnselect(&SPID1);
 	spiReleaseBus(&SPID1);
 
     while (true) {	
-		send_message();
+		//send_message();
 		chThdSleepMilliseconds(20);
-		recv_message();
+		//recv_message();
+		toggle_led(red1);
 		chThdSleepMilliseconds(20);
     }
 }

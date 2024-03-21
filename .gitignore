@@ -57,3 +57,4 @@ build/
 # Swamp files
 *.swp
 /Debug/
+.vscode
