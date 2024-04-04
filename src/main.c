@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "ch.h"
 #include "hal.h"
@@ -15,103 +16,49 @@ SPIConfig spi_cfg = { .end_cb = NULL, .ssport = IOPORT1, .sspad = SPI_SS,
         .misopad = SPI_MISO, .lsbfirst = false, .mode = 2};
 
 void send_message() {
-	uint8_t header[3] = {0b10001001, 0X00, 0X00};
-	size_t header_size = 1;
 	size_t data_size = 10;
 
 	uint8_t sendtx[4] = {0x2,0x0,0x0,0x2};
 	
 	uint8_t data[10] = {0xde,0xad,0xbe,0xef,0xef,0xbe,0xad,0xde,0x0,0x0};
-	uint8_t message[20];
 
-	spiAcquireBus(&SPID1);
-	spiSelect(&SPID1);
+	dw_write(DW_REG_INFO.TX_BUFFER, data, data_size, 0);
 
-	memcpy(message, header, header_size);
-	memcpy(message+header_size, data, data_size);
-	spiSend(&SPID1, header_size+data_size, message);
-
-	spiUnselect(&SPID1);
-	spiReleaseBus(&SPID1);
-
-	header[0] = 0b10001101;
-
-	spiAcquireBus(&SPID1);
-	spiSelect(&SPID1);
-
-	memcpy(message, header, header_size);
-	memcpy(message+header_size, sendtx, 4);
-	spiSend(&SPID1, header_size+4, message);
-
-	spiUnselect(&SPID1);
-	spiReleaseBus(&SPID1);
+	dw_write(DW_REG_INFO.SYS_CTRL, sendtx, 4, 0);
 
 	toggle_led(blue);
 }
 
 void recv_message() {
-	size_t header_size = 1;
-	size_t data_size = 10;
-
 	uint8_t sendrx[4] = {0x0,0x1,0x1,0x0};
 	
 	uint8_t received = 0;
 	uint8_t data[10];
 
-
-
 	uint32_t count=0;
-	uint8_t header[3] = {0b10001101, 0X00, 0X00};
 
 	while (!received && count<100) {
 
-		uint8_t message[20];
+		dw_write(DW_REG_INFO.SYS_CTRL, sendrx, 4, 0);
 
-		header[0] = 0b10001101;
+		sys_status_t statusrx;
 
-		spiAcquireBus(&SPID1);
-		spiSelect(&SPID1);
+		dw_read(DW_REG_INFO.SYS_STATUS, &statusrx, DW_REG_INFO.SYS_STATUS.size, 0);
 
-		memcpy(message, header, header_size);
-		memcpy(message+header_size, sendrx, 4);
-		spiSend(&SPID1, header_size+4, message);
-
-		spiUnselect(&SPID1);
-		spiReleaseBus(&SPID1);
-
-		header[0] = 0xF;
-		uint8_t rx[5];
-		size_t rx_size = 5;
-
-		spiAcquireBus(&SPID1);
-		spiSelect(&SPID1);
-
-		spiSend(&SPID1, header_size, &header);
-		spiReceive(&SPID1, rx_size, rx);
-
-		spiUnselect(&SPID1);
-		spiReleaseBus(&SPID1);
-
-		received=((rx[1]>>5)&0x1);
+		received=statusrx.RXDFR;
 		count++;
 		chThdSleepMilliseconds(1);
 	}
 
-	header[0] = 0x11;
-	header_size = 1;
-
+	sys_status_t statusrx2;
+	dw_read(DW_REG_INFO.SYS_STATUS, &statusrx2, DW_REG_INFO.SYS_STATUS.size, 0);
+	statusrx2.RXDFR = 1;
+	dw_write(DW_REG_INFO.SYS_STATUS, &statusrx2, DW_REG_INFO.SYS_STATUS.size, 0);
 
 	uint8_t rx2[10]={0,0,0,0,0,0,0,0,0,0};
 	size_t rx2_size = 10;
 
-	spiAcquireBus(&SPID1);
-	spiSelect(&SPID1);
-
-	spiSend(&SPID1, header_size, &header);
-	spiReceive(&SPID1, rx2_size, rx2);
-
-	spiUnselect(&SPID1);
-	spiReleaseBus(&SPID1);
+	dw_read(DW_REG_INFO.RX_BUFFER, rx2, rx2_size, 0);
 
 	if (received)
 		toggle_led(green);
@@ -125,11 +72,49 @@ static THD_FUNCTION(RadioThread, arg) {
     (void)arg;
 
 	 while (true) {	
-		send_message();
-		chThdSleepMilliseconds(20);
 		recv_message();
-		chThdSleepMilliseconds(20);
+		chThdSleepMilliseconds(100);
     }
+}
+
+void chibi_power_on(void)
+{
+	palSetPad(IOPORT1, DW_RST);
+}
+
+void chibi_power_off(void)
+{
+	palClearPad(IOPORT1, DW_RST);
+}
+
+void chibi_spi_lock(void)
+{
+	spiAcquireBus(&SPID1);
+}
+
+void chibi_spi_unlock(void)
+{
+	spiReleaseBus(&SPID1);
+}
+
+void chibi_spi_set_cs(void)
+{
+	spiSelect(&SPID1);
+}
+
+void chibi_spi_clear_cs(void)
+{
+	spiUnselect(&SPID1);
+}
+
+void chibi_spi_send(size_t count, const uint8_t* buf)
+{
+	spiSend(&SPID1, count, buf);
+}
+
+void chibi_spi_recv(size_t count, const uint8_t* buf)
+{
+	spiReceive(&SPID1, count, buf);
 }
 
 int main(void) {
@@ -138,47 +123,30 @@ int main(void) {
 
     leds_off(ALL_LEDS);
 
-	dw_power_off();
+	dw_set_power_on(chibi_power_on);
+	dw_set_power_off(chibi_power_off);
+
+	_dw_power_off();
 	chThdSleepMilliseconds(10);
-	dw_power_on();
+	_dw_power_on();
 
 	spiStart(&SPID1, &spi_cfg);
 
-	// send_message();
-	// chThdSleepMilliseconds(20);
+	//chThdCreateStatic(waRadioThread, sizeof(waRadioThread), NORMALPRIO, RadioThread, NULL);
 
-	chThdCreateStatic(waRadioThread, sizeof(waRadioThread), NORMALPRIO, RadioThread, NULL);
+	dw_set_spi_lock(chibi_spi_lock);
+	dw_set_spi_unlock(chibi_spi_unlock);
+	dw_set_spi_set_cs(chibi_spi_set_cs);
+	dw_set_spi_clear_cs(chibi_spi_clear_cs);
+	dw_set_spi_send(chibi_spi_send);
+	dw_set_spi_recv(chibi_spi_recv);
 
+	dev_id_t dev_test;
 
-	//uint16_t header  = 0b0000100000000000;
-	uint8_t header[3] = {0, 0X00, 0X00};
-	size_t header_size = 1;
-	size_t data_size = 10;
+	dw_read(DW_REG_INFO.DEV_ID, &dev_test, DW_REG_INFO.DEV_ID.size, 0);
 
-	uint8_t sendtx[4] = {0x0,0x0,0x0,0x1};
-	
-	uint8_t data[10] = {0xde,0xad,0xbe,0xef,0xef,0xbe,0xad,0xde,0x0,0x0};
-
-	uint8_t read = 1;
-
-	dev_id_t rx;
-	uint8_t rx2[4];
-	size_t rx_size = 4;
-
-	spiAcquireBus(&SPID1);
-	spiSelect(&SPID1);
-
-	spiSend(&SPID1, header_size, &header);
-	spiReceive(&SPID1, DW_REG_INFO.DEV_ID.size, rx.reg);
-
-	spiUnselect(&SPID1);
-	spiReleaseBus(&SPID1);
-
-    while (true) {	
-		//send_message();
-		chThdSleepMilliseconds(20);
-		//recv_message();
-		toggle_led(red1);
-		chThdSleepMilliseconds(20);
-    }
+	while (true) {	
+		send_message();
+		chThdSleepMilliseconds(100);
+	}
 }

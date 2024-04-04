@@ -14,6 +14,9 @@
  *
  */
 
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
 typedef enum dw_reg_file_perms
 {
@@ -22,8 +25,37 @@ typedef enum dw_reg_file_perms
 	RW,
 	SRW,		// Special Read Write, refer to docs
 	ROD,		// Read only double buffer
-	RWD			// Read write double buffer
 } reg_perm;
+
+typedef struct dw_pin_hal
+{
+	void (*_dw_power_on_func)(void);
+	void (*_dw_power_off_func)(void);
+} pin_hal_t;
+
+typedef struct dw_spi_hal
+{
+	void (*_dw_spi_lock)(void);
+	void (*_dw_spi_unlock)(void);
+	void (*_dw_spi_set_cs)(void);
+	void (*_dw_spi_clear_cs)(void);
+	void (*_dw_spi_send)(size_t, const uint8_t*);
+	void (*_dw_spi_recv)(size_t, const uint8_t*);
+} spi_hal_t;
+
+typedef struct dw_spi_header
+{
+	struct
+	{
+		uint8_t id			:6;
+		uint8_t subindex	:1;
+		uint8_t is_write	:1;
+		uint8_t l_sub_addr	:7;
+		uint8_t ext_addr	:1;
+		uint8_t h_sub_addr;	
+	} header;
+	size_t size;
+} spi_header_t;
 
 typedef struct dw_reg_metadata
 {
@@ -75,7 +107,7 @@ struct dw_register_set
     reg_metadata_t PMSC;         
 }; 
 
-const struct dw_register_set DW_REG_INFO = 
+static const struct dw_register_set DW_REG_INFO = 
 {
 	{0x00, 4, RO},		
 	{0x01, 8, RW},		
@@ -118,6 +150,9 @@ const struct dw_register_set DW_REG_INFO =
 	{0X36, 48, RW}
 };
 
+extern pin_hal_t _dw_pin_hal_set;
+
+extern spi_hal_t _dw_spi_hal_set;
 
 typedef struct dw_dev_id
 {
@@ -401,10 +436,10 @@ typedef struct dw_rx_time
 	{
 		struct
 		{
-			uint64_t RX_STAMP	:40;
-			uint64_t FP_INDEX	:16;
-			uint64_t FP_AMPL1	:16;
-			uint64_t RX_RAWST	:40;
+			uint8_t RX_STAMP[5];
+			uint8_t FP_INDEX[2];
+			uint8_t FP_AMPL1[2];
+			uint8_t RX_RAWST[5];
 		};
 		uint8_t reg[14]; 
 	};
@@ -416,8 +451,8 @@ typedef struct dw_tx_time
 	{
 		struct
 		{
-			uint64_t TX_STAMP	:40;
-			uint64_t RX_RAWST	:40;
+			uint8_t TX_STAMP[5];
+			uint8_t TX_RAWST[5];
 		};
 		uint8_t reg[10]; 
 	};
@@ -706,6 +741,37 @@ typedef struct dw_otp_if
 // } otp_reg_t;
 
 
-static inline void dw_power_on(void) {palSetPad(IOPORT1, DW_RST);}
+void _dw_power_on(void);
 
-static inline void dw_power_off(void) {palClearPad(IOPORT1, DW_RST);}
+void _dw_power_off(void);
+
+// TODO Indicate to user this should only be called on mutual exclusion
+void dw_set_power_on(void (*_dw_power_on_func)(void));
+void dw_set_power_off(void (*_dw_power_off_func)(void));
+
+void dw_set_spi_lock(void (*spi_lock_func)(void));
+void dw_set_spi_unlock(void (*spi_unlock_func)(void));
+void dw_set_spi_set_cs(void (*spi_set_cs_func)(void));
+void dw_set_spi_clear_cs(void (*spi_clear_cs_func)(void));
+
+void dw_set_spi_send(void (*spi_send_func)(size_t, const uint8_t*));
+void dw_set_spi_recv(void (*spi_recv_func)(size_t, const uint8_t*));
+
+
+void dw_reset(void);
+
+int8_t validate_spi_hal(void);
+
+int8_t validate_metadata(reg_metadata_t info);
+
+int8_t validate_spi_transaction(reg_metadata_t info, size_t count, uint16_t offset);
+
+int8_t validate_dw(reg_metadata_t info, size_t count, uint16_t offset);
+
+spi_header_t _build_header(uint8_t is_read_op, uint8_t id, uint16_t offset);
+
+void _dw_spi_transaction(uint8_t is_read_op,  uint8_t reg_id, uint8_t* buf, size_t count, uint16_t offset);
+
+int8_t dw_read(reg_metadata_t info, uint8_t* buf, size_t count, uint16_t offset);
+
+int8_t dw_write(reg_metadata_t info, uint8_t* buf, size_t count, uint16_t offset);
