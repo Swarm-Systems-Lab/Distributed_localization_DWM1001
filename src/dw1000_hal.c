@@ -32,6 +32,42 @@ spi_hal_t _dw_spi_hal_set =
 	NULL
 };
 
+irq_vector_t irq_vector = 
+{
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL
+};
+
 void _dw_power_on(void)
 {
 	_dw_pin_hal_set._dw_power_on_func();
@@ -168,7 +204,6 @@ void _dw_spi_transaction(uint8_t is_read_op,  uint8_t reg_id, uint8_t* buf, size
 {
 	spi_header_t spi_header = _build_header(is_read_op, reg_id, offset);
 
-	_dw_spi_hal_set._dw_spi_lock();
 	_dw_spi_hal_set._dw_spi_set_cs();
 
 	if (is_read_op)
@@ -187,7 +222,6 @@ void _dw_spi_transaction(uint8_t is_read_op,  uint8_t reg_id, uint8_t* buf, size
 	}
 
 	_dw_spi_hal_set._dw_spi_clear_cs();
-	_dw_spi_hal_set._dw_spi_unlock();
 }
 
 int8_t dw_read(reg_metadata_t info, uint8_t* buf, size_t count, uint16_t offset)
@@ -202,7 +236,9 @@ int8_t dw_read(reg_metadata_t info, uint8_t* buf, size_t count, uint16_t offset)
 	// if (info.perm == ROD)
 	// 	configure_rod();
 
+	_dw_spi_hal_set._dw_spi_lock();
 	_dw_spi_transaction(1, info.id, buf, count, offset);
+	_dw_spi_hal_set._dw_spi_unlock();
 
 	return count;
 }
@@ -216,7 +252,100 @@ int8_t dw_write(reg_metadata_t info, uint8_t* buf, size_t count, uint16_t offset
 	if (info.perm == RO || info.perm == ROD)
 		return -2;
 
+	_dw_spi_hal_set._dw_spi_lock();
 	_dw_spi_transaction(0, info.id, buf, count, offset);
+	_dw_spi_hal_set._dw_spi_unlock();
 
 	return count;
+}
+
+void dw_set_irq(sys_mask_t set_mask)
+{
+	sys_mask_t current_mask;
+	_dw_spi_hal_set._dw_spi_lock();
+	_dw_spi_transaction(1, DW_REG_INFO.SYS_MASK.id, current_mask.reg, DW_REG_INFO.SYS_MASK.size, 0);
+
+	sys_mask_t next_mask;
+	next_mask.mask = current_mask.mask | set_mask.mask;
+	_dw_spi_transaction(0, DW_REG_INFO.SYS_MASK.id, next_mask.reg, DW_REG_INFO.SYS_MASK.size, 0);
+	_dw_spi_hal_set._dw_spi_unlock();
+}
+
+void dw_clear_irq(sys_mask_t clear_mask)
+{
+	sys_mask_t current_mask;
+	_dw_spi_hal_set._dw_spi_lock();
+	_dw_spi_transaction(1, DW_REG_INFO.SYS_MASK.id, current_mask.reg, DW_REG_INFO.SYS_MASK.size, 0);
+
+	sys_mask_t next_mask;
+	next_mask.mask = current_mask.mask & ~clear_mask.mask;
+	_dw_spi_transaction(0, DW_REG_INFO.SYS_MASK.id, next_mask.reg, DW_REG_INFO.SYS_MASK.size, 0);
+	_dw_spi_hal_set._dw_spi_unlock();
+}
+
+void _dw_irq_handler(void)
+{
+// TODO check if event callbacks are in mutual exclusion
+	sys_status_t current_status;
+	current_status.mask = 1;
+
+	sys_mask_t current_mask;
+	
+	_dw_spi_hal_set._dw_spi_lock();
+	_dw_spi_transaction(1, DW_REG_INFO.SYS_MASK.id, current_mask.reg, DW_REG_INFO.SYS_MASK.size, 0);
+
+	while (current_status.mask)
+	{
+		_dw_spi_transaction(1, DW_REG_INFO.SYS_STATUS.id, current_status.reg, DW_REG_INFO.SYS_STATUS.size, 0);
+
+		current_status.mask &= current_mask.mask;
+
+		// Clearing reserved bits to avoid calling a reserved address
+		current_status.mask &= 0x3FF7FFFE;
+
+		// TODO this gets first set bit maybe better to make a for loop and priority array
+		uint8_t pos = __builtin_ffs(current_status.mask);
+
+		if (pos)
+		{
+			//  TODO add warning cannot change irq_vector while interrupts are enabled
+			irq_vector.vector[pos-1]();
+
+			// TODO disable mask each interrupt or manually
+			// sys_mask_t irq_mask;
+			// irq_mask.mask = current_status.mask;
+			// dw_clear_irq(irq_mask);
+
+			sys_status_t handled_mask;
+			handled_mask.mask = 1 << (pos-1);
+			// TODO check if writing 1 is good for bit 20 23 27 30 31
+			handled_mask.mask &= 0x376FFFFF;
+			_dw_spi_transaction(0, DW_REG_INFO.SYS_STATUS.id, handled_mask.reg, DW_REG_INFO.SYS_STATUS.size, 0);
+		}
+	}
+	_dw_spi_hal_set._dw_spi_unlock();
+}
+
+void dw_start_tx(tx_fctrl_t tx_fctrl, uint8_t * tx_buf)
+{
+	_dw_spi_hal_set._dw_spi_lock();
+	// TODO add sfcst support
+	validate_spi_transaction(DW_REG_INFO.TX_BUFFER, tx_fctrl.TFLEN, 0);
+	_dw_spi_transaction(0, DW_REG_INFO.TX_BUFFER.id, tx_buf, tx_fctrl.TFLEN, 0);
+
+	_dw_spi_transaction(0, DW_REG_INFO.TX_FCTRL.id, tx_fctrl.reg, DW_REG_INFO.TX_FCTRL.size, 0);
+
+	sys_ctrl_t ctrl_tx_start;
+	ctrl_tx_start.mask = 0;
+	ctrl_tx_start.TXSTRT = 1;
+	//TODO delyed transmission and check extended send
+	_dw_spi_transaction(0, DW_REG_INFO.SYS_CTRL.id, ctrl_tx_start.reg, DW_REG_INFO.SYS_CTRL.size, 0);
+	_dw_spi_hal_set._dw_spi_unlock();
+}
+
+void dw_start_rx(uint8_t * rx_buf)
+{
+	_dw_spi_hal_set._dw_spi_lock();
+	// TODO add sfcst support
+	_dw_spi_hal_set._dw_spi_unlock();
 }

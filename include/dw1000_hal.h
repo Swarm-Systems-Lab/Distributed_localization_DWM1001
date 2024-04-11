@@ -18,6 +18,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+// TODO remove
+#include "ch.h"
+#include "hal.h"
+
 typedef enum dw_reg_file_perms
 {
 	RO,
@@ -26,6 +30,8 @@ typedef enum dw_reg_file_perms
 	SRW,		// Special Read Write, refer to docs
 	ROD,		// Read only double buffer
 } reg_perm;
+
+// TODO priority for interrupts?
 
 typedef struct dw_pin_hal
 {
@@ -42,6 +48,49 @@ typedef struct dw_spi_hal
 	void (*_dw_spi_send)(size_t, const uint8_t*);
 	void (*_dw_spi_recv)(size_t, const uint8_t*);
 } spi_hal_t;
+
+typedef struct dw_irq_vector
+{
+	union
+	{
+		struct
+		{
+			void (*_reserved_irq0)(void);
+			void (*_dw_CPLOCK_handler)(void);
+			void (*_dw_ESYNCR_handler)(void);
+			void (*_dw_AAT_handler)(void);
+			void (*_dw_TXFRB_handler)(void);
+			void (*_dw_TXPRS_handler)(void);
+			void (*_dw_TXPHS_handler)(void);
+			void (*_dw_TXFRS_handler)(void);
+			void (*_dw_RXPRD_handler)(void);
+			void (*_dw_RXFSDD_handler)(void);
+			void (*_dw_LDEDONE_handler)(void);
+			void (*_dw_RXPHD_handler)(void);
+			void (*_dw_RXPHE_handler)(void);
+			void (*_dw_RXDFR_handler)(void);
+			void (*_dw_RXFCG_handler)(void);
+			void (*_dw_RXFCE_handler)(void);
+			void (*_dw_RXRFSL_handler)(void);
+			void (*_dw_RXRFTO_handler)(void);
+			void (*_dw_LDEERR_handler)(void);
+			void (*_reserved_irq19)(void);
+			void (*_dw_RXOVRR_handler)(void);
+			void (*_dw_RXPTO_handler)(void);
+			void (*_dw_GPIOIRQ_handler)(void);
+			void (*_dw_SLP2INIT_handler)(void);
+			void (*_dw_RFPLL_LL_handler)(void);
+			void (*_dw_CLKPLL_LL_handler)(void);
+			void (*_dw_RXSFDTO_handler)(void);
+			void (*_dw_HPDWARN_handler)(void);
+			void (*_dw_TXBERR_handler)(void);
+			void (*_dw_AFFREJ_handler)(void);
+			void (*_reserved_irq30)(void);
+			void (*_reserved_irq31)(void);
+		};
+		void (*vector[32])(void);
+	};
+} irq_vector_t;
 
 typedef struct dw_spi_header
 {
@@ -154,6 +203,8 @@ extern pin_hal_t _dw_pin_hal_set;
 
 extern spi_hal_t _dw_spi_hal_set;
 
+extern irq_vector_t irq_vector;
+
 typedef struct dw_dev_id
 {
 	union 
@@ -212,6 +263,7 @@ typedef struct dw_sys_cfg
 			uint32_t AACKPEND	:1;
 		};
 		uint8_t reg[4]; 
+		uint32_t mask; 
 	};
 } sys_cfg_t;
 
@@ -275,7 +327,8 @@ typedef struct dw_sys_ctrl
 			uint32_t HRBPT		:1;
 			uint32_t			:7;
 		};
-		uint8_t reg[4]; 
+		uint8_t reg[4];
+		uint32_t mask; 
 	};
 } sys_ctrl_t;
 
@@ -317,7 +370,8 @@ typedef struct dw_sys_mask
 			uint32_t MAFFREJ	:1;
 			uint32_t 			:2;
 		};
-		uint8_t reg[4]; 
+		uint8_t reg[4];
+		uint32_t mask; 
 	};
 } sys_mask_t;
 
@@ -365,6 +419,7 @@ typedef struct dw_sys_status
 			uint8_t				:5;
 		};
 		uint8_t reg[5]; 
+		uint32_t mask;
 	};
 } sys_status_t;
 
@@ -385,7 +440,8 @@ typedef struct dw_rx_finfo
 			uint32_t RXPSR		:2;
 			uint32_t RXPACC		:12;
 		};
-		uint8_t reg[4]; 
+		uint8_t reg[4];
+		uint32_t mask; 
 	};
 } rx_info_t;	
 
@@ -757,21 +813,110 @@ void dw_set_spi_clear_cs(void (*spi_clear_cs_func)(void));
 void dw_set_spi_send(void (*spi_send_func)(size_t, const uint8_t*));
 void dw_set_spi_recv(void (*spi_recv_func)(size_t, const uint8_t*));
 
-
+/**
+ * @brief 
+ * 
+ */
 void dw_reset(void);
 
+/**
+ * @brief 
+ * 
+ * @return int8_t 
+ */
 int8_t validate_spi_hal(void);
 
+/**
+ * @brief 
+ * 
+ * @param info 
+ * @return int8_t 
+ */
 int8_t validate_metadata(reg_metadata_t info);
 
+/**
+ * @brief 
+ * 
+ * @param info 
+ * @param count 
+ * @param offset 
+ * @return int8_t 
+ */
 int8_t validate_spi_transaction(reg_metadata_t info, size_t count, uint16_t offset);
 
+/**
+ * @brief 
+ * 
+ * @param info 
+ * @param count 
+ * @param offset 
+ * @return int8_t 
+ */
 int8_t validate_dw(reg_metadata_t info, size_t count, uint16_t offset);
 
+/**
+ * @brief 
+ * 
+ * @param is_read_op 
+ * @param id 
+ * @param offset 
+ * @return spi_header_t 
+ */
 spi_header_t _build_header(uint8_t is_read_op, uint8_t id, uint16_t offset);
 
+/**
+ * @brief 
+ * 
+ * @param is_read_op 
+ * @param reg_id 
+ * @param buf 
+ * @param count 
+ * @param offset 
+ */
 void _dw_spi_transaction(uint8_t is_read_op,  uint8_t reg_id, uint8_t* buf, size_t count, uint16_t offset);
 
+/**
+ * @brief 
+ * 
+ * @param info 
+ * @param buf 
+ * @param count 
+ * @param offset 
+ * @return int8_t 
+ */
 int8_t dw_read(reg_metadata_t info, uint8_t* buf, size_t count, uint16_t offset);
 
+/**
+ * @brief 
+ * 
+ * @param info 
+ * @param buf 
+ * @param count 
+ * @param offset 
+ * @return int8_t 
+ */
 int8_t dw_write(reg_metadata_t info, uint8_t* buf, size_t count, uint16_t offset);
+
+/**
+ * @brief 
+ * 
+ * @param set_mask 
+ */
+void dw_set_irq(sys_mask_t set_mask);
+
+/**
+ * @brief 
+ * 
+ * @param clear_mask 
+ */
+void dw_clear_irq(sys_mask_t clear_mask);
+
+
+// TODO add to docs chibios event callbacks are in syslock check mode
+void _dw_irq_handler(void);
+
+void dw_start_tx(tx_fctrl_t tx_fctrl, uint8_t * tx_buf);
+
+void dw_start_rx(uint8_t * rx_buf);
+
+//TODO add function to include tx time in uwb message format ieee with delayed tx
