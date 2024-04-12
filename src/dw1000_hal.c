@@ -329,7 +329,7 @@ void _dw_irq_handler(void)
 void dw_start_tx(tx_fctrl_t tx_fctrl, uint8_t * tx_buf)
 {
 	_dw_spi_hal_set._dw_spi_lock();
-	// TODO add sfcst support
+	// TODO add sfcst support DANGER MEMORY
 	validate_spi_transaction(DW_REG_INFO.TX_BUFFER, tx_fctrl.TFLEN, 0);
 	_dw_spi_transaction(0, DW_REG_INFO.TX_BUFFER.id, tx_buf, tx_fctrl.TFLEN, 0);
 
@@ -343,9 +343,13 @@ void dw_start_tx(tx_fctrl_t tx_fctrl, uint8_t * tx_buf)
 	_dw_spi_hal_set._dw_spi_unlock();
 }
 
-void dw_start_rx(uint8_t * rx_buf)
+void dw_start_rx()
 {
 	_dw_spi_hal_set._dw_spi_lock();
-	// TODO add sfcst support
+	sys_ctrl_t ctrl_rx_enab;
+	ctrl_rx_enab.mask = 0;
+	ctrl_rx_enab.RXENAB = 1;
+	//TODO delyed transmission and check extended send
+	_dw_spi_transaction(0, DW_REG_INFO.SYS_CTRL.id, ctrl_rx_enab.reg, DW_REG_INFO.SYS_CTRL.size, 0);
 	_dw_spi_hal_set._dw_spi_unlock();
 }

@@ -917,6 +917,6 @@ void _dw_irq_handler(void);
 
 void dw_start_tx(tx_fctrl_t tx_fctrl, uint8_t * tx_buf);
 
-void dw_start_rx(uint8_t * rx_buf);
+void dw_start_rx(void);
 
 //TODO add function to include tx time in uwb message format ieee with delayed tx
