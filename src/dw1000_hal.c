@@ -16,16 +16,10 @@
 
 #include "dw1000_hal.h"
 
-pin_hal_t _dw_pin_hal_set = 
-{
-	NULL,
-	NULL
-};
+uint64_t hardware_id = 0;
 
 spi_hal_t _dw_spi_hal_set = 
 {
-	NULL,
-	NULL,
 	NULL,
 	NULL,
 	NULL,
@@ -68,33 +62,6 @@ irq_vector_t irq_vector =
 	NULL
 };
 
-void _dw_power_on(void)
-{
-	_dw_pin_hal_set._dw_power_on_func();
-}
-
-void _dw_power_off(void)
-{
-	_dw_pin_hal_set._dw_power_off_func();
-}
-
-void dw_reset(void) 
-{
-	_dw_power_on();
-	//host_sleep(10);
-	_dw_power_off();
-}
-
-void dw_set_power_on(void (*_dw_power_on_func)(void))
-{
-	_dw_pin_hal_set._dw_power_on_func = _dw_power_on_func;
-}
-
-void dw_set_power_off(void (*_dw_power_off_func)(void))
-{
-	_dw_pin_hal_set._dw_power_off_func = _dw_power_off_func;
-}
-
 void dw_set_spi_lock(void (*spi_lock_func)(void))
 {
 	_dw_spi_hal_set._dw_spi_lock = spi_lock_func;
@@ -123,6 +90,12 @@ void dw_set_spi_send(void (*spi_send_func)(size_t, const uint8_t*))
 void dw_set_spi_recv(void (*spi_recv_func)(size_t, const uint8_t*))
 {
 	_dw_spi_hal_set._dw_spi_recv = spi_recv_func;
+}
+
+void dw_clear_register(uint8_t* reg, size_t size)
+{
+	for (size_t i = 0; i < size; i++)
+		reg[i] = 0;
 }
 
 int8_t validate_spi_hal(void)
@@ -191,7 +164,7 @@ spi_header_t _build_header(uint8_t is_read_op, uint8_t id, uint16_t offset)
 		spi_header.header.subindex = 1;
 		spi_header.header.ext_addr = 1;
 		spi_header.header.l_sub_addr = offset & 0x7F; // low 7 bits of offset
-		spi_header.header.h_sub_addr = offset & 0x7F80; // high 8 bits of offset (subaddress is 15 bits)
+		spi_header.header.h_sub_addr = (uint8_t)((offset & 0x7F80) >> 7); // high 8 bits of offset (subaddress is 15 bits)
 		spi_header.size = 3;
 	}
 	else
@@ -326,10 +299,11 @@ void _dw_irq_handler(void)
 	_dw_spi_hal_set._dw_spi_unlock();
 }
 
-void dw_start_tx(tx_fctrl_t tx_fctrl, uint8_t * tx_buf)
+// TODO add sfcst support DANGER MEMORY in TFLEN
+
+void dw_start_tx(tx_fctrl_t tx_fctrl, uint8_t* tx_buf, dx_time_t dly_time, ack_resp_t_t w4r_time)
 {
 	_dw_spi_hal_set._dw_spi_lock();
-	// TODO add sfcst support DANGER MEMORY
 	validate_spi_transaction(DW_REG_INFO.TX_BUFFER, tx_fctrl.TFLEN, 0);
 	_dw_spi_transaction(0, DW_REG_INFO.TX_BUFFER.id, tx_buf, tx_fctrl.TFLEN, 0);
 
@@ -338,18 +312,124 @@ void dw_start_tx(tx_fctrl_t tx_fctrl, uint8_t * tx_buf)
 	sys_ctrl_t ctrl_tx_start;
 	ctrl_tx_start.mask = 0;
 	ctrl_tx_start.TXSTRT = 1;
-	//TODO delyed transmission and check extended send
+
+	if(dly_time.time)
+	{
+		ctrl_tx_start.TXDLYS = 1;
+		_dw_spi_transaction(0, DW_REG_INFO.DX_TIME.id, dly_time.reg, DW_REG_INFO.DX_TIME.size, 0);
+	}
+
+	if (w4r_time.ACK_TIM) // TODO Documents ACK_TIM is used to tell if W4R is used
+	{
+		ctrl_tx_start.WAIT4RESP = 1;
+		w4r_time.reg[2] &= 0x0F; // Reserved bits must be written as 0
+		_dw_spi_transaction(0, DW_REG_INFO.ACK_RESP_T.id, w4r_time.reg, 3, 0);
+	}
+
 	_dw_spi_transaction(0, DW_REG_INFO.SYS_CTRL.id, ctrl_tx_start.reg, DW_REG_INFO.SYS_CTRL.size, 0);
 	_dw_spi_hal_set._dw_spi_unlock();
 }
 
-void dw_start_rx()
+void dw_start_rx(dx_time_t dly_time)
 {
 	_dw_spi_hal_set._dw_spi_lock();
 	sys_ctrl_t ctrl_rx_enab;
 	ctrl_rx_enab.mask = 0;
 	ctrl_rx_enab.RXENAB = 1;
-	//TODO delyed transmission and check extended send
+
+	if(dly_time.time)
+	{
+		ctrl_rx_enab.RXDLYE = 1;
+		_dw_spi_transaction(0, DW_REG_INFO.DX_TIME.id, dly_time.reg, DW_REG_INFO.DX_TIME.size, 0);
+	}
+
 	_dw_spi_transaction(0, DW_REG_INFO.SYS_CTRL.id, ctrl_rx_enab.reg, DW_REG_INFO.SYS_CTRL.size, 0);
 	_dw_spi_hal_set._dw_spi_unlock();
+}
+
+sys_state_t dw_transceiver_off()
+{
+	sys_ctrl_t ctrl;
+	sys_state_t previous_state;
+
+	_dw_spi_hal_set._dw_spi_lock();
+	_dw_spi_transaction(1, DW_REG_INFO.SYS_STATE.id, previous_state.reg, DW_REG_INFO.SYS_STATE.size, 0);
+	ctrl.mask = 0;
+	ctrl.TRXOFF = 1;
+	_dw_spi_transaction(0, DW_REG_INFO.SYS_CTRL.id, ctrl.reg, DW_REG_INFO.SYS_CTRL.size, 0);
+	_dw_spi_hal_set._dw_spi_unlock();
+
+	return previous_state;
+}
+
+void dw_command_read_OTP(uint16_t address)
+{
+	otp_if_t otp;
+	dw_clear_register(otp.otp_addr, 2);
+	otp.otp_addr[0] = (uint8_t)(address & 0x00FF);
+	otp.otp_addr[1] = (uint8_t)(address & 0x0700);
+	dw_clear_register(otp.otp_ctrl, 2);
+	otp.OTPREAD = 1;
+	otp.OTPRDEN = 1;
+
+	_dw_spi_hal_set._dw_spi_lock(); 
+	_dw_spi_transaction(0, DW_REG_INFO.OTP_IF.id, otp.otp_addr, sizeof(otp.otp_addr), 0x4); // TODO check to remove these magic numbers by using struct offset
+	_dw_spi_transaction(0, DW_REG_INFO.OTP_IF.id, otp.otp_ctrl, sizeof(otp.otp_ctrl), 0x6);
+	dw_clear_register(otp.otp_ctrl, 2);
+	_dw_spi_transaction(0, DW_REG_INFO.OTP_IF.id, otp.otp_ctrl, sizeof(otp.otp_ctrl), 0x6);
+	_dw_spi_hal_set._dw_spi_unlock();
+}
+
+uint64_t dw_get_tx_time(void)
+{
+	tx_time_t time;
+	uint64_t timestamp = 0;
+	dw_clear_register(time.reg, sizeof(time.reg));
+
+	dw_read(DW_REG_INFO.TX_TIME, time.reg, DW_REG_INFO.TX_TIME.size, 0);
+
+	timestamp |= (uint64_t)time.TX_RAWST[0];
+	timestamp |= (uint64_t)time.TX_RAWST[1] << 8;
+	timestamp |= (uint64_t)time.TX_RAWST[2] << 16;
+	timestamp |= (uint64_t)time.TX_RAWST[3] << 24;
+	timestamp |= (uint64_t)time.TX_RAWST[4] << 32;
+
+	return timestamp;
+}
+
+uint64_t dw_get_rx_time(void)
+{
+	rx_time_t time;
+	uint64_t timestamp = 0;
+	dw_clear_register(time.reg, sizeof(time.reg));
+
+	dw_read(DW_REG_INFO.RX_TIME, time.reg, DW_REG_INFO.RX_TIME.size, 0);
+
+	timestamp |= (uint64_t)time.RX_RAWST[0];
+	timestamp |= (uint64_t)time.RX_RAWST[1] << 8;
+	timestamp |= (uint64_t)time.RX_RAWST[2] << 16;
+	timestamp |= (uint64_t)time.RX_RAWST[3] << 24;
+	timestamp |= (uint64_t)time.RX_RAWST[4] << 32;
+
+	return timestamp;
+}
+
+int32_t dw_get_car_int(void)
+{
+	uint8_t car_int[3];
+	uint32_t u_car_int = 0;
+
+	dw_read(DW_REG_INFO.DRX_CONF, car_int, 3, 0x28);
+
+	u_car_int |= (uint32_t)car_int[0];
+	u_car_int |= (uint32_t)car_int[1] << 8;
+	u_car_int |= (uint32_t)car_int[2] << 16;
+
+	// Extend sign
+	if (u_car_int & 0x00100000)
+		u_car_int |= 0xFFF00000;
+	else	
+		u_car_int &= 0x001FFFFF;
+
+	return u_car_int;
 }

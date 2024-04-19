@@ -18,9 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// TODO remove
-#include "ch.h"
-#include "hal.h"
+extern uint64_t hardware_id;
 
 typedef enum dw_reg_file_perms
 {
@@ -32,12 +30,6 @@ typedef enum dw_reg_file_perms
 } reg_perm;
 
 // TODO priority for interrupts?
-
-typedef struct dw_pin_hal
-{
-	void (*_dw_power_on_func)(void);
-	void (*_dw_power_off_func)(void);
-} pin_hal_t;
 
 typedef struct dw_spi_hal
 {
@@ -151,7 +143,7 @@ struct dw_register_set
     reg_metadata_t FS_CTRL;      
     reg_metadata_t AON;          
     reg_metadata_t OTP_IF;       
-    reg_metadata_t LDE_IF;       
+    reg_metadata_t LDE_CTRL;       
     reg_metadata_t DIG_DIAG;     
     reg_metadata_t PMSC;         
 }; 
@@ -198,8 +190,6 @@ static const struct dw_register_set DW_REG_INFO =
 	{0X2F, 41, RW},
 	{0X36, 48, RW}
 };
-
-extern pin_hal_t _dw_pin_hal_set;
 
 extern spi_hal_t _dw_spi_hal_set;
 
@@ -298,10 +288,19 @@ typedef struct dw_tx_buffer
 	uint8_t reg[1024];
 } tx_buffer_t;
 
-// typedef struct dw_dx_time
-// {
-// 	/* data */
-// } dx_time_t;
+#pragma pack (1)
+typedef struct dw_dx_time
+{
+	union 
+	{
+		struct
+		{
+			uint8_t reserved;
+			uint32_t time;
+		};
+		uint8_t reg[5]; 
+	};
+} dx_time_t;
 
 // typedef struct dw_rx_fwto
 // {
@@ -443,7 +442,7 @@ typedef struct dw_rx_finfo
 		uint8_t reg[4];
 		uint32_t mask; 
 	};
-} rx_info_t;	
+} rx_finfo_t;	
 
 // typedef struct dw_rx_buffer
 // {
@@ -632,10 +631,31 @@ typedef struct dw_chan_ctrl
 // 	/* data */
 // } gpio_ctrl_t;
 
-// typedef struct dw_drx_conf
-// {
-// 	/* data */
-// } drx_conf_t;
+#pragma pack (1)
+typedef struct dw_drx_conf
+{
+	union 
+	{
+		struct
+		{
+			uint16_t drx_res1;
+			uint16_t drx_tune0b;
+			uint16_t drx_tune1a;
+			uint16_t drx_tune1b;
+			uint32_t drx_tune2;
+			uint8_t drx_res2[20];
+			uint16_t drx_sfdtoc; // TODO Warning do not set to 0
+			uint16_t drx_res3;
+			uint16_t drx_pretoc;
+			uint16_t drx_tune4h;
+			uint8_t drx_car_int[3];
+			uint8_t reserved;
+			uint16_t rxpacc_nosat;
+		};
+		uint8_t reg[46];
+	};
+	
+} drx_conf_t; 
 
 // typedef struct dw_rf_conf
 // {
@@ -796,15 +816,6 @@ typedef struct dw_otp_if
 // 	/* data */
 // } otp_reg_t;
 
-
-void _dw_power_on(void);
-
-void _dw_power_off(void);
-
-// TODO Indicate to user this should only be called on mutual exclusion
-void dw_set_power_on(void (*_dw_power_on_func)(void));
-void dw_set_power_off(void (*_dw_power_off_func)(void));
-
 void dw_set_spi_lock(void (*spi_lock_func)(void));
 void dw_set_spi_unlock(void (*spi_unlock_func)(void));
 void dw_set_spi_set_cs(void (*spi_set_cs_func)(void));
@@ -816,15 +827,11 @@ void dw_set_spi_recv(void (*spi_recv_func)(size_t, const uint8_t*));
 /**
  * @brief 
  * 
- */
-void dw_reset(void);
-
-/**
- * @brief 
- * 
  * @return int8_t 
  */
 int8_t validate_spi_hal(void);
+
+void dw_clear_register(uint8_t* reg, size_t size);
 
 /**
  * @brief 
@@ -915,8 +922,18 @@ void dw_clear_irq(sys_mask_t clear_mask);
 // TODO add to docs chibios event callbacks are in syslock check mode
 void _dw_irq_handler(void);
 
-void dw_start_tx(tx_fctrl_t tx_fctrl, uint8_t * tx_buf);
+void dw_start_tx(tx_fctrl_t tx_fctrl, uint8_t * tx_buf, dx_time_t dly_time, ack_resp_t_t w4r_time);
 
-void dw_start_rx(void);
+void dw_start_rx(dx_time_t dly_time);
+
+sys_state_t dw_transceiver_off(void);
+
+void dw_command_read_OTP(uint16_t address);
+
+uint64_t dw_get_tx_time(void);
+
+uint64_t dw_get_rx_time(void);
+
+int32_t dw_get_car_int(void);
 
 //TODO add function to include tx time in uwb message format ieee with delayed tx

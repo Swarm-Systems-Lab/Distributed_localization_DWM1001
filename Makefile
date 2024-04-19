@@ -6,7 +6,7 @@
 # Compiler options here.
 ifeq ($(USE_OPT),)
   # Warning, if you want to debug the code, substitute -Os to -O0
-  USE_OPT = -O0 -ggdb -fomit-frame-pointer -falign-functions=16 -std=c11 
+  USE_OPT = -O0 -ggdb -fomit-frame-pointer -falign-functions=16 -std=c11 -fsingle-precision-constant 
 endif
 
 # C specific options here (added to USE_OPT).
