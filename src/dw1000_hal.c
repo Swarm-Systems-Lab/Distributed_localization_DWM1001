@@ -23,6 +23,8 @@ spi_hal_t _dw_spi_hal_set =
 	NULL,
 	NULL,
 	NULL,
+	NULL,
+	NULL,
 	NULL
 };
 
@@ -253,6 +255,37 @@ void dw_clear_irq(sys_mask_t clear_mask)
 	sys_mask_t next_mask;
 	next_mask.mask = current_mask.mask & ~clear_mask.mask;
 	_dw_spi_transaction(0, DW_REG_INFO.SYS_MASK.id, next_mask.reg, DW_REG_INFO.SYS_MASK.size, 0);
+	_dw_spi_hal_set._dw_spi_unlock();
+}
+
+void dw_soft_reset()
+{
+	pmsc_ctrl0_t pmsc_ctrl_sr;
+
+	_dw_spi_hal_set._dw_spi_lock();
+	_dw_spi_transaction(1, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, sizeof(pmsc_ctrl_sr.reg), 0);
+	pmsc_ctrl_sr.SYSCLKS = 0b01;
+	pmsc_ctrl_sr.mask |= 0x00300200;
+	_dw_spi_transaction(0, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, sizeof(pmsc_ctrl_sr.reg), 0);
+	pmsc_ctrl_sr.SOFTRESET = 0b0000;
+	_dw_spi_transaction(0, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, sizeof(pmsc_ctrl_sr.reg), 0);
+	pmsc_ctrl_sr.SOFTRESET = 0b1111;
+	_dw_spi_transaction(0, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, sizeof(pmsc_ctrl_sr.reg), 0);
+	_dw_spi_hal_set._dw_spi_unlock();
+	// TODO add to docs 10 micro second wait is needed
+}
+
+void dw_soft_reset_rx(void)
+{
+	pmsc_ctrl0_t pmsc_ctrl_sr;
+	_dw_spi_hal_set._dw_spi_lock();
+	_dw_spi_transaction(1, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, sizeof(pmsc_ctrl_sr.reg), 0);
+	// Todo check reserved bits as 1 maybe not write whole register
+	pmsc_ctrl_sr.mask |= 0x00300200;
+	pmsc_ctrl_sr.SOFTRESET &= 0b1110; // Clear bit 28
+	_dw_spi_transaction(0, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, sizeof(pmsc_ctrl_sr.reg), 0);
+	pmsc_ctrl_sr.SOFTRESET |= 0b0001; // Set bit 28
+	_dw_spi_transaction(0, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, sizeof(pmsc_ctrl_sr.reg), 0);
 	_dw_spi_hal_set._dw_spi_unlock();
 }
 

@@ -125,8 +125,6 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	dx_time_t dx_time;
 	ack_resp_t_t w4r;
 
-	eventmask_t evt;
-
 	uint8_t data[20] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 	uint8_t recv[20] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 	dw_clear_register(tx_ctrl.reg, sizeof(tx_ctrl.reg));
@@ -152,6 +150,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 
 	uint16_t tx_ant_d = 0;
 	uint16_t rx_ant_d = 0;
+	eventmask_t evt = 0;
 
 	// dw_write(DW_REG_INFO.LDE_CTRL, &rx_ant_d, 2, 0x1804);
 	// dw_write(DW_REG_INFO.TX_ANTD, &tx_ant_d, 2, 0);
@@ -174,25 +173,28 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 		{
 			dw_clear_register(w4r.reg, sizeof(w4r.reg));
 			w4r.ACK_TIM = 1;
+			dw_read(DW_REG_INFO.SYS_STATE, state.reg, DW_REG_INFO.SYS_STATE.size, 0);
 			dw_start_tx(tx_ctrl, data, dx_time, w4r);
-			eventmask_t evt = chEvtWaitOneTimeout(MRXPHE_E | MRXFCE_E | MLDEERR_E | MRXFCG_E, TIME_MS2I(600));
+			evt = chEvtWaitOneTimeout(MRXPHE_E | MRXFCE_E | MLDEERR_E | MRXFCG_E, TIME_MS2I(30));
 			if (evt == MRXFCG_E)
 			{
 				toggle_led(green);
 				tx_time = dw_get_tx_time() + tx_ant_d;
 				rx_time = dw_get_rx_time() + rx_ant_d;
 				dw_read(DW_REG_INFO.RX_BUFFER, recv, sizeof(recv), 0);
-				m_tx_time |= (uint64_t)recv[0];
-				m_tx_time |= (uint64_t)recv[1] << 8;
-				m_tx_time |= (uint64_t)recv[2] << 16;
-				m_tx_time |= (uint64_t)recv[3] << 24;
-				m_tx_time |= (uint64_t)recv[4] << 32;
+				// m_tx_time |= (uint64_t)recv[0];
+				// m_tx_time |= (uint64_t)recv[1] << 8;
+				// m_tx_time |= (uint64_t)recv[2] << 16;
+				// m_tx_time |= (uint64_t)recv[3] << 24;
+				// m_tx_time |= (uint64_t)recv[4] << 32;
+				memcpy(&m_tx_time, recv, 5);
 
-				m_rx_time |= (uint64_t)recv[8];
-				m_rx_time |= (uint64_t)recv[9] << 8;
-				m_rx_time |= (uint64_t)recv[10] << 16;
-				m_rx_time |= (uint64_t)recv[11] << 24;
-				m_rx_time |= (uint64_t)recv[12] << 32;
+				// m_rx_time |= (uint64_t)recv[8];
+				// m_rx_time |= (uint64_t)recv[9] << 8;
+				// m_rx_time |= (uint64_t)recv[10] << 16;
+				// m_rx_time |= (uint64_t)recv[11] << 24;
+				// m_rx_time |= (uint64_t)recv[12] << 32;
+				memcpy(&m_rx_time, recv+8, 5);
 
 				rt_init = rx_time - tx_time;
 				rt_resp = m_tx_time - m_rx_time;
@@ -203,11 +205,17 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				distance -= 149;
 				distance *= 64;
 			}
+			else
+				dw_soft_reset_rx();
+			//dw_soft_reset_rx();
+			evt = 0;
 			state = dw_transceiver_off();
-			chThdSleepMilliseconds(3);
-			dw_reset();
-			set_fast_spi_freq();
-			dw_set_irq(irq_mask);
+			chThdSleepMilliseconds(100);
+			dw_read(DW_REG_INFO.SYS_STATE, state.reg, DW_REG_INFO.SYS_STATE.size, 0);
+
+			// dw_reset();
+			// set_fast_spi_freq();
+			// dw_set_irq(irq_mask);
 		}
 	}
 	else
@@ -217,8 +225,9 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 		while (true)
 		{
 			dw_clear_register(dx_time.reg, sizeof(dx_time.reg));
+			dw_read(DW_REG_INFO.SYS_STATE, state.reg, DW_REG_INFO.SYS_STATE.size, 0);
 			dw_start_rx(dx_time);
-			eventmask_t evt = chEvtWaitOneTimeout(MRXPHE_E | MRXFCE_E | MLDEERR_E | MRXFCG_E, TIME_MS2I(600));
+			evt = chEvtWaitOneTimeout(MRXPHE_E | MRXFCE_E | MLDEERR_E | MRXFCG_E, TIME_MS2I(30));
 			if (evt == MRXFCG_E)
 			{
 				toggle_led(green);
@@ -237,11 +246,20 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				// m_tx_time = ((sys_time+(65536*5000)) & 0xFFFFFE00) + 16456;
 				memcpy(data, &delay_tx, 8);
 				memcpy(data+8, &rx_time, 8);
+				dw_read(DW_REG_INFO.SYS_STATE, state.reg, DW_REG_INFO.SYS_STATE.size, 0);
 				dw_start_tx(tx_ctrl, data, dx_time, w4r);
+				evt = chEvtWaitOneTimeout(MTXFRS_E, TIME_MS2I(30));
+				if (!evt)
+					dw_soft_reset_rx();
 			}
-			chEvtWaitOneTimeout(MTXFRS_E, TIME_MS2I(600));
+			else
+				dw_soft_reset_rx();
+			// dw_soft_reset_rx();
+			evt = 0;
 			state = dw_transceiver_off();
-			chThdSleepMilliseconds(3);
+			chThdSleepMilliseconds(80);
+			dw_read(DW_REG_INFO.SYS_STATE, state.reg, DW_REG_INFO.SYS_STATE.size, 0);
+
 			// dw_reset();
 			// set_fast_spi_freq();
 			// chThdSleepMilliseconds(10);

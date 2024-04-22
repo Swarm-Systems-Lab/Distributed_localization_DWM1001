@@ -26,8 +26,53 @@ typedef enum dw_reg_file_perms
 	WO,
 	RW,
 	SRW,		// Special Read Write, refer to docs
-	ROD,		// Read only double buffer
+	ROD		// Read only double buffer
 } reg_perm;
+
+typedef enum dw_tx_states
+{
+	TX_IDLE,
+	PREAMBLE,
+	SFD,
+	PHR,
+	SDE,
+	DATA
+} tx_state;
+
+typedef enum dw_rx_states
+{
+	RX_IDLE,
+	START_ANALOG,
+	RESERVED0,
+	RESERVED1,
+	RX_RDY,
+	PREAMBLE_FND,
+	PRMBL_TIMEOUT,
+	SFD_FND,
+	CNFG_PHR_RX,
+	PHR_RX_STRT,
+	DATA_RATE_RDY,
+	RESERVED2,
+	DATA_RX_SEQ,
+	CNFG_DATA_RX,
+	PHR_NOT_OK,
+	LAST_SYMBOL,
+	WAIT_RSD_DONE,
+	RSD_OK,
+	RSD_NOT_OK,
+	RECONFIG_110,
+	WAIT_110_PHR
+} rx_state;
+
+typedef enum dw_pmsc_states
+{
+	INIT,
+	IDLE,
+	TX_WAIT,
+	RX_WAIT,
+	TX,
+	RX
+} pmsc_state;
 
 // TODO priority for interrupts?
 
@@ -531,7 +576,14 @@ typedef struct dw_sys_state
 			uint32_t PMSC_STATE	:4;
 			uint32_t 			:12;
 		};
-		uint8_t reg[4]; 
+		uint8_t reg[4];
+		struct
+		{
+			tx_state tx_state;
+			rx_state rx_state;
+			pmsc_state pmsc_state;
+		};
+		
 	};
 } sys_state_t;
 
@@ -654,7 +706,6 @@ typedef struct dw_drx_conf
 		};
 		uint8_t reg[46];
 	};
-	
 } drx_conf_t; 
 
 // typedef struct dw_rf_conf
@@ -806,15 +857,91 @@ typedef struct dw_otp_if
 // 	/* data */
 // } dig_diag_t;
 
-// typedef struct dw_pmsc
-// {
-// 	/* data */
-// } pmsc_t;
+typedef struct dw_psmc_ctrl0
+{
+	union
+	{
+		struct
+		{
+			uint32_t SYSCLKS	:2;
+			uint32_t RXCLKS		:2;
+			uint32_t TXCLKS		:2;
+			uint32_t FACE		:1;
+			uint32_t 			:3;
+			uint32_t ADCCE		:1;
+			uint32_t 			:4;
+			uint32_t AMCE		:1;
+			uint32_t GPCE		:1;
+			uint32_t GPRN		:1;
+			uint32_t GPDCE		:1;
+			uint32_t GPDRN		:1;
+			uint32_t 			:3;
+			uint32_t KHZCLKEN	:1;
+			uint32_t PLL2_SEQ_EN:1;
+			uint32_t 			:3;
+			uint32_t SOFTRESET	:4;
+		};
+		uint32_t mask;
+		uint8_t reg[4];
+	};
+} pmsc_ctrl0_t;
 
-// typedef struct dw_otp
-// {
-// 	/* data */
-// } otp_reg_t;
+typedef struct dw_psmc_ctrl1
+{
+	union
+	{
+		struct
+		{
+			uint32_t 			:1;
+			uint32_t ARX2INIT	:1;
+			uint32_t 			:1;
+			uint32_t PKTSEQ		:8;
+			uint32_t ATXSLP		:1;
+			uint32_t ARXSLP		:1;
+			uint32_t SNOZE		:1;
+			uint32_t SNOZR		:1;
+			uint32_t PLLSYN		:1;
+			uint32_t 			:1;
+			uint32_t LDERUNE	:1;
+			uint32_t 			:8;
+			uint32_t KHZCLKDIV	:6;
+		};
+		uint32_t mask;
+		uint8_t reg[4];
+	};
+} pmsc_ctrl1_t;
+
+#pragma pack (1)
+typedef struct dw_pmsc
+{
+	union
+	{
+		struct
+		{	
+			pmsc_ctrl0_t PMSC_CTRL0;
+			pmsc_ctrl1_t PMSC_CTRL1;
+			uint32_t PMSC_RES1;
+			uint8_t SNOZT;
+			uint8_t RESERVED0[3]; // TODO check
+			uint8_t PMSC_RES2[22];
+			uint16_t PMSC_TXFSEQ;
+			union
+			{
+				struct
+				{
+					uint32_t BLINK_TIM	:8;
+					uint32_t BLNKEN		:1;
+					uint32_t 			:7;
+					uint32_t BLNKNOW	:4;
+					uint32_t 			:12;
+				};
+				uint32_t PMSC_LEDC;
+			};
+			uint32_t RESERVED1;
+		};
+		uint8_t reg[48];
+	};
+} pmsc_t;
 
 void dw_set_spi_lock(void (*spi_lock_func)(void));
 void dw_set_spi_unlock(void (*spi_unlock_func)(void));
@@ -918,6 +1045,9 @@ void dw_set_irq(sys_mask_t set_mask);
  */
 void dw_clear_irq(sys_mask_t clear_mask);
 
+void dw_soft_reset(void);
+
+void dw_soft_reset_rx(void);
 
 // TODO add to docs chibios event callbacks are in syslock check mode
 void _dw_irq_handler(void);
