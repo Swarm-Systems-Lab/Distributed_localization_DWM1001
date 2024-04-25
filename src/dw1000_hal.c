@@ -421,11 +421,7 @@ uint64_t dw_get_tx_time(void)
 
 	dw_read(DW_REG_INFO.TX_TIME, time.reg, DW_REG_INFO.TX_TIME.size, 0);
 
-	timestamp |= (uint64_t)time.TX_RAWST[0];
-	timestamp |= (uint64_t)time.TX_RAWST[1] << 8;
-	timestamp |= (uint64_t)time.TX_RAWST[2] << 16;
-	timestamp |= (uint64_t)time.TX_RAWST[3] << 24;
-	timestamp |= (uint64_t)time.TX_RAWST[4] << 32;
+	memcpy(&timestamp, time.TX_RAWST, sizeof(time.TX_RAWST));
 
 	return timestamp;
 }
@@ -438,11 +434,7 @@ uint64_t dw_get_rx_time(void)
 
 	dw_read(DW_REG_INFO.RX_TIME, time.reg, DW_REG_INFO.RX_TIME.size, 0);
 
-	timestamp |= (uint64_t)time.RX_RAWST[0];
-	timestamp |= (uint64_t)time.RX_RAWST[1] << 8;
-	timestamp |= (uint64_t)time.RX_RAWST[2] << 16;
-	timestamp |= (uint64_t)time.RX_RAWST[3] << 24;
-	timestamp |= (uint64_t)time.RX_RAWST[4] << 32;
+	memcpy(&timestamp, time.RX_RAWST, sizeof(time.RX_RAWST));
 
 	return timestamp;
 }
@@ -454,9 +446,7 @@ int32_t dw_get_car_int(void)
 
 	dw_read(DW_REG_INFO.DRX_CONF, car_int, 3, 0x28);
 
-	u_car_int |= (uint32_t)car_int[0];
-	u_car_int |= (uint32_t)car_int[1] << 8;
-	u_car_int |= (uint32_t)car_int[2] << 16;
+	memcpy(&u_car_int, car_int, sizeof(car_int));
 
 	// Extend sign
 	if (u_car_int & 0x00100000)

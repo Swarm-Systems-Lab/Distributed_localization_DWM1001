@@ -27,7 +27,7 @@
 #define NRF_SERIES                 52
 
 #define NRF5_SERIAL_USE_UART0             TRUE
-#define NRF5_SERIAL_USE_HWFLOWCTRL        TRUE
+#define NRF5_SERIAL_USE_HWFLOWCTRL        FALSE
 #define NRF5_RNG_USE_RNG0                 TRUE
 #define NRF5_GPT_USE_TIMER0               TRUE
 

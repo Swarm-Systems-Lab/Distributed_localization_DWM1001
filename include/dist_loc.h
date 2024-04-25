@@ -58,6 +58,7 @@
 extern thread_reference_t irq_evt;
 
 extern SPIConfig spi_cfg;
+extern SerialConfig serial_cfg;
 
 void ISR_wrapper(void * arg);
 

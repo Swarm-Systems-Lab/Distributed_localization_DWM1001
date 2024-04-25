@@ -108,7 +108,7 @@ include $(CHIBIOS_CONTRIB)/os/common/startup/ARMCMx/compilers/GCC/mk/startup_nrf
 # HAL-OSAL files (optional).
 include $(CHIBIOS_CONTRIB)/os/hal/hal.mk
 include $(CHIBIOS_CONTRIB)/os/hal/ports/NRF5/NRF52832/platform.mk
-include $(CHIBIOS_CONTRIB)/os/hal/boards/NRF52-DWM1001/board.mk
+include $(CHIBIOS_CONTRIB)/os/hal/boards/DWM1001-DEV/board.mk
 include $(CHIBIOS)/os/hal/osal/rt-nil/osal.mk
 include $(CHIBIOS)/os/hal/lib/streams/streams.mk
 # RTOS files (optional).
@@ -207,7 +207,7 @@ CPPWARN = -Wall -Wextra -Wundef
 #
 
 # List all user C define here, like -D_DEBUG=1
-UDEFS = -DRADIO_ESB_PRIMARY_TRANSMITTER 
+UDEFS = -DRADIO_ESB_PRIMARY_TRANSMITTER -DCHPRINTF_USE_FLOAT=1
 
 # Define ASM defines here
 UADEFS =

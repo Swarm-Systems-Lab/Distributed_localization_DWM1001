@@ -26,3 +26,5 @@ Interrupts seem to break after rxenab is set once
 BEWARE PRIORITIES, if a thread is created with higher priority than the creator thread it will be executed before its pointer is set
 
 nested interrupts not supported (maybe?) can't disable interrupts in ISR
+
+TODO boards supports NFC

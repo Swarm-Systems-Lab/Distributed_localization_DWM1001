@@ -18,9 +18,25 @@
 
 thread_reference_t irq_evt = NULL;
 
-SPIConfig spi_cfg = {.end_cb = NULL, .ssport = IOPORT1, .sspad = SPI_SS,
-        .freq = NRF5_SPI_FREQ_2MBPS, .sckpad = SPI_SCK, .mosipad = SPI_MOSI,
-        .misopad = SPI_MISO, .lsbfirst = false, .mode = 2};
+SPIConfig spi_cfg = 
+{
+	.end_cb = NULL,
+	.ssport = IOPORT1,
+	.sspad = SPI_SS,
+    .freq = NRF5_SPI_FREQ_2MBPS,
+	.sckpad = SPI_SCK,
+	.mosipad = SPI_MOSI,
+    .misopad = SPI_MISO,
+	.lsbfirst = false,
+	.mode = 2
+};
+
+SerialConfig serial_cfg = 
+{
+  .speed = 115200,
+  .tx_pad  = UART_TX,
+  .rx_pad  = UART_RX,
+};
 
 void ISR_wrapper(void * arg)
 {
@@ -121,6 +137,8 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	// irq_mask.MRXRFSL = 0b1;
 	irq_mask.MLDEERR = 0b1;
 
+	sdStart(&SD1, &serial_cfg);
+
 	tx_fctrl_t tx_ctrl;
 	dx_time_t dx_time;
 	ack_resp_t_t w4r;
@@ -162,8 +180,12 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	// dw_read(DW_REG_INFO.LDE_CTRL, &rx_ant_d, 2, 0x1804);
 
 	double tof = 0.0;
+	double tof2 = 0.0;
 	double distance = 0.0;
 	float clock_offset_r = 0.0;
+
+	float distances[20] = {0,0,0,0,0};
+	int cnt = 0;
 
 	if (id == 588618085864310691)
 	{
@@ -182,40 +204,44 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				tx_time = dw_get_tx_time() + tx_ant_d;
 				rx_time = dw_get_rx_time() + rx_ant_d;
 				dw_read(DW_REG_INFO.RX_BUFFER, recv, sizeof(recv), 0);
-				// m_tx_time |= (uint64_t)recv[0];
-				// m_tx_time |= (uint64_t)recv[1] << 8;
-				// m_tx_time |= (uint64_t)recv[2] << 16;
-				// m_tx_time |= (uint64_t)recv[3] << 24;
-				// m_tx_time |= (uint64_t)recv[4] << 32;
 				memcpy(&m_tx_time, recv, 5);
-
-				// m_rx_time |= (uint64_t)recv[8];
-				// m_rx_time |= (uint64_t)recv[9] << 8;
-				// m_rx_time |= (uint64_t)recv[10] << 16;
-				// m_rx_time |= (uint64_t)recv[11] << 24;
-				// m_rx_time |= (uint64_t)recv[12] << 32;
 				memcpy(&m_rx_time, recv+8, 5);
 
-				rt_init = rx_time - tx_time;
-				rt_resp = m_tx_time - m_rx_time;
+				rt_init = (rx_time >> 9) - (tx_time >> 9);
+				rt_resp = (m_tx_time >> 9) - (m_rx_time >> 9);
+
+				tof = (rt_init - rt_resp)/2.0f;
 
 				clock_offset_r = dw_get_car_int() * ((998.4e6/2.0/1024.0/131072.0) * (-1.0e6/6489.6e6) / 1.0e6);
-				tof = ((rt_init - rt_resp * (1.0f - clock_offset_r)) / 2.0f) * (1.0/499.2e6/128.0);
-				distance = tof * 299702547;
-				distance -= 149;
-				distance *= 64;
+				// tof = ((rt_init - rt_resp * (1.0f - clock_offset_r)) / 2.0f) * (1.0f/(float)(499.2e6*128.0));
+				// tof = (rt_init - rt_resp)/2.0f * (1.0f/(float)(499.2e6*128.0));
+				distance = tof * (1.0f/(float)(499.2e6*128.0)) * 299702547;
+				distance -= 0.295;
+				distance *= 50000;
+
+				if (distance > 0)
+					distances[cnt] = distance;
+
+				cnt++;
+				if (cnt == 20)
+					cnt = 0;
+
+				distance = 0;
+
+				for (int i = 0; i < 20; i++)
+					distance += distances[i];
+
+				distance /= 20;
+
+				chprintf((BaseSequentialStream*)&SD1, "Distance: %dcm\n", (int)distance);
 			}
 			else
 				dw_soft_reset_rx();
 			//dw_soft_reset_rx();
 			evt = 0;
 			state = dw_transceiver_off();
-			chThdSleepMilliseconds(100);
+			chThdSleepMilliseconds(50);
 			dw_read(DW_REG_INFO.SYS_STATE, state.reg, DW_REG_INFO.SYS_STATE.size, 0);
-
-			// dw_reset();
-			// set_fast_spi_freq();
-			// dw_set_irq(irq_mask);
 		}
 	}
 	else
@@ -224,6 +250,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 		dw_clear_register(w4r.reg, sizeof(w4r.reg));
 		while (true)
 		{
+			sdPut(&SD1, 'B');
 			dw_clear_register(dx_time.reg, sizeof(dx_time.reg));
 			dw_read(DW_REG_INFO.SYS_STATE, state.reg, DW_REG_INFO.SYS_STATE.size, 0);
 			dw_start_rx(dx_time);
@@ -235,20 +262,12 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				delay_tx = (uint64_t)rx_time + (uint64_t)(65536*2500);
 				// tx_time = (uint64_t)((uint64_t)delay_tx & 0xFFFFFE00) + (uint64_t)tx_ant_d;
 				dx_time.time = (uint32_t)(delay_tx >> 8);
-				// sys_time = 0;
-				// dw_read(DW_REG_INFO.SYS_TIME, sys_time_raw, DW_REG_INFO.SYS_TIME.size, 0);
-				// sys_time |= (uint64_t)sys_time_raw[0];
-				// sys_time |= (uint64_t)sys_time_raw[1] << 8;
-				// sys_time |= (uint64_t)sys_time_raw[2] << 16;
-				// sys_time |= (uint64_t)sys_time_raw[3] << 24;
-				// sys_time |= (uint64_t)sys_time_raw[4] << 32;
-				// dx_time.time = (uint32_t)((sys_time +(65536*5000)) >> 8);
-				// m_tx_time = ((sys_time+(65536*5000)) & 0xFFFFFE00) + 16456;
 				memcpy(data, &delay_tx, 8);
 				memcpy(data+8, &rx_time, 8);
 				dw_read(DW_REG_INFO.SYS_STATE, state.reg, DW_REG_INFO.SYS_STATE.size, 0);
 				dw_start_tx(tx_ctrl, data, dx_time, w4r);
 				evt = chEvtWaitOneTimeout(MTXFRS_E, TIME_MS2I(30));
+				tx_time = dw_get_tx_time();
 				if (!evt)
 					dw_soft_reset_rx();
 			}
@@ -257,7 +276,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 			// dw_soft_reset_rx();
 			evt = 0;
 			state = dw_transceiver_off();
-			chThdSleepMilliseconds(80);
+			chThdSleepMilliseconds(50);
 			dw_read(DW_REG_INFO.SYS_STATE, state.reg, DW_REG_INFO.SYS_STATE.size, 0);
 
 			// dw_reset();
@@ -267,46 +286,6 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 		}
 
 	}
-
-	// memcpy(data, &id, sizeof(id));
-
-	// while (true)
-	// {
-	// 	dw_clear_register(tx_ctrl.reg, sizeof(tx_ctrl.reg));
-	// 	dw_clear_register(dx_time.reg, sizeof(dx_time.reg));
-	// 	dw_clear_register(w4r.reg, sizeof(w4r.reg));
-	// 	tx_ctrl.TFLEN = 12;
-	// 	tx_ctrl.TXBR = 0b10;
-	// 	tx_ctrl.TXPRF = 0b1;
-	// 	tx_ctrl.TXPSR = 0b1;
-	// 	tx_ctrl.PE = 0b1;
-	// 	dw_start_tx(tx_ctrl, data, dx_time, w4r);
-	// 	evt = chEvtWaitOneTimeout(MTXFRS_E, TIME_MS2I(20));
-	// 	if (evt)
-	// 		toggle_led(blue);
-
-	// 	state = dw_transceiver_off();
-	// 	chThdSleepMilliseconds(3);
-
-	// 	// SEND OVER
-
-	// 	dw_start_rx(dx_time);
-	// 	eventmask_t evt = chEvtWaitOneTimeout(MRXPHE_E | MRXFCE_E | MLDEERR_E | MRXFCG_E, TIME_MS2I(600));
-
-	// 	if (evt)
-	// 	{
-	// 		if (evt == MRXFCG_E)
-	// 		{
-	// 			toggle_led(green);
-	// 			dw_read(DW_REG_INFO.RX_BUFFER, recv, sizeof(recv), 0);
-	// 		}
-	// 		else
-	// 			toggle_led(red2);
-	// 	}
-
-	// 	state = dw_transceiver_off();
-	// 	chThdSleepMilliseconds(3);
-	// }
 }
 
 void set_fast_spi_freq(void)
