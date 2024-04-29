@@ -421,7 +421,7 @@ uint64_t dw_get_tx_time(void)
 
 	dw_read(DW_REG_INFO.TX_TIME, time.reg, DW_REG_INFO.TX_TIME.size, 0);
 
-	memcpy(&timestamp, time.TX_RAWST, sizeof(time.TX_RAWST));
+	memcpy(&timestamp, time.TX_RAWST, sizeof(time.TX_STAMP));
 
 	return timestamp;
 }
@@ -434,7 +434,7 @@ uint64_t dw_get_rx_time(void)
 
 	dw_read(DW_REG_INFO.RX_TIME, time.reg, DW_REG_INFO.RX_TIME.size, 0);
 
-	memcpy(&timestamp, time.RX_RAWST, sizeof(time.RX_RAWST));
+	memcpy(&timestamp, time.RX_RAWST, sizeof(time.RX_STAMP));
 
 	return timestamp;
 }

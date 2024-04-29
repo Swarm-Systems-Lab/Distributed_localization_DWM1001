@@ -131,12 +131,13 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	irq_mask.mask = 0U;
 	irq_mask.MTXFRS = 0b1;
 	irq_mask.MRXFCG = 0b1;
+	//irq_mask.MLDEDONE = 0b1;
 	// irq_mask.MRXRFTO = 0b1;
 	irq_mask.MRXPHE = 0b1;
 	irq_mask.MRXFCE = 0b1;
 	// irq_mask.MRXRFSL = 0b1;
 	irq_mask.MLDEERR = 0b1;
-
+	
 	sdStart(&SD1, &serial_cfg);
 
 	tx_fctrl_t tx_ctrl;
@@ -166,18 +167,12 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	
 	dw_set_irq(irq_mask);
 
-	uint16_t tx_ant_d = 0;
-	uint16_t rx_ant_d = 0;
+	uint16_t tx_ant_d = 63500;
+	uint16_t rx_ant_d = 63500;
 	eventmask_t evt = 0;
 
-	// dw_write(DW_REG_INFO.LDE_CTRL, &rx_ant_d, 2, 0x1804);
-	// dw_write(DW_REG_INFO.TX_ANTD, &tx_ant_d, 2, 0);
-
-	// tx_ant_d = 0;
-	// rx_ant_d = 0;
-
-	// dw_read(DW_REG_INFO.TX_ANTD, &tx_ant_d, 2, 0);
-	// dw_read(DW_REG_INFO.LDE_CTRL, &rx_ant_d, 2, 0x1804);
+	dw_write(DW_REG_INFO.LDE_CTRL, &rx_ant_d, 2, 0x1804);
+	dw_write(DW_REG_INFO.TX_ANTD, &tx_ant_d, 2, 0);
 
 	double tof = 0.0;
 	double tof2 = 0.0;
@@ -201,23 +196,25 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 			if (evt == MRXFCG_E)
 			{
 				toggle_led(green);
-				tx_time = dw_get_tx_time() + tx_ant_d;
-				rx_time = dw_get_rx_time() + rx_ant_d;
+				tx_time = dw_get_tx_time();
+				rx_time = dw_get_rx_time();
 				dw_read(DW_REG_INFO.RX_BUFFER, recv, sizeof(recv), 0);
 				memcpy(&m_tx_time, recv, 5);
 				memcpy(&m_rx_time, recv+8, 5);
 
-				rt_init = (rx_time >> 9) - (tx_time >> 9);
-				rt_resp = (m_tx_time >> 9) - (m_rx_time >> 9);
+				rt_init = (rx_time) - (tx_time);
+				rt_resp = (m_tx_time) - (m_rx_time);
+
+				clock_offset_r = dw_get_car_int() * ((998.4e6/2.0/1024.0/131072.0) * (-1.0e6/6489.6e6) / 1.0e6);
+				rt_resp *= (1.0f - clock_offset_r);
 
 				tof = (rt_init - rt_resp)/2.0f;
 
-				clock_offset_r = dw_get_car_int() * ((998.4e6/2.0/1024.0/131072.0) * (-1.0e6/6489.6e6) / 1.0e6);
 				// tof = ((rt_init - rt_resp * (1.0f - clock_offset_r)) / 2.0f) * (1.0f/(float)(499.2e6*128.0));
 				// tof = (rt_init - rt_resp)/2.0f * (1.0f/(float)(499.2e6*128.0));
-				distance = tof * (1.0f/(float)(499.2e6*128.0)) * 299702547;
-				distance -= 0.295;
-				distance *= 50000;
+				tof = tof * (1.0f/(float)(499.2e6*128.0));
+				distance = tof * 299702547;
+				distance *= 100;
 
 				if (distance > 0)
 					distances[cnt] = distance;
@@ -258,16 +255,15 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 			if (evt == MRXFCG_E)
 			{
 				toggle_led(green);
-				rx_time = dw_get_rx_time() + rx_ant_d;
-				delay_tx = (uint64_t)rx_time + (uint64_t)(65536*2500);
-				// tx_time = (uint64_t)((uint64_t)delay_tx & 0xFFFFFE00) + (uint64_t)tx_ant_d;
+				rx_time = dw_get_rx_time();
+				delay_tx = (uint64_t)rx_time + (uint64_t)(65536*2400);
+				tx_time = (uint64_t)delay_tx + (uint64_t)tx_ant_d;
 				dx_time.time = (uint32_t)(delay_tx >> 8);
-				memcpy(data, &delay_tx, 8);
+				memcpy(data, &tx_time, 8);
 				memcpy(data+8, &rx_time, 8);
 				dw_read(DW_REG_INFO.SYS_STATE, state.reg, DW_REG_INFO.SYS_STATE.size, 0);
 				dw_start_tx(tx_ctrl, data, dx_time, w4r);
 				evt = chEvtWaitOneTimeout(MTXFRS_E, TIME_MS2I(30));
-				tx_time = dw_get_tx_time();
 				if (!evt)
 					dw_soft_reset_rx();
 			}
