@@ -263,14 +263,14 @@ void dw_soft_reset()
 	pmsc_ctrl0_t pmsc_ctrl_sr;
 
 	_dw_spi_hal_set._dw_spi_lock();
-	_dw_spi_transaction(1, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, sizeof(pmsc_ctrl_sr.reg), 0);
+	_dw_spi_transaction(1, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, DW_SUBREG_INFO.PMSC_CTRL0.size, DW_SUBREG_INFO.PMSC_CTRL0.offset);
 	pmsc_ctrl_sr.SYSCLKS = 0b01;
 	pmsc_ctrl_sr.mask |= 0x00300200;
-	_dw_spi_transaction(0, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, sizeof(pmsc_ctrl_sr.reg), 0);
+	_dw_spi_transaction(0, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, DW_SUBREG_INFO.PMSC_CTRL0.size, DW_SUBREG_INFO.PMSC_CTRL0.offset);
 	pmsc_ctrl_sr.SOFTRESET = 0b0000;
-	_dw_spi_transaction(0, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, sizeof(pmsc_ctrl_sr.reg), 0);
+	_dw_spi_transaction(0, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, DW_SUBREG_INFO.PMSC_CTRL0.size, DW_SUBREG_INFO.PMSC_CTRL0.offset);
 	pmsc_ctrl_sr.SOFTRESET = 0b1111;
-	_dw_spi_transaction(0, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, sizeof(pmsc_ctrl_sr.reg), 0);
+	_dw_spi_transaction(0, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, DW_SUBREG_INFO.PMSC_CTRL0.size, DW_SUBREG_INFO.PMSC_CTRL0.offset);
 	_dw_spi_hal_set._dw_spi_unlock();
 	// TODO add to docs 10 micro second wait is needed
 }
@@ -279,13 +279,13 @@ void dw_soft_reset_rx(void)
 {
 	pmsc_ctrl0_t pmsc_ctrl_sr;
 	_dw_spi_hal_set._dw_spi_lock();
-	_dw_spi_transaction(1, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, sizeof(pmsc_ctrl_sr.reg), 0);
+	_dw_spi_transaction(1, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, DW_SUBREG_INFO.PMSC_CTRL0.size, DW_SUBREG_INFO.PMSC_CTRL0.offset);
 	// Todo check reserved bits as 1 maybe not write whole register
 	pmsc_ctrl_sr.mask |= 0x00300200;
 	pmsc_ctrl_sr.SOFTRESET &= 0b1110; // Clear bit 28
-	_dw_spi_transaction(0, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, sizeof(pmsc_ctrl_sr.reg), 0);
+	_dw_spi_transaction(0, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, DW_SUBREG_INFO.PMSC_CTRL0.size, DW_SUBREG_INFO.PMSC_CTRL0.offset);
 	pmsc_ctrl_sr.SOFTRESET |= 0b0001; // Set bit 28
-	_dw_spi_transaction(0, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, sizeof(pmsc_ctrl_sr.reg), 0);
+	_dw_spi_transaction(0, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, DW_SUBREG_INFO.PMSC_CTRL0.size, DW_SUBREG_INFO.PMSC_CTRL0.offset);
 	_dw_spi_hal_set._dw_spi_unlock();
 }
 
@@ -346,7 +346,7 @@ void dw_start_tx(tx_fctrl_t tx_fctrl, uint8_t* tx_buf, dx_time_t dly_time, ack_r
 	ctrl_tx_start.mask = 0;
 	ctrl_tx_start.TXSTRT = 1;
 
-	if(dly_time.time)
+	if(dly_time.time32)
 	{
 		ctrl_tx_start.TXDLYS = 1;
 		_dw_spi_transaction(0, DW_REG_INFO.DX_TIME.id, dly_time.reg, DW_REG_INFO.DX_TIME.size, 0);
@@ -370,7 +370,7 @@ void dw_start_rx(dx_time_t dly_time)
 	ctrl_rx_enab.mask = 0;
 	ctrl_rx_enab.RXENAB = 1;
 
-	if(dly_time.time)
+	if(dly_time.time32)
 	{
 		ctrl_rx_enab.RXDLYE = 1;
 		_dw_spi_transaction(0, DW_REG_INFO.DX_TIME.id, dly_time.reg, DW_REG_INFO.DX_TIME.size, 0);
@@ -397,19 +397,17 @@ sys_state_t dw_transceiver_off()
 
 void dw_command_read_OTP(uint16_t address)
 {
-	otp_if_t otp;
-	dw_clear_register(otp.otp_addr, 2);
-	otp.otp_addr[0] = (uint8_t)(address & 0x00FF);
-	otp.otp_addr[1] = (uint8_t)(address & 0x0700);
-	dw_clear_register(otp.otp_ctrl, 2);
-	otp.OTPREAD = 1;
-	otp.OTPRDEN = 1;
+	otp_ctrl_t otp_ctrl;
+	otp_addr_t otp_addr = address & 0x07FF;
+	otp_ctrl.mask = 0;
+	otp_ctrl.OTPREAD = 1;
+	otp_ctrl.OTPRDEN = 1;
 
 	_dw_spi_hal_set._dw_spi_lock(); 
-	_dw_spi_transaction(0, DW_REG_INFO.OTP_IF.id, otp.otp_addr, sizeof(otp.otp_addr), 0x4); // TODO check to remove these magic numbers by using struct offset
-	_dw_spi_transaction(0, DW_REG_INFO.OTP_IF.id, otp.otp_ctrl, sizeof(otp.otp_ctrl), 0x6);
-	dw_clear_register(otp.otp_ctrl, 2);
-	_dw_spi_transaction(0, DW_REG_INFO.OTP_IF.id, otp.otp_ctrl, sizeof(otp.otp_ctrl), 0x6);
+	_dw_spi_transaction(0, DW_REG_INFO.OTP_IF.id, &otp_addr, DW_SUBREG_INFO.OTP_ADDR.size, DW_SUBREG_INFO.OTP_ADDR.offset);
+	_dw_spi_transaction(0, DW_REG_INFO.OTP_IF.id, otp_ctrl.reg, DW_SUBREG_INFO.OTP_CTRL.size, DW_SUBREG_INFO.OTP_CTRL.offset);
+	otp_ctrl.mask = 0;
+	_dw_spi_transaction(0, DW_REG_INFO.OTP_IF.id, otp_ctrl.reg, DW_SUBREG_INFO.OTP_CTRL.size, DW_SUBREG_INFO.OTP_CTRL.offset);
 	_dw_spi_hal_set._dw_spi_unlock();
 }
 
@@ -444,7 +442,7 @@ int32_t dw_get_car_int(void)
 	uint8_t car_int[3];
 	uint32_t u_car_int = 0;
 
-	dw_read(DW_REG_INFO.DRX_CONF, car_int, 3, 0x28);
+	dw_read(DW_SUBREG_INFO.DRX_CAR_INT.parent, car_int, DW_SUBREG_INFO.DRX_CAR_INT.size, DW_SUBREG_INFO.DRX_CAR_INT.offset);
 
 	memcpy(&u_car_int, car_int, sizeof(car_int));
 
@@ -455,4 +453,32 @@ int32_t dw_get_car_int(void)
 		u_car_int &= 0x001FFFFF;
 
 	return u_car_int;
+}
+
+void default_config(void)
+{
+	agc_tune1_t agc_tune1 = 0x8870;
+	agc_tune2_t agc_tune2 = 0x2502A907;
+	drx_tune2_t drx_tune2 = 0x311A002D;
+	lde_cfg1_t lde_cfg1;
+	lde_cfg1.mask = 0x6D;
+	lde_cfg2_t lde_cfg2 = 0x1607;
+	tx_power_t tx_power;
+	tx_power.mask = 0x0E082848;
+	rf_txctrl_t rf_txctrl;
+	rf_txctrl.mask = 0x001E3FE3;
+	tc_pgdelay_t tc_pgdelay = 0xB5;
+	fs_plltune_t fs_plltune = 0xBE;
+
+ 	_dw_spi_hal_set._dw_spi_lock(); 
+	_dw_spi_transaction(0, DW_SUBREG_INFO.AGC_TUNE1.parent.id, &agc_tune1, DW_SUBREG_INFO.AGC_TUNE1.size, DW_SUBREG_INFO.AGC_TUNE1.offset);
+	_dw_spi_transaction(0, DW_SUBREG_INFO.AGC_TUNE2.parent.id, &agc_tune2, DW_SUBREG_INFO.AGC_TUNE2.size, DW_SUBREG_INFO.AGC_TUNE2.offset);
+	_dw_spi_transaction(0, DW_SUBREG_INFO.DRX_TUNE2.parent.id, &drx_tune2, DW_SUBREG_INFO.DRX_TUNE2.size, DW_SUBREG_INFO.DRX_TUNE2.offset);
+	_dw_spi_transaction(0, DW_SUBREG_INFO.LDE_CFG1.parent.id, lde_cfg1.reg, DW_SUBREG_INFO.LDE_CFG1.size, DW_SUBREG_INFO.LDE_CFG1.offset);
+	_dw_spi_transaction(0, DW_SUBREG_INFO.LDE_CFG2.parent.id, &lde_cfg2, DW_SUBREG_INFO.LDE_CFG2.size, DW_SUBREG_INFO.LDE_CFG2.offset);
+	_dw_spi_transaction(0, DW_REG_INFO.TX_POWER.id, tx_power.reg, DW_REG_INFO.TX_POWER.size, 0);
+	_dw_spi_transaction(0, DW_SUBREG_INFO.RF_TXCTRL.parent.id, rf_txctrl.reg, DW_SUBREG_INFO.RF_TXCTRL.size, DW_SUBREG_INFO.RF_TXCTRL.offset);
+	_dw_spi_transaction(0, DW_SUBREG_INFO.TC_PGDELAY.parent.id, &tc_pgdelay, DW_SUBREG_INFO.TC_PGDELAY.size, DW_SUBREG_INFO.TC_PGDELAY.offset);
+	_dw_spi_transaction(0, DW_SUBREG_INFO.FS_PLLTUNE.parent.id, &fs_plltune, DW_SUBREG_INFO.FS_PLLTUNE.size, DW_SUBREG_INFO.FS_PLLTUNE.offset);
+	_dw_spi_hal_set._dw_spi_unlock();
 }

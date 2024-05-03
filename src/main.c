@@ -40,21 +40,8 @@ int main(void) {
 
 	dw_reset();
 	spi_hal_init();
-
-	//LDE Load
-	pmsc_ctrl0_t pmscc0;
-	pmscc0.mask = 0x0602;
-	otp_if_t otp_lde;
-	dw_clear_register(otp_lde.otp_ctrl, sizeof(otp_lde.otp_ctrl));
-	otp_lde.LDELOAD = 0b1;
-	dw_write(DW_REG_INFO.PMSC, pmscc0.reg, 2, 0);
-	dw_write(DW_REG_INFO.OTP_IF, otp_lde.otp_ctrl, sizeof(otp_lde.otp_ctrl), 0x6);
-	chThdSleepMicroseconds(150);
-	pmscc0.mask = 0x0200;
-	dw_write(DW_REG_INFO.PMSC, pmscc0.reg, 2, 0);
-	chThdSleepMicroseconds(150);
-
-	dw_read(DW_REG_INFO.OTP_IF, otp_lde.otp_ctrl, sizeof(otp_lde.otp_ctrl), 0x6);
+	default_config();
+	load_lde();
 
 	irq_vector._dw_TXFRS_handler = TXFRS_handler;
 	irq_vector._dw_RXFCG_handler = RXFCG_handler;

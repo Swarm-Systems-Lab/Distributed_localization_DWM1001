@@ -86,5 +86,11 @@ uint64_t get_hardware_id(void);
 
 void spi_hal_init(void);
 
+// TODO document must not be preempted
+// TODO solve magic number for size
+void load_lde(void);
+
+uint64_t load_ldotune(void);
+
 // static THD_WORKING_AREA(SYSTEM_STATUS_THREAD, THREAD_STACK_SIZE);
 // static THD_FUNCTION(SYSTEM_STATUS, arg);

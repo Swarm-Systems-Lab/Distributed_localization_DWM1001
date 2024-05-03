@@ -26,7 +26,7 @@ typedef enum dw_reg_file_perms
 	WO,
 	RW,
 	SRW,		// Special Read Write, refer to docs
-	ROD		// Read only double buffer
+	ROD			// Read only double buffer
 } reg_perm;
 
 typedef enum dw_tx_states
@@ -34,30 +34,30 @@ typedef enum dw_tx_states
 	TX_IDLE,
 	PREAMBLE,
 	SFD,
-	PHR,
-	SDE,
-	DATA
+	PHR,		// Transmitting PHY header data
+	SDE,		// Transmitting PHR SECDED bits
+	DATA		// Transmitting data block (330 symbols)
 } tx_state;
 
 typedef enum dw_rx_states
 {
 	RX_IDLE,
-	START_ANALOG,
+	START_ANALOG,		// Start analog receiver blocks
 	RESERVED0,
 	RESERVED1,
 	RX_RDY,
-	PREAMBLE_FND,
+	PREAMBLE_FND,		// Receiver is waiting to detect preamble
 	PRMBL_TIMEOUT,
 	SFD_FND,
-	CNFG_PHR_RX,
+	CNFG_PHR_RX,		// Configure for PHR reception
 	PHR_RX_STRT,
-	DATA_RATE_RDY,
+	DATA_RATE_RDY,		// Ready for data reception
 	RESERVED2,
 	DATA_RX_SEQ,
 	CNFG_DATA_RX,
 	PHR_NOT_OK,
-	LAST_SYMBOL,
-	WAIT_RSD_DONE,
+	LAST_SYMBOL,		// Received last symbol
+	WAIT_RSD_DONE,		// Wait for Reed Solomon decoder to finish
 	RSD_OK,
 	RSD_NOT_OK,
 	RECONFIG_110,
@@ -73,6 +73,95 @@ typedef enum dw_pmsc_states
 	TX,
 	RX
 } pmsc_state;
+
+typedef enum dw_phr_mode
+{
+	STANDARD = 0, 
+	LONG = 3
+} phr_mode_t;
+
+typedef enum dw_otp_map
+{
+	EUID0 			= 0x00,
+	EUID1 			= 0x01,
+	AEUID0 			= 0x02,
+	AEUID1 			= 0x03,
+	LDOTUNE0 		= 0x04,
+	LDOTUNE1 		= 0x05,
+	PARTID 			= 0x06,
+	LOTID 			= 0x07,
+	VOLT 			= 0x08,
+	TEMP 			= 0x09,
+	TXP_CH1_PRF16 	= 0x10,
+	TXP_CH1_PRF64	= 0x11,
+	TXP_CH2_PRF16	= 0x12,
+	TXP_CH2_PRF64	= 0x13,
+	TXP_CH3_PRF16 	= 0x14,
+	TXP_CH3_PRF64 	= 0x15,
+	TXP_CH4_PRF16 	= 0x16,
+	TXP_CH4_PRF64 	= 0x17,
+	TXP_CH5_PRF16 	= 0x18,
+	TXP_CH5_PRF64 	= 0x19,
+	TXP_CH7_PRF16 	= 0x1A,
+	TXP_CH7_PRF64 	= 0x1B,
+	ANTD		 	= 0x1C,
+	USER0		 	= 0x1D,
+	XTAL_TRIM	 	= 0x1E,
+	USER1		 	= 0x1F
+} otp_map;
+
+typedef enum dw_tx_bitrate
+{
+	BR_110KBPS, 
+	BR_850KBPS,
+	BR_6_8MBPS
+} txbr_t;
+
+typedef enum dw_tx_prf
+{
+	PRF_4MHZ, 
+	PRF_16MHZ,
+	PRF_64MHZ
+} txprf_t;
+
+typedef enum dw_preamble_length
+{
+	PL_16		= 0x0, 
+	PL_64		= 0x1,
+	PL_128		= 0x5,
+	PL_256		= 0x9,
+	PL_512		= 0xD,
+	PL_1024		= 0x2,
+	PL_1536		= 0x6,
+	PL_2048		= 0xA,
+	PL_4096		= 0x3
+} preamble_lengt_t;
+
+// typedef enum dw_modes
+
+// typedef enum dw_ref_tx_power
+// {
+// 	TX_POW_CH1_2_16_S		= 0x0, 
+// 	TX_POW_CH1_2_16_S		= 0x1,
+// 	TX_POW_CH1_2_16_S		= 0x5,
+// 	TX_POW_CH1_2_16_S		= 0x9,
+// 	TX_POW_CH1_2_16_S		= 0xD,
+// 	TX_POW_CH1_2_16_S		= 0x0, 
+// 	TX_POW_CH1_2_16_S		= 0x1,
+// 	TX_POW_CH1_2_16_S		= 0x5,
+// 	TX_POW_CH1_2_16_S		= 0x9,
+// 	TX_POW_CH1_2_16_S		= 0xD,
+// 	TX_POW_CH1_2_16_S		= 0x0, 
+// 	TX_POW_CH1_2_16_S		= 0x1,
+// 	TX_POW_CH1_2_16_S		= 0x5,
+// 	TX_POW_CH1_2_16_S		= 0x9,
+// 	TX_POW_CH1_2_16_S		= 0xD,
+// 	TX_POW_CH1_2_16_S		= 0x0, 
+// 	TX_POW_CH1_2_16_S		= 0x1,
+// 	TX_POW_CH1_2_16_S		= 0x5,
+// 	TX_POW_CH1_2_16_S		= 0x9,
+// 	TX_POW_CH1_2_16_S		= 0xD,
+// } ref_tx_power_t;
 
 // TODO priority for interrupts?
 
@@ -129,6 +218,11 @@ typedef struct dw_irq_vector
 	};
 } irq_vector_t;
 
+// typedef struct dw_config
+// {
+
+// } dw_config_t;
+
 typedef struct dw_spi_header
 {
 	struct
@@ -149,6 +243,14 @@ typedef struct dw_reg_metadata
 	size_t size;
 	reg_perm perm;
 } reg_metadata_t;
+
+typedef struct dw_subreg_metadata
+{
+	reg_metadata_t parent;
+	uint16_t offset;
+	size_t size;
+	reg_perm perm;
+} subreg_metadata_t;
 
 struct dw_register_set
 {
@@ -195,45 +297,249 @@ struct dw_register_set
 
 static const struct dw_register_set DW_REG_INFO = 
 {
-	{0x00, 4, RO},		
-	{0x01, 8, RW},		
-	{0x03, 4, RW},		
-	{0x04, 4, RW},		
-	{0x06, 5, RO},		
-	{0x08, 5, RW},		
-	{0x09, 1024, WO},	
-	{0x0A, 5, RW},
-	{0X0C, 2, RW},
-	{0X0D, 4, SRW},
-	{0X0E, 4, RW},
-	{0X0F, 5, SRW},
-	{0x10, 4, ROD},
-	{0X11, 1024, ROD},
-	{0X12, 8, ROD},
-	{0X13, 4, ROD},
-	{0X14, 5, ROD},
-	{0X15, 14, ROD},
-	{0X17, 10, RO},
-	{0X18, 2, RW},
-	{0X19, 5, RO},
-	{0X1A, 4, RW},
-	{0X1D, 4, RW},
-	{0X1E, 4, RW},
-	{0X1F, 4, RW},
-	{0X21, 41, RW},
-	{0X23, 33, RW},
-	{0X24, 12, RW},
-	{0X25, 4064, RO},
-	{0X26, 44, RW},
-	{0X27, 44, RW},
-	{0x28, 58, RW},
-	{0X2A, 52, RW},
-	{0X2B, 21, RW},
-	{0X2C, 12, RW},
-	{0X2D, 18, RW}, //OTP TODO CHECK DOC AS IT IS 18
-	{0X2E, 13, RW},
-	{0X2F, 41, RW},
-	{0X36, 48, RW}
+	{0x00, 4, RO},		// DEV_ID
+	{0x01, 8, RW},		// EUI
+	{0x03, 4, RW},		// PAN_ADR
+	{0x04, 4, RW},		// SYS_CFG
+	{0x06, 5, RO},		// SYS_TIME
+	{0x08, 5, RW},		// TX_FCTRL
+	{0x09, 1024, WO},	// TX_BUFFER
+	{0x0A, 5, RW},		// DX_TIME
+	{0X0C, 2, RW},		// RX_FWTO
+	{0X0D, 4, SRW},		// SYS_CTRL
+	{0X0E, 4, RW},		// SYS_MASK
+	{0X0F, 5, SRW},		// SYS_STATUS
+	{0x10, 4, ROD},		// RX_FINFO
+	{0X11, 1024, ROD},	// RX_BUFFER
+	{0X12, 8, ROD},		// RX_FQUAL
+	{0X13, 4, ROD},		// RX_TTCKI
+	{0X14, 5, ROD},		// RX_TTCKO
+	{0X15, 14, ROD},	// RX_TIME
+	{0X17, 10, RO},		// TX_TIME
+	{0X18, 2, RW},		// TX_ANTD
+	{0X19, 5, RO},		// SYS_STATE
+	{0X1A, 4, RW},		// ACK_RESP_T
+	{0X1D, 4, RW},		// RX_SNIFF
+	{0X1E, 4, RW},		// TX_POWER
+	{0X1F, 4, RW},		// CHAN_CTRL
+	{0X21, 41, RW},		// USR_SFD
+	{0X23, 33, RW},		// AGC_CTRL
+	{0X24, 12, RW},		// EXT_SYNC
+	{0X25, 4064, RO},	// ACC_MEM
+	{0X26, 44, RW},		// GPIO_CTRL
+	{0X27, 44, RW},		// DRX_CONF
+	{0x28, 58, RW},		// RF_CONF
+	{0X2A, 52, RW},		// TX_CAL
+	{0X2B, 21, RW},		// FS_CTRL
+	{0X2C, 12, RW},		// AON
+	{0X2D, 18, RW}, 	// OTP_IF		OTP TODO CHECK DOC AS IT IS 18
+	{0X2E, 13, RW},		// LDE_CTRL
+	{0X2F, 41, RW},		// DIG_DIAG
+	{0X36, 48, RW}		// PMSC
+};
+
+struct dw_subregister_set
+{	
+	// AGC_CTRL
+	subreg_metadata_t AGC_CTRL1;
+	subreg_metadata_t AGC_TUNE1;
+	subreg_metadata_t AGC_TUNE2;
+	subreg_metadata_t AGC_TUNE3;
+	subreg_metadata_t AGC_STAT1;
+
+	// EXT_SYNC
+	subreg_metadata_t EC_CTRL;
+	subreg_metadata_t EC_RXTC;
+	subreg_metadata_t EC_GOLP;
+
+	// GPIO_CTRL
+	subreg_metadata_t GPIO_MODE;
+	subreg_metadata_t GPIO_DIR;
+	subreg_metadata_t GPIO_DOUT;
+	subreg_metadata_t GPIO_IRQE;
+	subreg_metadata_t GPIO_ISEN;
+	subreg_metadata_t GPIO_IMODE;
+	subreg_metadata_t GPIO_IBES;
+	subreg_metadata_t GPIO_ICLR;
+	subreg_metadata_t GPIO_IDBE;
+	subreg_metadata_t GPIO_RAW;
+
+	// DRX_CONF
+	subreg_metadata_t DRX_TUNE0b;
+	subreg_metadata_t DRX_TUNE1a;
+	subreg_metadata_t DRX_TUNE1b;
+	subreg_metadata_t DRX_TUNE2;
+	subreg_metadata_t DRX_SFDTOC;
+	subreg_metadata_t DRX_PRETOC;
+	subreg_metadata_t DRX_TUNE4H;
+	subreg_metadata_t DRX_CAR_INT;
+	subreg_metadata_t RXPACC_NOSAT;
+	
+	// RF_CONF
+	subreg_metadata_t RF_CONF;
+	subreg_metadata_t RF_RXCTRLH;
+	subreg_metadata_t RF_TXCTRL;
+	subreg_metadata_t RF_STATUS;
+	subreg_metadata_t LDO_TUNE;
+
+	// TX_CAL
+	subreg_metadata_t TC_SARC;
+	subreg_metadata_t TC_SARL;
+	subreg_metadata_t TC_SARW;
+	subreg_metadata_t TC_PG_CTRL;
+	subreg_metadata_t TC_PG_STATUS;
+	subreg_metadata_t TC_PGDELAY;
+	subreg_metadata_t TC_PGTEST;
+
+	// FS_CTRL
+	subreg_metadata_t FS_PLLCFG;
+	subreg_metadata_t FS_PLLTUNE;
+	subreg_metadata_t FS_XTALT;
+
+	// AON
+	subreg_metadata_t AON_WCFG;
+	subreg_metadata_t AON_CTRL;
+	subreg_metadata_t AON_RDAT;
+	subreg_metadata_t AON_ADDR;
+	subreg_metadata_t AON_CFG0;
+	subreg_metadata_t AON_CFG1;
+
+	// OTP_IF
+	subreg_metadata_t OTP_WDAT;
+	subreg_metadata_t OTP_ADDR;
+	subreg_metadata_t OTP_CTRL;
+	subreg_metadata_t OTP_STAT;
+	subreg_metadata_t OTP_RDAT;
+	subreg_metadata_t OTP_SRDAT;
+	subreg_metadata_t OTP_SF;
+
+	// LDE_CTRL
+	subreg_metadata_t LDE_THRESH;
+	subreg_metadata_t LDE_CFG1;
+	subreg_metadata_t LDE_PPINDX;
+	subreg_metadata_t LDE_PPAMPL;
+	subreg_metadata_t LDE_RXANTD;
+	subreg_metadata_t LDE_CFG2;
+	subreg_metadata_t LDE_REPC;
+
+	// DIG_DIAG
+	subreg_metadata_t EVC_CTRL;
+	subreg_metadata_t EVC_PHE;
+	subreg_metadata_t EVC_RSE;
+	subreg_metadata_t EVC_FCG;
+	subreg_metadata_t EVC_FCE;
+	subreg_metadata_t EVC_FFR;
+	subreg_metadata_t EVC_OVR;
+	subreg_metadata_t EVC_STO;
+	subreg_metadata_t EVC_PTO;
+	subreg_metadata_t EVC_FWTO;
+	subreg_metadata_t EVC_TXFS;
+	subreg_metadata_t EVC_HPW;
+	subreg_metadata_t EVC_TPW;
+	subreg_metadata_t DIAG_TMC;
+
+	// PMSC
+	subreg_metadata_t PMSC_CTRL0;
+	subreg_metadata_t PMSC_CTRL1;
+	subreg_metadata_t PMSC_SNOZT;
+	subreg_metadata_t PMSC_TXFSEQ;
+	subreg_metadata_t PMSC_LEDC;
+};
+
+static const struct dw_subregister_set DW_SUBREG_INFO = 
+{
+	{DW_REG_INFO.AGC_CTRL, 0x2, 2, RW},	 		// AGC_CTRL1
+	{DW_REG_INFO.AGC_CTRL, 0x4, 2, RW},  		// AGC_TUNE1
+	{DW_REG_INFO.AGC_CTRL, 0xC, 4, RW},  		// AGC_TUNE2
+	{DW_REG_INFO.AGC_CTRL, 0x12, 2, RW}, 		// AGC_TUNE3
+	{DW_REG_INFO.AGC_CTRL, 0x1E, 3, RO}, 		// AGC_STAT1
+
+	{DW_REG_INFO.EXT_SYNC, 0x0, 4, RW},			// EC_CTRL
+	{DW_REG_INFO.EXT_SYNC, 0x4, 4, RO}, 		// EC_RXTC
+	{DW_REG_INFO.EXT_SYNC, 0x8, 4, RO}, 		// EC_GOLP
+
+	{DW_REG_INFO.GPIO_CTRL, 0x0, 4, RW},		// GPIO_MODE
+	{DW_REG_INFO.GPIO_CTRL, 0x8, 4, RW},		// GPIO_DIR
+	{DW_REG_INFO.GPIO_CTRL, 0xC, 4, RW},		// GPIO_DOUT
+	{DW_REG_INFO.GPIO_CTRL, 0x10, 4, RW},		// GPIO_IRQE
+	{DW_REG_INFO.GPIO_CTRL, 0x14, 4, RW},		// GPIO_ISEN
+	{DW_REG_INFO.GPIO_CTRL, 0x18, 4, RW},		// GPIO_IMODE
+	{DW_REG_INFO.GPIO_CTRL, 0x1C, 4, RW},		// GPIO_IBES
+	{DW_REG_INFO.GPIO_CTRL, 0x20, 4, RW},		// GPIO_ICLR
+	{DW_REG_INFO.GPIO_CTRL, 0x24, 4, RW},		// GPIO_IDBE
+	{DW_REG_INFO.GPIO_CTRL, 0x28, 4, RO},		// GPIO_RAW
+
+	{DW_REG_INFO.DRX_CONF, 0x2, 2, RW},			// DRX_TUNE0b
+	{DW_REG_INFO.DRX_CONF, 0x4, 2, RW},			// DRX_TUNE1a
+	{DW_REG_INFO.DRX_CONF, 0x6, 2, RW},			// DRX_TUNE1b
+	{DW_REG_INFO.DRX_CONF, 0x8, 4, RW},			// DRX_TUNE2
+	{DW_REG_INFO.DRX_CONF, 0x20, 2, RW},		// DRX_SFDTOC
+	{DW_REG_INFO.DRX_CONF, 0x24, 2, RW},		// DRX_PRETOC
+	{DW_REG_INFO.DRX_CONF, 0x26, 2, RW},		// DRX_TUNE4H
+	{DW_REG_INFO.DRX_CONF, 0x28, 3, RO},		// DRX_CAR_INT
+	{DW_REG_INFO.DRX_CONF, 0x2C, 2, RO},		// RXPACC_NOSAT
+
+	{DW_REG_INFO.RF_CONF, 0x0, 4, RW},			// RF_CONF
+	{DW_REG_INFO.RF_CONF, 0xB, 1, RW},			// RF_RXCTRLH
+	{DW_REG_INFO.RF_CONF, 0xC, 3, RW},			// RF_TXCTRL
+	{DW_REG_INFO.RF_CONF, 0x2C, 4, RO},			// RF_STATUS
+	{DW_REG_INFO.RF_CONF, 0x30, 5, RW},			// LDO_TUNE
+
+	{DW_REG_INFO.TX_CAL, 0x0, 2, RW},			// TC_SARC
+	{DW_REG_INFO.TX_CAL, 0x3, 3, RO},			// TC_SARL
+	{DW_REG_INFO.TX_CAL, 0x6, 2, RO},			// TC_SARW
+	{DW_REG_INFO.TX_CAL, 0x8, 1, RW},			// TC_PG_CTRL
+	{DW_REG_INFO.TX_CAL, 0x9, 2, RO},			// TC_PG_STATUS
+	{DW_REG_INFO.TX_CAL, 0xB, 1, RW},			// TC_PGDELAY
+	{DW_REG_INFO.TX_CAL, 0xC, 1, RW},			// TC_PGTEST
+
+	{DW_REG_INFO.FS_CTRL, 0x7, 4, RW},			// FS_PLLCFG
+	{DW_REG_INFO.FS_CTRL, 0xB, 1, RW},			// FS_PLLTUNE
+	{DW_REG_INFO.FS_CTRL, 0xE, 1, RW},			// FS_XTALT
+
+	{DW_REG_INFO.AON, 0x0, 2, RW},				// AON_WCFG
+	{DW_REG_INFO.AON, 0x2, 1, RW},				// AON_CTRL
+	{DW_REG_INFO.AON, 0x3, 1, RW},				// AON_RDAT
+	{DW_REG_INFO.AON, 0x4, 1, RW},				// AON_ADDR
+	{DW_REG_INFO.AON, 0x6, 4, RW},				// AON_CFG0
+	{DW_REG_INFO.AON, 0xA, 2, RW},				// AON_CFG1
+
+	{DW_REG_INFO.OTP_IF, 0x0, 4, RW},			// OTP_WDAT
+	{DW_REG_INFO.OTP_IF, 0x4, 2, RW},			// OTP_ADDR
+	{DW_REG_INFO.OTP_IF, 0x6, 2, RW},			// OTP_CTRL
+	{DW_REG_INFO.OTP_IF, 0x8, 2, RW},			// OTP_STAT
+	{DW_REG_INFO.OTP_IF, 0xA, 4, RO},			// OTP_RDAT
+	{DW_REG_INFO.OTP_IF, 0xE, 4, RW},			// OTP_SRDAT
+	{DW_REG_INFO.OTP_IF, 0x12, 1, RW},			// OTP_SF
+
+	{DW_REG_INFO.LDE_CTRL, 0x0000, 2, RO},		// LDE_THRESH	
+	{DW_REG_INFO.LDE_CTRL, 0x0806, 1, RW},		// LDE_CFG1	
+	{DW_REG_INFO.LDE_CTRL, 0x1000, 2, RO},		// LDE_PPINDX	
+	{DW_REG_INFO.LDE_CTRL, 0x1002, 2, RO},		// LDE_PPAMPL	
+	{DW_REG_INFO.LDE_CTRL, 0x1804, 2, RW},		// LDE_RXANTD	
+	{DW_REG_INFO.LDE_CTRL, 0x1806, 2, RW},		// LDE_CFG2	
+	{DW_REG_INFO.LDE_CTRL, 0x2804, 2, RW},		// LDE_REPC	
+
+	{DW_REG_INFO.DIG_DIAG, 0x00, 4, SRW},		// EVC_CTRL
+	{DW_REG_INFO.DIG_DIAG, 0x04, 2, RO},		// EVC_PHE
+	{DW_REG_INFO.DIG_DIAG, 0x06, 2, RO},		// EVC_RSE
+	{DW_REG_INFO.DIG_DIAG, 0x08, 2, RO},		// EVC_FCG
+	{DW_REG_INFO.DIG_DIAG, 0x0A, 2, RO},		// EVC_FCE
+	{DW_REG_INFO.DIG_DIAG, 0x0C, 2, RO},		// EVC_FFR
+	{DW_REG_INFO.DIG_DIAG, 0x0E, 2, RO},		// EVC_OVR
+	{DW_REG_INFO.DIG_DIAG, 0x10, 2, RO},		// EVC_STO
+	{DW_REG_INFO.DIG_DIAG, 0x12, 2, RO},		// EVC_PTO
+	{DW_REG_INFO.DIG_DIAG, 0x14, 2, RO},		// EVC_FWTO
+	{DW_REG_INFO.DIG_DIAG, 0x16, 2, RO},		// EVC_TXFS
+	{DW_REG_INFO.DIG_DIAG, 0x18, 2, RO},		// EVC_HPW
+	{DW_REG_INFO.DIG_DIAG, 0x1A, 2, RO},		// EVC_TPW
+	{DW_REG_INFO.DIG_DIAG, 0x24, 2, RW},		// DIAG_TMC
+
+	{DW_REG_INFO.PMSC, 0x00, 4, RW},			// PMSC_CTRL0
+	{DW_REG_INFO.PMSC, 0x04, 4, RW},			// PMSC_CTRL1
+	{DW_REG_INFO.PMSC, 0x0C, 1, RW},			// PMSC_SNOZT
+	{DW_REG_INFO.PMSC, 0x26, 2, RW},			// PMSC_TXFSEQ
+	{DW_REG_INFO.PMSC, 0x28, 4, RW}				// PMSC_LEDC
 };
 
 extern spi_hal_t _dw_spi_hal_set;
@@ -255,14 +561,21 @@ typedef struct dw_dev_id
 	};
 } dev_id_t;
 
-typedef struct dw_eui
-{
-	/* data */
-} eui_t;
+typedef uint64_t eui_t;
 
 typedef struct dw_panadr
 {
-	/* data */
+	union
+	{
+		struct
+		{
+			uint16_t short_addr;
+			uint16_t pan_id;
+		};
+		uint8_t reg[4];
+		uint32_t mask;
+	};
+	
 } panadr_t;
 
 typedef struct dw_sys_cfg
@@ -302,9 +615,18 @@ typedef struct dw_sys_cfg
 	};
 } sys_cfg_t;
 
+#pragma pack (1)
 typedef struct dw_sys_time
 {
-	/* data */
+	union 
+	{
+		struct
+		{
+			uint8_t lower8;
+			uint32_t time32;
+		};
+		uint8_t reg[5];
+	};
 } sys_time_t;
 
 typedef struct dw_tx_fctrl
@@ -324,7 +646,15 @@ typedef struct dw_tx_fctrl
 			uint32_t TXBOFFS	:10;
 			uint8_t IFSDELAY;
 		};
+		struct
+		{
+			uint32_t 			:18;
+			uint32_t TXPL		:4;
+			uint32_t 			:10;
+			uint8_t RES;
+		};
 		uint8_t reg[5]; 
+		uint32_t mask;
 	};
 } tx_fctrl_t;
 
@@ -333,24 +663,9 @@ typedef struct dw_tx_buffer
 	uint8_t reg[1024];
 } tx_buffer_t;
 
-#pragma pack (1)
-typedef struct dw_dx_time
-{
-	union 
-	{
-		struct
-		{
-			uint8_t reserved;
-			uint32_t time;
-		};
-		uint8_t reg[5]; 
-	};
-} dx_time_t;
+typedef sys_time_t dx_time_t;
 
-// typedef struct dw_rx_fwto
-// {
-// 	/* data */
-// } rx_fwto_t;
+typedef uint16_t rx_fwto_t;
 
 typedef struct dw_sys_ctrl
 {
@@ -489,10 +804,10 @@ typedef struct dw_rx_finfo
 	};
 } rx_finfo_t;	
 
-// typedef struct dw_rx_buffer
-// {
-// 	/* data */
-// } rx_buffer_t;
+typedef struct dw_rx_buffer
+{
+	uint8_t reg[1024];
+} rx_buffer_t;
 
 typedef struct dw_rx_fqual
 {
@@ -506,13 +821,11 @@ typedef struct dw_rx_fqual
 			uint16_t CIR_PWR;
 		};
 		uint8_t reg[8]; 
+		uint64_t mask;
 	};
 } rx_fqual_t;
 
-typedef struct dw_rx_ttcki
-{
-	uint8_t reg[4];
-} rx_ttcki_t;
+typedef uint32_t rx_ttcki_t;
 
 typedef struct dw_rx_ttcko
 {
@@ -558,10 +871,7 @@ typedef struct dw_tx_time
 	};
 } tx_time_t;
 
-// typedef struct dw_tx_antd
-// {
-// 	/* data */
-// } tx_antd_t;
+typedef uint16_t tx_antd_t;
 
 typedef struct dw_sys_state
 {
@@ -583,7 +893,7 @@ typedef struct dw_sys_state
 			rx_state rx_state;
 			pmsc_state pmsc_state;
 		};
-		
+		uint32_t mask;
 	};
 } sys_state_t;
 
@@ -598,6 +908,7 @@ typedef struct dw_ack_resp_t
 			uint32_t ACK_TIM	:8;
 		};
 		uint8_t reg[4]; 
+		uint32_t mask;
 	};
 } ack_resp_t_t;
 
@@ -612,7 +923,8 @@ typedef struct dw_rx_sniff
 			uint32_t SNIFF_OFFT	:8;
 			uint32_t 			:16;
 		};
-		uint8_t reg[4]; 
+		uint8_t reg[4];
+		uint32_t mask;
 	};
 } rx_sniff_t;
 
@@ -634,7 +946,8 @@ typedef struct dw_tx_power
 			uint32_t TXPOWSD	:8;
 			uint32_t 			:8;
 		};
-		uint8_t reg[4]; 
+		uint8_t reg[4];
+		uint32_t mask;
 	};
 } tx_power_t;
 
@@ -654,7 +967,8 @@ typedef struct dw_chan_ctrl
 			uint32_t TX_PCODE	:5;
 			uint32_t RX_PCODE	:5;
 		};
-		uint8_t reg[4]; 
+		uint8_t reg[4];
+		uint32_t mask;
 	};
 } chan_ctrl_t;
 
@@ -663,15 +977,58 @@ typedef struct dw_chan_ctrl
 // 	/* data */
 // } usr_sfd_t;
 
+typedef uint16_t agc_tune1_t;
+typedef uint32_t agc_tune2_t;
+typedef uint16_t agc_tune3_t;
+
+typedef struct dw_agc_stat1
+{
+	union 
+	{
+		struct
+		{
+			uint32_t 			:6;
+			uint32_t EDG1		:5;
+			uint32_t EDV2		:9;
+			uint32_t			:12;
+		};
+		uint8_t reg[3];
+	};
+} agc_stat1_t;
+
 // typedef struct dw_agc_ctrl
 // {
 // 	/* data */
 // } agc_ctrl_t;
 
-// typedef struct dw_ext_sync
-// {
-// 	/* data */
-// } ext_sync_t;
+typedef struct dw_ec_ctrl
+{
+	union 
+	{
+		struct
+		{
+			uint16_t OSTSM		:1;
+			uint16_t OSRSM		:1;
+			uint16_t PLLLDT		:1;
+			uint16_t WAIT		:8;
+			uint16_t OSTRM		:1;
+			uint16_t 			:4;
+		};
+		uint8_t reg[2];
+		uint16_t mask;
+	};
+} ec_ctrl_t;
+
+typedef uint32_t ec_rxtc_t;
+typedef uint32_t ec_golp_t;
+
+typedef struct dw_ext_sync
+{
+	ec_ctrl_t ec_ctrl;
+	uint16_t res1;
+	ec_rxtc_t ec_rxtc;
+	ec_golp_t ec_golp;
+} ext_sync_t;
 
 // typedef struct dw_acc_mem
 // {
@@ -683,6 +1040,15 @@ typedef struct dw_chan_ctrl
 // 	/* data */
 // } gpio_ctrl_t;
 
+typedef uint16_t drx_tune0b_t;
+typedef uint16_t drx_tune1a_t;
+typedef uint16_t drx_tune1b_t;
+typedef uint32_t drx_tune2_t;
+typedef uint16_t drx_sfdtoc_t;
+typedef uint16_t drx_pretoc_t;
+typedef uint16_t drx_tune4h_t;
+typedef uint16_t rxpacc_nosat_t;
+
 #pragma pack (1)
 typedef struct dw_drx_conf
 {
@@ -691,108 +1057,308 @@ typedef struct dw_drx_conf
 		struct
 		{
 			uint16_t drx_res1;
-			uint16_t drx_tune0b;
-			uint16_t drx_tune1a;
-			uint16_t drx_tune1b;
-			uint32_t drx_tune2;
+			drx_tune0b_t drx_tune0b;
+			drx_tune1a_t drx_tune1a;
+			drx_tune1b_t drx_tune1b;
+			drx_tune2_t drx_tune2;
 			uint8_t drx_res2[20];
-			uint16_t drx_sfdtoc; // TODO Warning do not set to 0
+			drx_sfdtoc_t drx_sfdtoc; // TODO Warning do not set to 0
 			uint16_t drx_res3;
-			uint16_t drx_pretoc;
-			uint16_t drx_tune4h;
+			drx_pretoc_t drx_pretoc;
+			drx_tune4h_t drx_tune4h;
 			uint8_t drx_car_int[3];
 			uint8_t reserved;
-			uint16_t rxpacc_nosat;
+			rxpacc_nosat_t rxpacc_nosat;
 		};
 		uint8_t reg[46];
 	};
-} drx_conf_t; 
+} drx_conf_t;
+
+typedef struct dw_rf_conf
+{
+	union 
+	{
+		struct
+		{
+			uint32_t 			:8;
+			uint32_t TXFEN		:5;
+			uint32_t PLLFEN		:3;
+			uint32_t LDOFEN		:5;
+			uint32_t TXRXSW		:2;
+			uint32_t 			:9;
+		};
+		uint8_t reg[4];
+		uint32_t mask;
+	};
+} rf_conf_t;
+
+typedef uint8_t rf_rxctrlh_t;
+
+typedef struct dw_rf_txctrl
+{
+	union 
+	{
+		struct
+		{
+			uint32_t 			:5;
+			uint32_t TXMTUNE	:4;
+			uint32_t TXMQ		:3;
+			uint32_t RESERVED	:12;
+			uint32_t			:8;
+		};
+		uint8_t reg[3];
+		uint32_t mask;
+	};
+} rf_txctrl_t;
+
+typedef struct dw_rf_status
+{
+	union 
+	{
+		struct
+		{
+			uint8_t CPLLLOCK	:1;
+			uint8_t CPLLLOW		:1;
+			uint8_t CPLLHIGH	:1;
+			uint8_t RFPLLLOCK	:1;
+			uint8_t				:4;
+		};
+		uint8_t reg[1];
+		uint8_t mask;
+	};
+} rf_status_t;
+
+typedef struct dw_ldotune
+{
+	uint8_t reg[5];
+} ldotune_t;
 
 // typedef struct dw_rf_conf
 // {
 // 	/* data */
 // } rf_conf_t;
 
+typedef uint8_t tc_sarc_t;
+
+typedef struct dw_tc_sarl
+{
+	union 
+	{
+		struct
+		{
+			uint16_t SAR_LVBAT	:8;
+			uint16_t SAR_LTEMP	:8;
+		};
+		uint8_t reg[2];
+		uint16_t mask;
+	};
+} tc_sarl_t;
+
+typedef struct dw_tc_sarw
+{
+	union 
+	{
+		struct
+		{
+			uint16_t SAR_WVBAT	:8;
+			uint16_t SAR_WTEMP	:8;
+		};
+		uint8_t reg[2];
+		uint16_t mask;
+	};
+} tc_sarw_t;
+
+typedef struct dw_tc_pg_ctrl
+{
+	union 
+	{
+		struct
+		{
+			uint8_t PG_START	:1;
+			uint8_t 			:1;
+			uint8_t PG_TMEAS	:4;
+			uint8_t 			:2;
+		};
+		uint8_t reg[1];
+		uint8_t mask;
+	};
+} tc_pg_ctrl_t;
+
+typedef uint16_t tc_pg_status_t;
+typedef uint8_t tc_pgdelay_t;
+typedef uint8_t tc_pgtest_t;
+
 // typedef struct dw_tx_cal
 // {
 // 	/* data */
 // } tx_cal_t;
+
+typedef uint32_t fs_pllcfg_t;
+typedef uint8_t fs_plltune_t;
+typedef uint8_t fs_xtalt_t; // TODO high 3 bits must be 0b011
 
 // typedef struct dw_fs_ctrl
 // {
 // 	/* data */
 // } fs_ctrl_t;
 
-typedef struct dw_aon
+typedef struct dw_aon_wcfg
 {
 	union 
 	{
-		struct 
+		struct
 		{
-			union 
-			{
-				struct
-				{
-					uint16_t ONW_RADC	:1;
-					uint16_t ONW_RX		:1;
-					uint16_t 			:1;
-					uint16_t ONW_LEUI	:1;
-					uint16_t 			:2;
-					uint16_t ONW_LDC	:1;
-					uint16_t ONW_L64P	:1;
-					uint16_t PRES_SLEEP	:1;
-					uint16_t 			:2;
-					uint16_t ONW_LLDE	:1;
-					uint16_t ONW_LLDO	:1;
-					uint16_t 			:3;
-				};
-				uint8_t aon_wcfg[2]; 
-			};
-			union 
-			{
-				struct
-				{
-					uint8_t RESTORE		:1;
-					uint8_t SAVE		:1;
-					uint8_t UPL_CFG		:1;
-					uint8_t DC_READ		:1;
-					uint8_t 			:3;
-					uint8_t DCA_ENAB	:1;
-				};
-				uint8_t aon_ctrl[1]; 
-			};
-			uint8_t aon_rdat[1]; 
-			uint8_t aon_addr[1]; 
-			uint8_t aon_res1[1]; 
-			union 
-			{
-				struct
-				{
-					uint32_t SLEEP_EN	:1;
-					uint32_t WAKE_PIN	:1;
-					uint32_t WAKE_SPI	:1;
-					uint32_t WAKE_CNT	:1;
-					uint32_t LPDIV_EN	:1;
-					uint32_t LPCLKDIVA	:11;
-					uint32_t SLEEP_TIM	:16;
-				};
-				uint8_t aon_cfg0[4]; 
-			};
-			union 
-			{
-				struct
-				{
-					uint16_t SLEEP_CE	:1;
-					uint16_t SMXX		:1;
-					uint16_t LPOSC_C	:1;
-					uint16_t BOOSTP125	:13;
-				};
-				uint8_t aon_cfg1[2]; 
-			};
+			uint16_t ONW_RADC	:1;
+			uint16_t ONW_RX		:1;
+			uint16_t 			:1;
+			uint16_t ONW_LEUI	:1;
+			uint16_t 			:2;
+			uint16_t ONW_LDC	:1;
+			uint16_t ONW_L64P	:1;
+			uint16_t PRES_SLEEP	:1;
+			uint16_t 			:2;
+			uint16_t ONW_LLDE	:1;
+			uint16_t ONW_LLDO	:1;
+			uint16_t 			:3;
 		};
-		uint8_t reg[12]; 
+		uint8_t reg[2]; 
+		uint16_t mask;
+	};
+} aon_wcfg_t;
+
+typedef struct dw_aon_ctrl
+{
+	union 
+	{
+		struct
+		{
+			uint8_t RESTORE		:1;
+			uint8_t SAVE		:1;
+			uint8_t UPL_CFG		:1;
+			uint8_t DC_READ		:1;
+			uint8_t 			:3;
+			uint8_t DCA_ENAB	:1;
+		};
+		uint8_t reg[1];
+		uint8_t mask; 
+	};
+} aon_ctrl_t;
+
+typedef uint8_t aon_rdat_t;
+typedef uint8_t aon_addr_t;
+
+typedef struct dw_aon_cfg0
+{
+	union 
+	{
+		struct
+		{
+			uint32_t SLEEP_EN	:1;
+			uint32_t WAKE_PIN	:1;
+			uint32_t WAKE_SPI	:1;
+			uint32_t WAKE_CNT	:1;
+			uint32_t LPDIV_EN	:1;
+			uint32_t LPCLKDIVA	:11;
+			uint32_t SLEEP_TIM	:16;
+		};
+		uint8_t reg[4];
+		uint32_t mask;
+	};
+} aon_cfg0_t;
+
+typedef struct dw_aon_cfg1
+{
+	union 
+	{
+		struct
+		{
+			uint8_t SLEEP_CE	:1;
+			uint8_t SMXX		:1;
+			uint8_t LPOSC_C		:1;
+			uint8_t 			:5;
+		};
+		uint8_t reg[1];
+		uint8_t mask;
+	};
+} aon_cfg1_t;
+
+typedef struct dw_aon
+{
+	union
+	{
+		struct
+		{
+			aon_wcfg_t aon_wcfg;
+			aon_ctrl_t aon_ctrl;
+			aon_rdat_t aon_rdat;
+			aon_addr_t aon_addr;
+			uint8_t res1;
+			aon_cfg0_t aon_cfg0;
+			aon_cfg1_t aon_cfg1;
+			uint8_t res2;
+		};
+		uint8_t reg[12];
 	};
 } aon_t;
+
+typedef uint32_t otp_wdat_t;
+typedef uint16_t otp_addr_t; // Address is lower 11 bits 
+
+typedef struct dw_otp_ctrl
+{
+	union
+	{
+		struct
+		{
+			uint16_t OTPRDEN	:1;
+			uint16_t OTPREAD	:1;
+			uint16_t 			:1;
+			uint16_t OTPMRWR	:1;
+			uint16_t 			:2;
+			uint16_t OTPPROG	:1;
+			uint16_t OTPMR		:4;
+			uint16_t 			:4;
+			uint16_t LDELOAD	:1;
+		};
+		uint8_t reg[2];
+		uint16_t mask;
+	};
+} otp_ctrl_t;
+
+typedef struct dw_otp_stat
+{
+	union
+	{
+		struct
+		{
+			uint8_t OTPPRGD	:1;
+			uint8_t OTPVPOK	:1;
+			uint8_t 		:6;
+		};
+		uint8_t reg[1];
+		uint8_t mask;
+	};
+} otp_stat_t;
+
+typedef uint32_t otp_rdat_t;
+typedef uint32_t otp_srdat_t;
+
+typedef struct dw_otp_sf
+{
+	union
+	{
+		struct
+		{
+			uint8_t OPS_KICK	:1;
+			uint8_t LDO_KICK	:1;
+			uint8_t 			:3;
+			uint8_t OPS_SEL		:2;
+			uint8_t 			:1;
+		};
+		uint8_t reg[1];
+		uint8_t mask;
+	};
+} otp_sf_t;
 
 typedef struct dw_otp_if
 {
@@ -800,57 +1366,87 @@ typedef struct dw_otp_if
 	{
 		struct 
 		{
-			uint8_t otp_wdat[4]; 
-			uint8_t otp_addr[2]; // Address is lower 11 bits 
-			union 
-			{
-				struct
-				{
-					uint16_t OTPRDEN	:1;
-					uint16_t OTPREAD	:1;
-					uint16_t 			:1;
-					uint16_t OTPMRWR	:1;
-					uint16_t 			:2;
-					uint16_t OTPPROG	:1;
-					uint16_t OTPMR		:4;
-					uint16_t 			:4;
-					uint16_t LDELOAD	:1;
-				};
-				uint8_t otp_ctrl[2]; 
-			};
-			union 
-			{
-				struct
-				{
-					uint16_t OTPPRGD	:1;
-					uint16_t OTPVPOK	:1;
-					uint16_t 			:14;
-				};
-				uint8_t otp_stat[2]; 
-			};
-			uint8_t otp_rdat[4]; 
-			uint8_t otp_srdat[4]; 
-			union 
-			{
-				struct
-				{
-					uint8_t OPS_KICK	:1;
-					uint8_t LDO_KICK	:1;
-					uint8_t 			:3;
-					uint8_t OPS_SEL		:2;
-					uint8_t 			:1;
-				};
-				uint8_t otp_sf[1]; 
-			};
+			otp_wdat_t otp_wdat;
+			otp_addr_t otp_addr;
+			otp_ctrl_t otp_ctrl;
+			otp_stat_t otp_stat;
+			otp_rdat_t otp_rdat;
+			otp_srdat_t otp_srdat;
+			otp_sf_t otp_sf;
 		};
 		uint8_t reg[19]; // TODO CHECK DOC AS IT IS 18
 	};
 } otp_if_t;
 
+typedef uint16_t lde_thresh_t;
+
+typedef struct dw_lde_cfg1
+{
+	union
+	{
+		struct 
+		{
+			uint8_t NTM		:5;
+			uint8_t PMULT	:3;
+		};
+		uint8_t reg[1];
+		uint8_t mask;
+	};
+} lde_cfg1_t;
+
+typedef uint16_t lde_ppindx_t;
+typedef uint16_t lde_ppampl_t;
+typedef uint16_t lde_rxantd_t;
+typedef uint16_t lde_cfg2_t;
+typedef uint16_t lde_repc_t;
+
 // typedef struct dw_lde_ctrl
 // {
 // 	/* data */
 // } lde_ctrl_t;
+
+// TODO Document minimum 2 byte write, reserved bytes as 0
+typedef struct dw_evc_ctrl
+{
+	union
+	{
+		struct 
+		{
+			uint16_t EVC_EN		:1;
+			uint16_t EVC_CLR	:1;
+			uint16_t 			:14;
+		};
+		uint16_t reg[2];
+		uint16_t mask;
+	};
+} evc_ctrl_t;
+
+typedef uint16_t evc_phe_t;
+typedef uint16_t evc_rse_t;
+typedef uint16_t evc_fcg_t;
+typedef uint16_t evc_fce_t;
+typedef uint16_t evc_ffr_t;
+typedef uint16_t evc_ovr_t;
+typedef uint16_t evc_pto_t;
+typedef uint16_t evc_fwto_t;
+typedef uint16_t evc_txfs_t;
+typedef uint16_t evc_hpw_t;
+typedef uint16_t evc_tpw_t;
+
+typedef struct dw_diag_tmc
+{
+	union
+	{
+		struct 
+		{
+			uint16_t 			:4;
+			uint16_t TX_PSTM	:1;
+			uint16_t 			:11;
+		};
+		uint16_t reg[2];
+		uint16_t mask;
+	};
+} diag_tmc_t;
 
 // typedef struct dw_dig_diag
 // {
@@ -911,6 +1507,26 @@ typedef struct dw_psmc_ctrl1
 	};
 } pmsc_ctrl1_t;
 
+typedef uint8_t pmsc_snozt_t;
+typedef uint16_t pmsc_txfseq_t;
+
+typedef struct dw_psmc_ledc
+{
+	union
+	{
+		struct
+		{
+			uint32_t BLINK_TIM	:8;
+			uint32_t BLNKEN		:1;
+			uint32_t 			:7;
+			uint32_t BLNKNOW	:4;
+			uint32_t 			:12;
+		};
+		uint8_t reg[4];
+		uint32_t mask;
+	};
+} pmsc_ledc_t;
+
 #pragma pack (1)
 typedef struct dw_pmsc
 {
@@ -918,25 +1534,14 @@ typedef struct dw_pmsc
 	{
 		struct
 		{	
-			pmsc_ctrl0_t PMSC_CTRL0;
-			pmsc_ctrl1_t PMSC_CTRL1;
+			pmsc_ctrl0_t pmsc_ctrl0;
+			pmsc_ctrl1_t pmsc_ctrl1;
 			uint32_t PMSC_RES1;
-			uint8_t SNOZT;
+			pmsc_snozt_t pmsc_snozt;
 			uint8_t RESERVED0[3]; // TODO check
 			uint8_t PMSC_RES2[22];
-			uint16_t PMSC_TXFSEQ;
-			union
-			{
-				struct
-				{
-					uint32_t BLINK_TIM	:8;
-					uint32_t BLNKEN		:1;
-					uint32_t 			:7;
-					uint32_t BLNKNOW	:4;
-					uint32_t 			:12;
-				};
-				uint32_t PMSC_LEDC;
-			};
+			pmsc_txfseq_t pmsc_txfseq;
+			pmsc_ledc_t pmsc_ledc;
 			uint32_t RESERVED1;
 		};
 		uint8_t reg[48];
@@ -1065,5 +1670,7 @@ uint64_t dw_get_tx_time(void);
 uint64_t dw_get_rx_time(void);
 
 int32_t dw_get_car_int(void);
+
+void default_config(void);
 
 //TODO add function to include tx time in uwb message format ieee with delayed tx
