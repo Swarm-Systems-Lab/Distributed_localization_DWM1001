@@ -32,36 +32,33 @@ typedef enum dw_reg_file_perms
 typedef enum dw_tx_states
 {
 	TX_IDLE,
-	PREAMBLE,
-	SFD,
-	PHR,		// Transmitting PHY header data
-	SDE,		// Transmitting PHR SECDED bits
-	DATA		// Transmitting data block (330 symbols)
+	TX_PREAMBLE,
+	TX_SFD,
+	TX_PHR,		// Transmitting PHY header data
+	TX_SDE,		// Transmitting PHR SECDED bits
+	TX_DATA		// Transmitting data block (330 symbols)
 } tx_state;
 
 typedef enum dw_rx_states
 {
-	RX_IDLE,
-	START_ANALOG,		// Start analog receiver blocks
-	RESERVED0,
-	RESERVED1,
-	RX_RDY,
-	PREAMBLE_FND,		// Receiver is waiting to detect preamble
-	PRMBL_TIMEOUT,
-	SFD_FND,
-	CNFG_PHR_RX,		// Configure for PHR reception
-	PHR_RX_STRT,
-	DATA_RATE_RDY,		// Ready for data reception
-	RESERVED2,
-	DATA_RX_SEQ,
-	CNFG_DATA_RX,
-	PHR_NOT_OK,
-	LAST_SYMBOL,		// Received last symbol
-	WAIT_RSD_DONE,		// Wait for Reed Solomon decoder to finish
-	RSD_OK,
-	RSD_NOT_OK,
-	RECONFIG_110,
-	WAIT_110_PHR
+	RX_IDLE			= 0x00,
+	START_ANALOG	= 0x01,		// Start analog receiver blocks
+	RX_RDY			= 0x04,
+	PREAMBLE_FND	= 0x05,		// Receiver is waiting to detect preamble
+	PRMBL_TIMEOUT	= 0x06,
+	SFD_FND			= 0x07,
+	CNFG_PHR_RX		= 0x08,		// Configure for PHR reception
+	PHR_RX_STRT		= 0x09,
+	DATA_RATE_RDY	= 0x0A,		// Ready for data reception	
+	DATA_RX_SEQ		= 0x0C,
+	CNFG_DATA_RX	= 0x0D,
+	PHR_NOT_OK		= 0x0E,
+	LAST_SYMBOL		= 0x0F,		// Received last symbol
+	WAIT_RSD_DONE	= 0x10,		// Wait for Reed Solomon decoder to finish
+	RSD_OK			= 0x11,
+	RSD_NOT_OK		= 0x12,
+	RECONFIG_110	= 0x13,
+	WAIT_110_PHR	= 0x14
 } rx_state;
 
 typedef enum dw_pmsc_states

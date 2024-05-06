@@ -160,6 +160,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	dw_clear_register(tx_ctrl.reg, sizeof(tx_ctrl.reg));
 	tx_ctrl.TFLEN = 22;
 	tx_ctrl.TXBR = BR_6_8MBPS;
+	tx_ctrl.TXPRF = PRF_16MHZ;
 	tx_ctrl.TXPL = PL_128;
 	
 	dw_set_irq(irq_mask);
@@ -237,7 +238,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 		{
 			dw_clear_register(dx_time.reg, sizeof(dx_time.reg));
 			dw_start_rx(dx_time);
-			evt = chEvtWaitOneTimeout(MRXPHE_E | MRXFCE_E | MLDEERR_E | MRXFCG_E, TIME_MS2I(30));
+			evt = chEvtWaitOneTimeout(MRXPHE_E | MRXFCE_E | MLDEERR_E | MRXFCG_E, TIME_MS2I(35));
 			if (evt == MRXFCG_E)
 			{
 				toggle_led(green);
@@ -256,7 +257,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				dw_soft_reset_rx();
 			evt = 0;
 			state = dw_transceiver_off();
-			chThdSleepMilliseconds(50);
+			chThdSleepMilliseconds(55);
 		}
 
 	}
