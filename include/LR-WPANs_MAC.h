@@ -18,12 +18,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+// TODO Not going to use beacons for dist_loc
 typedef enum frame_type
 {
-	BEACON,
-	DATA,
-	ACK,
-	MAC_CMD
+	FT_BEACON,
+	FT_DATA,
+	FT_ACK,
+	FT_MAC_CMD
 } frame_type_t;
 
 typedef enum address_mode
@@ -40,21 +41,32 @@ typedef struct frame_control
 	{
 		struct 
 		{
-			uint16_t frame_type			:2;
+			uint16_t frame_type			:3;
 			uint16_t sec_en				:1;
 			uint16_t frame_pending		:1;
 			uint16_t ack_req			:1;
 			uint16_t pan_id_compress	:1;
-			uint16_t 					:2;
+			uint16_t 					:3;
 			uint16_t dest_addr_mode		:2;
 			uint16_t frame_version		:2;
 			uint16_t src_addr_mode		:2;
 		};
 		uint16_t mask;
 	};
-	size_t MHR_size;
 } frame_control_t;
 
-void get_MHR(frame_control_t frame_control, uint8_t* MHR, uint8_t seq_num, uint64_t dest_pan_id, uint64_t dest_addr);
+#pragma pack (1)
+typedef struct MHR_16
+{
+	frame_control_t frame_control;
+	uint8_t seq_num;
+	uint16_t dest_pan_id;
+	uint16_t dest_addr;
+	uint16_t src_addr;
+} MHR_16_t;
+
+void encode_MHR(frame_control_t frame_control, uint8_t* MHR, uint8_t seq_num, uint16_t pan_id, uint64_t dest_addr, uint64_t src_addr);
+
+MHR_16_t decode_MHR(uint8_t* MHR);
 
 // TODO Version should be 0x1 for deca only 0x0 and 0x1 are valid

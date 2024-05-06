@@ -23,6 +23,7 @@
 #include "led.h"
 
 #include "dw1000_hal.h"
+#include "LR-WPANs_MAC.h"
 
 #define THREAD_STACK_SIZE	4096
 
@@ -91,6 +92,8 @@ void spi_hal_init(void);
 void load_lde(void);
 
 uint64_t load_ldotune(void);
+
+MHR_16_t build_MHR(uint8_t seq_num, uint16_t dest_addr);
 
 // static THD_WORKING_AREA(SYSTEM_STATUS_THREAD, THREAD_STACK_SIZE);
 // static THD_FUNCTION(SYSTEM_STATUS, arg);

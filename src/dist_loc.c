@@ -134,18 +134,20 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	// irq_mask.MRXRFTO = 0b1;
 	irq_mask.MRXPHE = 0b1;
 	irq_mask.MRXFCE = 0b1;
-	// irq_mask.MRXRFSL = 0b1;
+	irq_mask.MRXRFSL = 0b1;
 	irq_mask.MLDEERR = 0b1;
+	irq_mask.MAFFREJ = 0b1;
 	
 	sdStart(&SD1, &serial_cfg);
 
-	uint8_t data[20] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-	uint8_t recv[20] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+	uint8_t data[29] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+	uint8_t recv[29] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
 	tx_fctrl_t tx_ctrl;
 	dx_time_t dx_time;
 	ack_resp_t_t w4r;
 	uint64_t id = get_hardware_id();
+	dw_write(DW_REG_INFO.PAN_ADR, &id, 2, 0);
 	uint64_t rx_time = 0;
 	uint64_t tx_time = 0;
 	uint64_t m_rx_time = 0;
@@ -158,7 +160,9 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	eventmask_t evt = 0;
 
 	dw_clear_register(tx_ctrl.reg, sizeof(tx_ctrl.reg));
-	tx_ctrl.TFLEN = 22;
+	MHR_16_t MHR = build_MHR(0, 0xFFFF);
+	memcpy(data, &MHR, sizeof(MHR));
+	tx_ctrl.TFLEN = sizeof(data)+2;
 	tx_ctrl.TXBR = BR_6_8MBPS;
 	tx_ctrl.TXPRF = PRF_16MHZ;
 	tx_ctrl.TXPL = PL_128;
@@ -191,8 +195,8 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				tx_time = dw_get_tx_time();
 				rx_time = dw_get_rx_time();
 				dw_read(DW_REG_INFO.RX_BUFFER, recv, sizeof(recv), 0);
-				memcpy(&m_tx_time, recv, 5);
-				memcpy(&m_rx_time, recv+8, 5);
+				memcpy(&m_tx_time, recv+9, 5);
+				memcpy(&m_rx_time, recv+17, 5);
 
 				rt_init = (rx_time) - (tx_time);
 				rt_resp = (m_tx_time) - (m_rx_time);
@@ -246,8 +250,8 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				delay_tx = (uint64_t)rx_time + (uint64_t)(65536*3000);
 				tx_time = (uint64_t)delay_tx + (uint64_t)tx_ant_d;
 				dx_time.time32 = (uint32_t)(delay_tx >> 8);
-				memcpy(data, &tx_time, 8);
-				memcpy(data+8, &rx_time, 8);
+				memcpy(data+9, &tx_time, 8);
+				memcpy(data+17, &rx_time, 8);
 				dw_start_tx(tx_ctrl, data, dx_time, w4r);
 				evt = chEvtWaitOneTimeout(MTXFRS_E, TIME_MS2I(30));
 				if (!evt)
@@ -357,4 +361,29 @@ uint64_t load_ldotune(void)
 	memcpy(&ldotune64, ldotune.reg, DW_SUBREG_INFO.LDO_TUNE.size);
 
 	return ldotune64;
+}
+
+MHR_16_t build_MHR(uint8_t seq_num, uint16_t dest_addr)
+{
+	MHR_16_t MHR;
+	panadr_t panadr;
+
+	dw_read(DW_REG_INFO.PAN_ADR, panadr.reg, DW_REG_INFO.PAN_ADR.size, 0);
+
+	MHR.frame_control.mask = 0;
+	MHR.frame_control.frame_type = FT_DATA;
+	MHR.frame_control.sec_en = 0b0;
+	MHR.frame_control.frame_pending = 0b0;
+	MHR.frame_control.ack_req = 0b0;
+	MHR.frame_control.pan_id_compress = 0b1;
+	MHR.frame_control.dest_addr_mode = SHORT_16;
+	MHR.frame_control.frame_version = 0x1;
+	MHR.frame_control.src_addr_mode = SHORT_16;
+
+	MHR.seq_num = seq_num;
+	MHR.dest_pan_id = panadr.pan_id;
+	MHR.dest_addr = dest_addr;
+	MHR.src_addr = panadr.short_addr;
+
+	return MHR;
 }

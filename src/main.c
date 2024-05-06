@@ -48,11 +48,12 @@ int main(void) {
 	// irq_vector._dw_RXRFTO_handler = RXERR_handler;
 	irq_vector._dw_RXPHE_handler = RXERR_handler;
 	irq_vector._dw_RXFCE_handler = RXERR_handler;
-	// irq_vector._dw_RXRFSL_handler = RXERR_handler;
+	irq_vector._dw_RXRFSL_handler = RXERR_handler;
 	// irq_vector._dw_RXSFDTO_handler = RXERR_handler;
 	// irq_vector._dw_AFFREJ_handler = RXERR_handler;
 	irq_vector._dw_LDEERR_handler = RXERR_handler;
-	irq_vector._dw_LDEDONE_handler = RXFCG_handler;
+	//irq_vector._dw_LDEDONE_handler = RXFCG_handler;
+	irq_vector._dw_AFFREJ_handler = RXERR_handler;
 
 	palEnablePadEvent(IOPORT1, DW_IRQ, PAL_EVENT_MODE_RISING_EDGE);
 	palSetPadCallback(IOPORT1, DW_IRQ, ISR_wrapper, NULL);

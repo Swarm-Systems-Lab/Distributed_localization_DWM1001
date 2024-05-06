@@ -469,6 +469,11 @@ void default_config(void)
 	rf_txctrl.mask = 0x001E3FE3;
 	tc_pgdelay_t tc_pgdelay = 0xB5;
 	fs_plltune_t fs_plltune = 0xBE;
+	sys_cfg_t sys_cfg;
+	dw_read(DW_REG_INFO.SYS_CFG, sys_cfg.reg, DW_REG_INFO.SYS_CFG.size, 0);
+	sys_cfg.FFEN = 0b1;
+	sys_cfg.FFAD = 0b1;
+	dw_write(DW_REG_INFO.SYS_CFG, sys_cfg.reg, DW_REG_INFO.SYS_CFG.size, 0);
 
  	_dw_spi_hal_set._dw_spi_lock(); 
 	_dw_spi_transaction(0, DW_SUBREG_INFO.AGC_TUNE1.parent.id, &agc_tune1, DW_SUBREG_INFO.AGC_TUNE1.size, DW_SUBREG_INFO.AGC_TUNE1.offset);
