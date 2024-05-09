@@ -63,7 +63,7 @@
  * @brief   Enables the RNG subsystem.
  */
 #if !defined(HAL_USE_RNG) || defined(__DOXYGEN__)
-#define HAL_USE_RNG                 FALSE
+#define HAL_USE_RNG                 TRUE
 #endif
 
 /**

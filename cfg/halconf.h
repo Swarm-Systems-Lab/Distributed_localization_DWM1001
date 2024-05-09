@@ -40,6 +40,17 @@
 #define HAL_USE_PAL                         TRUE
 #endif
 
+#if !defined(HAL_USE_COMMUNITY) || defined(__DOXYGEN__)
+#define HAL_USE_COMMUNITY           TRUE
+#endif
+
+/**
+ * @brief   Enables the RNG subsystem.
+ */
+#if !defined(HAL_USE_RNG) || defined(__DOXYGEN__)
+#define HAL_USE_RNG                 TRUE
+#endif
+
 /**
  * @brief   Enables the ADC subsystem.
  */

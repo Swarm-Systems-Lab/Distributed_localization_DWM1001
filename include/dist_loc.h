@@ -61,6 +61,17 @@ extern thread_reference_t irq_evt;
 extern SPIConfig spi_cfg;
 extern SerialConfig serial_cfg;
 
+typedef enum loc_state
+{
+	LOC_STANDBY,
+	LOC_DISC,
+	LOC_INIT,
+	LOC_RESP,
+	LOC_TXERR,
+	LOC_RXERR,
+	LOC_ERR
+} loc_state_t;
+
 void ISR_wrapper(void * arg);
 
 void _dw_power_on(void);
@@ -95,5 +106,12 @@ uint64_t load_ldotune(void);
 
 MHR_16_t build_MHR(uint8_t seq_num, uint16_t dest_addr);
 
-// static THD_WORKING_AREA(SYSTEM_STATUS_THREAD, THREAD_STACK_SIZE);
-// static THD_FUNCTION(SYSTEM_STATUS, arg);
+void loc_init_fun(uint16_t addr);
+void loc_resp_fun(uint16_t addr);
+void loc_disc_fun(void);
+
+static THD_WORKING_AREA(SYSTEM_STATUS_THREAD, THREAD_STACK_SIZE);
+static THD_FUNCTION(SYSTEM_STATUS, arg);
+
+// static THD_WORKING_AREA(LOCATOR_THREAD, THREAD_STACK_SIZE);
+// static THD_FUNCTION(LOCATOR, arg);

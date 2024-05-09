@@ -36,7 +36,7 @@ endif
 
 # If enabled, this option allows to compile the application in THUMB mode.
 ifeq ($(USE_THUMB),)
-  USE_THUMB = yes
+  USE_THUMB = no
 endif
 
 # Enable this if you want to see the full log while compiling.
@@ -47,7 +47,7 @@ endif
 # If enabled, this option makes the build process faster by not compiling
 # modules not used in the current configuration.
 ifeq ($(USE_SMART_BUILD),)
-  USE_SMART_BUILD = no
+  USE_SMART_BUILD = yes
 endif
 
 #
@@ -128,6 +128,7 @@ LDSCRIPT= $(STARTUPLD_CONTRIB)/NRF52832.ld
 CSRC = $(ALLCSRC) \
        $(TESTSRC) \
        $(wildcard $(PSRCDIR)/*.c) \
+	   $(CHIBIOS)/os/various/syscalls.c \
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.

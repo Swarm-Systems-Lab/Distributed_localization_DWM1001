@@ -21,21 +21,25 @@
 // TODO remove magic numbers for sizes of memcpy
 void encode_MHR(frame_control_t frame_control, uint8_t* MHR, uint8_t seq_num, uint16_t pan_id, uint64_t dest_addr, uint64_t src_addr)
 {
-	memcpy(MHR, &frame_control, sizeof(frame_control));
-	memcpy(MHR+2, &seq_num, 1);
 	size_t dest_addr_size = 0;
 	size_t src_addr_size = 0;
 	size_t MHR_size = 0;
+	memcpy(MHR, &frame_control, sizeof(frame_control));
+	MHR_size += sizeof(frame_control);
+	memcpy(MHR+MHR_size, &seq_num, sizeof(seq_num));
+	MHR_size += sizeof(seq_num);
 
 	if (frame_control.dest_addr_mode != NO_ADDR)
 	{
-		memcpy(MHR+3, &pan_id, 2);
+		memcpy(MHR+MHR_size, &pan_id, sizeof(pan_id));
+		MHR_size += sizeof(pan_id);
 		if (frame_control.dest_addr_mode == SHORT_16)
 			dest_addr_size = 2;
 		if (frame_control.dest_addr_mode == LONG_64)
 			dest_addr_size = 8;
 
-		memcpy(MHR+5, &dest_addr, dest_addr_size);
+		memcpy(MHR+MHR_size, &dest_addr, dest_addr_size);
+		MHR_size += dest_addr_size;
 	}
 
 	if (frame_control.src_addr_mode != NO_ADDR)
@@ -45,16 +49,18 @@ void encode_MHR(frame_control_t frame_control, uint8_t* MHR, uint8_t seq_num, ui
 		if (frame_control.src_addr_mode == LONG_64)
 			src_addr_size = 8;
 
-		memcpy(MHR+5+dest_addr_size, &src_addr, src_addr_size);
+		memcpy(MHR+MHR_size, &src_addr, src_addr_size);
+		MHR_size += src_addr_size;
 	}
 
-	if (sizeof(MHR) != MHR_size)
-	{
-		// Write the header with 0xdead to indicate size error
-		uint16_t error_mark = 0xDEAD;
-		for (size_t i = 0; i < sizeof(MHR); i++)
-			memcpy(MHR+i, &error_mark+(i&1),1);
-	}
+	// TODO fix useless check too late and not filling with dead
+	// if (sizeof(MHR) < MHR_size)
+	// {
+	// 	// Write the header with 0xdead to indicate size error
+	// 	uint16_t error_mark = 0xDEAD;
+	// 	for (size_t i = 0; i < sizeof(MHR); i++)
+	// 		memcpy(MHR+i, &error_mark+(i&1), 1);
+	// }
 /*
 
 pan id compression when the bit is 0 both fields should be present with padding(check) (also check if multiple networks would be used)

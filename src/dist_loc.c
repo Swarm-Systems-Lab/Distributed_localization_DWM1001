@@ -18,6 +18,19 @@
 
 thread_reference_t irq_evt = NULL;
 
+frame_control_t def_frame_ctrl = {.mask=0x9841};
+// MHR.frame_control.frame_type = FT_DATA;
+// MHR.frame_control.sec_en = 0b0;
+// MHR.frame_control.frame_pending = 0b0;
+// MHR.frame_control.ack_req = 0b0;
+// MHR.frame_control.pan_id_compress = 0b1;
+// MHR.frame_control.dest_addr_mode = SHORT_16;
+// MHR.frame_control.frame_version = 0x1;
+// MHR.frame_control.src_addr_mode = SHORT_16;
+
+uint16_t neighbours[3] = {0,0,0};
+uint16_t neighbours_3wh[3] = {0,0,0};
+
 SPIConfig spi_cfg = 
 {
 	.end_cb = NULL,
@@ -111,6 +124,144 @@ void dw_reset(void)
 	spi1_unlock();
 }
 
+void loc_init_fun(uint16_t addr)
+{
+	sys_state_t state;
+	tx_fctrl_t tx_ctrl;
+	dx_time_t dx_time;
+	ack_resp_t_t w4r;
+	uint64_t rx_time = 0;
+	uint64_t tx_time = 0;
+	uint64_t m_rx_time = 0;
+	uint64_t m_tx_time = 0;
+	int64_t rt_init = 0;
+	int64_t rt_resp = 0;
+	eventmask_t evt = 0;
+	panadr_t panadr;
+	uint8_t data[29] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+	uint8_t recv[29] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
+	double tof = 0.0;
+	double distance = 0.0;
+	float clock_offset_r = 0.0;
+	float distances[20] = {0,0,0,0,0};
+	uint8_t cnt = 0;
+
+	dw_read(DW_REG_INFO.PAN_ADR, panadr.reg, DW_REG_INFO.PAN_ADR.size, 0);
+	encode_MHR(def_frame_ctrl, data, 0x0, panadr.pan_id, addr, panadr.short_addr);
+	dw_clear_register(tx_ctrl.reg, sizeof(tx_ctrl.reg));
+	tx_ctrl.TFLEN = sizeof(data)+2;
+	tx_ctrl.TXBR = BR_6_8MBPS;
+	tx_ctrl.TXPRF = PRF_16MHZ;
+	tx_ctrl.TXPL = PL_128;
+
+	w4r.mask = 0;
+	dw_clear_register(dx_time.reg, sizeof(dx_time.reg));
+	w4r.ACK_TIM = 1;
+	dw_start_tx(tx_ctrl, data, dx_time, w4r);
+	evt = chEvtWaitOneTimeout(MRXPHE_E | MRXFCE_E | MLDEERR_E | MRXFCG_E, TIME_MS2I(30));
+	if (evt == MRXFCG_E)
+	{
+		toggle_led(green);
+		tx_time = dw_get_tx_time();
+		rx_time = dw_get_rx_time();
+		dw_read(DW_REG_INFO.RX_BUFFER, recv, sizeof(recv), 0);
+		memcpy(&m_tx_time, recv+9, 5);
+		memcpy(&m_rx_time, recv+17, 5);
+
+		rt_init = (rx_time) - (tx_time);
+		rt_resp = (m_tx_time) - (m_rx_time);
+
+		clock_offset_r = dw_get_car_int() * ((998.4e6/2.0/1024.0/131072.0) * (-1.0e6/6489.6e6) / 1.0e6);
+		
+		//rt_resp *= (1.0f - clock_offset_r);
+
+		tof = (rt_init - rt_resp)/2.0f;
+		tof = tof * (1.0f/(float)(499.2e6*128.0));
+
+		distance = tof * 299702547;
+		distance *= 100;
+
+		if (distance > 0 && distance < 1000)
+			distances[cnt] = distance;
+
+		cnt++;
+		if (cnt == 10)
+			cnt = 0;
+
+		distance = 0;
+
+		for (int i = 0; i < 10; i++)
+			distance += distances[i];
+
+		distance /= 10;
+
+		chprintf((BaseSequentialStream*)&SD1, "Distance: %dcm\n", (int)distance);
+	}
+	else
+		dw_soft_reset_rx();
+	evt = 0;
+	state = dw_transceiver_off();
+	chThdSleepMilliseconds(50);
+}
+
+void loc_resp_fun(uint16_t addr)
+{
+	sys_state_t state;
+	tx_fctrl_t tx_ctrl;
+	dx_time_t dx_time;
+	ack_resp_t_t w4r;
+	uint64_t rx_time = 0;
+	uint64_t tx_time = 0;
+	uint64_t delay_tx = 0;
+	eventmask_t evt = 0;
+	uint16_t tx_ant_d;
+	panadr_t panadr;
+
+	dw_read(DW_REG_INFO.TX_ANTD, &tx_ant_d, DW_REG_INFO.TX_ANTD.size, 0);
+
+	uint8_t data[29] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+	uint8_t recv[29] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
+	dw_read(DW_REG_INFO.PAN_ADR, panadr.reg, DW_REG_INFO.PAN_ADR.size, 0);
+	encode_MHR(def_frame_ctrl, data, 0x0, panadr.pan_id, addr, panadr.short_addr);
+	dw_clear_register(tx_ctrl.reg, sizeof(tx_ctrl.reg));
+	tx_ctrl.TFLEN = sizeof(data)+2;
+	tx_ctrl.TXBR = BR_6_8MBPS;
+	tx_ctrl.TXPRF = PRF_16MHZ;
+	tx_ctrl.TXPL = PL_128;
+
+	w4r.mask = 0;
+	dw_clear_register(dx_time.reg, sizeof(dx_time.reg));
+	dw_start_rx(dx_time);
+	evt = chEvtWaitOneTimeout(MRXPHE_E | MRXFCE_E | MLDEERR_E | MRXFCG_E, TIME_MS2I(31));
+	if (evt == MRXFCG_E)
+	{
+		toggle_led(green);
+		dw_read(DW_REG_INFO.RX_BUFFER, recv, sizeof(recv), 0);
+		rx_time = dw_get_rx_time();
+		delay_tx = (uint64_t)rx_time + (uint64_t)(65536*3000);
+		tx_time = (uint64_t)delay_tx + (uint64_t)tx_ant_d;
+		dx_time.time32 = (uint32_t)(delay_tx >> 8);
+		memcpy(data+9, &tx_time, 8);
+		memcpy(data+17, &rx_time, 8);
+		dw_start_tx(tx_ctrl, data, dx_time, w4r);
+		evt = chEvtWaitOneTimeout(MTXFRS_E, TIME_MS2I(30));
+		if (!evt)
+			dw_soft_reset_rx();
+	}
+	else
+		dw_soft_reset_rx();
+	evt = 0;
+	state = dw_transceiver_off();
+	chThdSleepMilliseconds(51);
+}
+
+void loc_disc_fun(void)
+{
+
+}
+
 THD_FUNCTION(DW_CONTROLLER, arg)
 {
 	(void)arg;
@@ -125,7 +276,12 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	// dw_read(DW_REG_INFO.RX_FWTO, fwto, DW_REG_INFO.RX_FWTO.size, 0);
 
 	sys_state_t state;
+	tx_fctrl_t tx_ctrl;
+	dx_time_t dx_time;
+	ack_resp_t_t w4r;
 	sys_mask_t irq_mask;
+	MHR_16_t MHR;
+	panadr_t panadr;
 
 	irq_mask.mask = 0U;
 	irq_mask.MTXFRS = 0b1;
@@ -140,131 +296,113 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	
 	sdStart(&SD1, &serial_cfg);
 
-	uint8_t data[29] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-	uint8_t recv[29] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-
-	tx_fctrl_t tx_ctrl;
-	dx_time_t dx_time;
-	ack_resp_t_t w4r;
 	uint64_t id = get_hardware_id();
+	srand(id);
 	dw_write(DW_REG_INFO.PAN_ADR, &id, 2, 0);
-	uint64_t rx_time = 0;
-	uint64_t tx_time = 0;
-	uint64_t m_rx_time = 0;
-	uint64_t m_tx_time = 0;
-	uint64_t delay_tx = 0;
-	int64_t rt_init = 0;
-	int64_t rt_resp = 0;
 	uint16_t tx_ant_d = 63520;
 	uint16_t rx_ant_d = 63520;
 	eventmask_t evt = 0;
-
-	dw_clear_register(tx_ctrl.reg, sizeof(tx_ctrl.reg));
-	MHR_16_t MHR = build_MHR(0, 0xFFFF);
-	memcpy(data, &MHR, sizeof(MHR));
-	tx_ctrl.TFLEN = sizeof(data)+2;
-	tx_ctrl.TXBR = BR_6_8MBPS;
-	tx_ctrl.TXPRF = PRF_16MHZ;
-	tx_ctrl.TXPL = PL_128;
 	
 	dw_set_irq(irq_mask);
 
 	dw_write(DW_REG_INFO.LDE_CTRL, &rx_ant_d, DW_SUBREG_INFO.LDE_RXANTD.size, DW_SUBREG_INFO.LDE_RXANTD.offset);
 	dw_write(DW_REG_INFO.TX_ANTD, &tx_ant_d, DW_REG_INFO.TX_ANTD.size, 0);
 
-	double tof = 0.0;
-	double tof2 = 0.0;
-	double distance = 0.0;
-	float clock_offset_r = 0.0;
-	float distances[20] = {0,0,0,0,0};
-	uint8_t cnt = 0;
+	uint8_t data[10] = {0,0,0,0,0,0,0,0,0,0};
+	uint8_t recv[10] = {0,0,0,0,0,0,0,0,0,0};
 
-	if (id == 588618085864310691)
+	uint16_t addrs[3] = {0,0,0};
+	uint8_t end[3] = {0,0,0};
+
+	dw_read(DW_REG_INFO.PAN_ADR, addrs, 2, 0);
+	uint8_t finish[3] = {0,0,0};
+
+	while (!(finish[0] == 0x1 && finish[1] == 0x1 && finish[2] == 0x1) && !(end[0] == 0x1 && end[1] == 0x1 && end[2] == 0x1))
 	{
-		// Initiator
 		dw_clear_register(dx_time.reg, sizeof(dx_time.reg));
-		while (true)
+		dw_start_rx(dx_time);
+		evt = chEvtWaitOneTimeout(MRXPHE_E | MRXFCE_E | MLDEERR_E | MRXFCG_E, TIME_MS2I(300+(id&0x3F)));
+		if (evt == MRXFCG_E)
 		{
-			dw_clear_register(w4r.reg, sizeof(w4r.reg));
-			w4r.ACK_TIM = 1;
-			dw_start_tx(tx_ctrl, data, dx_time, w4r);
-			evt = chEvtWaitOneTimeout(MRXPHE_E | MRXFCE_E | MLDEERR_E | MRXFCG_E, TIME_MS2I(30));
-			if (evt == MRXFCG_E)
+			toggle_led(green);
+			dw_read(DW_REG_INFO.RX_BUFFER, recv, sizeof(recv), 0);
+			MHR = decode_MHR(recv);
+			if (addrs[1] == 0)
+				addrs[1] = MHR.src_addr;
+			if (addrs[1] != 0 && addrs[1] != MHR.src_addr)
 			{
-				toggle_led(green);
-				tx_time = dw_get_tx_time();
-				rx_time = dw_get_rx_time();
-				dw_read(DW_REG_INFO.RX_BUFFER, recv, sizeof(recv), 0);
-				memcpy(&m_tx_time, recv+9, 5);
-				memcpy(&m_rx_time, recv+17, 5);
-
-				rt_init = (rx_time) - (tx_time);
-				rt_resp = (m_tx_time) - (m_rx_time);
-
-				clock_offset_r = dw_get_car_int() * ((998.4e6/2.0/1024.0/131072.0) * (-1.0e6/6489.6e6) / 1.0e6);
-				
-				//rt_resp *= (1.0f - clock_offset_r);
-
-				tof = (rt_init - rt_resp)/2.0f;
-				tof = tof * (1.0f/(float)(499.2e6*128.0));
-
-				distance = tof * 299702547;
-				distance *= 100;
-
-				if (distance > 0 && distance < 1000)
-					distances[cnt] = distance;
-
-				cnt++;
-				if (cnt == 10)
-					cnt = 0;
-
-				distance = 0;
-
-				for (int i = 0; i < 10; i++)
-					distance += distances[i];
-
-				distance /= 10;
-
-				chprintf((BaseSequentialStream*)&SD1, "Distance: %dcm\n", (int)distance);
+				addrs[2] = MHR.src_addr;
 			}
-			else
-				dw_soft_reset_rx();
-			evt = 0;
+
+			if (recv[9] == 0xD)
+			{
+				for (int i = 1; i < 3; i++)
+				{
+					if (addrs[i] == MHR.src_addr)
+						end[i] = 0x1;
+				}
+			}
+
+			if (recv[9] == 0xC)
+			{
+				for (int i = 1; i < 3; i++)
+				{
+					if (addrs[i] == MHR.src_addr)
+						finish[i] = 0x1;
+				}
+			}
+			dw_clear_register(recv, sizeof(recv));
+		}
+		else
+		{
+			dw_soft_reset_rx();
 			state = dw_transceiver_off();
+			dw_read(DW_REG_INFO.PAN_ADR, panadr.reg, DW_REG_INFO.PAN_ADR.size, 0);
+			encode_MHR(def_frame_ctrl, data, 0x0, panadr.pan_id, 0xFFFF, panadr.short_addr);
+			dw_clear_register(tx_ctrl.reg, sizeof(tx_ctrl.reg));
+			tx_ctrl.TFLEN = sizeof(data)+2;
+			tx_ctrl.TXBR = BR_6_8MBPS;
+			tx_ctrl.TXPRF = PRF_16MHZ;
+			tx_ctrl.TXPL = PL_128;
+			w4r.mask = 0;
+			dw_clear_register(dx_time.reg, sizeof(dx_time.reg));
+			dw_start_tx(tx_ctrl, data, dx_time, w4r);
+			dw_clear_register(data, sizeof(data));
+			evt = chEvtWaitOneTimeout(MTXFRS_E, TIME_MS2I(30));
+			if (!evt)
+				dw_soft_reset_rx();
 			chThdSleepMilliseconds(50);
 		}
-	}
-	else
-	{
-		// Responder
-		dw_clear_register(w4r.reg, sizeof(w4r.reg));
-		while (true)
+		evt = 0;
+		state = dw_transceiver_off();
+		chThdSleepMilliseconds(51);
+
+		if (addrs[0] != 0x0 && addrs[1] != 0x0 && addrs[2] != 0x0)
 		{
-			dw_clear_register(dx_time.reg, sizeof(dx_time.reg));
-			dw_start_rx(dx_time);
-			evt = chEvtWaitOneTimeout(MRXPHE_E | MRXFCE_E | MLDEERR_E | MRXFCG_E, TIME_MS2I(35));
-			if (evt == MRXFCG_E)
-			{
-				toggle_led(green);
-				rx_time = dw_get_rx_time();
-				delay_tx = (uint64_t)rx_time + (uint64_t)(65536*3000);
-				tx_time = (uint64_t)delay_tx + (uint64_t)tx_ant_d;
-				dx_time.time32 = (uint32_t)(delay_tx >> 8);
-				memcpy(data+9, &tx_time, 8);
-				memcpy(data+17, &rx_time, 8);
-				dw_start_tx(tx_ctrl, data, dx_time, w4r);
-				evt = chEvtWaitOneTimeout(MTXFRS_E, TIME_MS2I(30));
-				if (!evt)
-					dw_soft_reset_rx();
-			}
-			else
-				dw_soft_reset_rx();
-			evt = 0;
-			state = dw_transceiver_off();
-			chThdSleepMilliseconds(55);
+			end[0] = 0x1;
+			data[9] = 0xD;
 		}
 
+		if ((addrs[0] != 0x0 && addrs[1] != 0x0 && addrs[2] != 0x0) && (end[0] == 0x1 && end[1] == 0x1 && end[2] == 0x1))
+		{
+			finish[0] = 0x1;
+			data[9] = 0xC;
+		}
 	}
+	while (true) {	
+		toggle_led(blue);
+		chThdSleepMilliseconds(500);
+	}
+}
+
+THD_FUNCTION(SYSTEM_STATUS, arg)
+{
+	loc_state_t loc_state = LOC_DISC;
+
+	uint16_t addrs[3] = {0,0,0};
+
+	dw_read(DW_REG_INFO.PAN_ADR, addrs, 2, 0);
+
 }
 
 void set_fast_spi_freq(void)
@@ -361,29 +499,4 @@ uint64_t load_ldotune(void)
 	memcpy(&ldotune64, ldotune.reg, DW_SUBREG_INFO.LDO_TUNE.size);
 
 	return ldotune64;
-}
-
-MHR_16_t build_MHR(uint8_t seq_num, uint16_t dest_addr)
-{
-	MHR_16_t MHR;
-	panadr_t panadr;
-
-	dw_read(DW_REG_INFO.PAN_ADR, panadr.reg, DW_REG_INFO.PAN_ADR.size, 0);
-
-	MHR.frame_control.mask = 0;
-	MHR.frame_control.frame_type = FT_DATA;
-	MHR.frame_control.sec_en = 0b0;
-	MHR.frame_control.frame_pending = 0b0;
-	MHR.frame_control.ack_req = 0b0;
-	MHR.frame_control.pan_id_compress = 0b1;
-	MHR.frame_control.dest_addr_mode = SHORT_16;
-	MHR.frame_control.frame_version = 0x1;
-	MHR.frame_control.src_addr_mode = SHORT_16;
-
-	MHR.seq_num = seq_num;
-	MHR.dest_pan_id = panadr.pan_id;
-	MHR.dest_addr = dest_addr;
-	MHR.src_addr = panadr.short_addr;
-
-	return MHR;
 }

@@ -132,7 +132,7 @@ typedef enum dw_preamble_length
 	PL_1536		= 0x6,
 	PL_2048		= 0xA,
 	PL_4096		= 0x3
-} preamble_lengt_t;
+} preamble_length_t;
 
 // typedef enum dw_modes
 
@@ -214,6 +214,13 @@ typedef struct dw_irq_vector
 		void (*vector[32])(void);
 	};
 } irq_vector_t;
+
+typedef struct dw_op_mode
+{
+	txbr_t data_rate;
+	txprf_t prf;
+	preamble_length_t preamble_length;
+} dw_op_mode_t;
 
 // typedef struct dw_config
 // {
