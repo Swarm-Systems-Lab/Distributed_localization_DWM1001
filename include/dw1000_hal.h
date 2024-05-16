@@ -1567,8 +1567,6 @@ void dw_set_spi_recv(void (*spi_recv_func)(size_t, const uint8_t*));
  */
 int8_t validate_spi_hal(void);
 
-void dw_clear_register(uint8_t* reg, size_t size);
-
 /**
  * @brief 
  * 

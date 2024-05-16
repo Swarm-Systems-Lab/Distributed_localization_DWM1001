@@ -28,8 +28,13 @@ frame_control_t def_frame_ctrl = {.mask=0x9841};
 // MHR.frame_control.frame_version = 0x1;
 // MHR.frame_control.src_addr_mode = SHORT_16;
 
-uint16_t neighbours[3] = {0,0,0};
-uint16_t neighbours_3wh[3] = {0,0,0};
+address_list_t neighbours;
+
+panadr_t panadr_own;
+
+uint8_t recv_buf[128];
+
+double distances_neigh[NEIGHBOUR_NUM];
 
 SPIConfig spi_cfg = 
 {
@@ -124,12 +129,186 @@ void dw_reset(void)
 	spi1_unlock();
 }
 
-void loc_init_fun(uint16_t addr)
+int32_t _send_message(uint16_t addr, uint8_t* message, size_t size, uint8_t w4r_on, uint32_t w_time, uint32_t dly_time)
 {
-	sys_state_t state;
+	uint8_t frame[size+9];
+	// Todo remove 9 magic and panadr should be global variable set at config
+	panadr_t panadr;
 	tx_fctrl_t tx_ctrl;
 	dx_time_t dx_time;
 	ack_resp_t_t w4r;
+	eventmask_t evt = 0;
+	memset(tx_ctrl.reg, 0, sizeof(tx_ctrl.reg));
+	memset(dx_time.reg, 0, sizeof(dx_time.reg));
+	w4r.mask = 0;
+	if (w4r_on)
+	{
+		w4r.mask = w_time; // TODO check if bitfield works
+		w4r.ACK_TIM = 1;
+	}
+
+	// TODO time should be the delay??
+	dx_time.time32 = dly_time;
+
+	dw_read(DW_REG_INFO.PAN_ADR, panadr.reg, DW_REG_INFO.PAN_ADR.size, 0);
+	encode_MHR(def_frame_ctrl, frame, 0x0, panadr.pan_id, addr, panadr.short_addr);
+	memcpy(frame+9, message, size);
+	tx_ctrl.TFLEN = sizeof(frame)+2;
+	tx_ctrl.TXBR = BR_6_8MBPS;
+	tx_ctrl.TXPRF = PRF_16MHZ;
+	tx_ctrl.TXPL = PL_128;
+
+	dw_start_tx(tx_ctrl, frame, dx_time, w4r);
+	evt = chEvtWaitOneTimeout(MTXFRS_E, TIME_MS2I(8));
+	if (!evt)
+		return -1;
+	
+	return evt;
+}
+
+int32_t send_message(uint16_t addr, uint8_t* message, size_t size)
+{	
+	return _send_message(addr, message, size, 0, 0, 0);
+}
+
+int32_t send_message_w4r(uint16_t addr, uint8_t* message, size_t size, uint32_t time, uint16_t* recv_addr, size_t* recv_size)
+{
+	eventmask_t evt = 0;
+	int32_t code = _send_message(addr, message, size, 1, time, 0);
+	//TODO check code
+	evt = chEvtWaitOneTimeout(MRXPHE_E | MRXFCE_E | MLDEERR_E | MRXFCG_E, TIME_US2I(60000));
+	if (evt == MRXFCG_E)
+		get_message(recv_addr, recv_size);
+	else if (!evt)
+		return 0;
+	dw_soft_reset_rx();
+	return evt;
+}
+
+int32_t send_message_delay(uint16_t addr, uint8_t* message, size_t size, uint32_t time)
+{
+	return _send_message(addr, message, size, 0, 0, time);
+}
+
+void get_message(uint16_t* addr, size_t* size)
+{
+	rx_finfo_t rx_finfo;
+	rx_finfo.mask = 0;
+	MHR_16_t MHR;
+
+	dw_read(DW_REG_INFO.RX_FINFO, rx_finfo.reg, DW_REG_INFO.RX_FINFO.size, 0);
+	dw_read(DW_REG_INFO.RX_BUFFER, recv_buf, rx_finfo.RXFLEN, 0);
+	MHR = decode_MHR(recv_buf);
+	*addr = MHR.src_addr;
+	*size = rx_finfo.RXFLEN-9;
+	memmove(recv_buf, recv_buf+9, *size);
+}
+
+int32_t recv_message(uint16_t* addr, size_t* size, uint32_t timeout)
+{
+	dx_time_t dx_time;
+	eventmask_t evt = 0;
+
+	memset(dx_time.reg, 0, sizeof(dx_time.reg));
+	*size = 0;
+
+	dw_start_rx(dx_time);
+	evt = chEvtWaitOneTimeout(MRXPHE_E | MRXFCE_E | MLDEERR_E | MRXFCG_E, TIME_US2I(timeout));
+	if (evt == MRXFCG_E)
+		get_message(addr, size);
+	else if (!evt)
+		return 0;
+	dw_soft_reset_rx();
+	return evt;
+}
+
+void init_neigh(void)
+{
+	neighbours.last_p = 0;
+	for (size_t i = 0; i < NEIGHBOUR_NUM; i++)
+	{
+		neighbours.addrs[i] = 0;
+	}
+}
+
+int8_t search_addr(uint16_t addr)
+{
+	int8_t pos = -1;
+	if (neighbours.last_p > 0)
+	{
+		for (size_t i = 0; i < neighbours.last_p; i++)
+		{
+			if (addr == neighbours.addrs[i] || addr == 0 || addr == panadr_own.short_addr)
+				pos = i;
+		}
+	}
+
+	return pos;
+}
+
+int8_t insert_addr(uint16_t addr)
+{
+	if (neighbours.last_p >= NEIGHBOUR_NUM)
+		return -2;
+
+	if (search_addr(addr) < 0)
+	{
+		neighbours.addrs[neighbours.last_p] = addr;
+		neighbours.last_p++;
+		return neighbours.last_p-1;
+	}
+	else
+		return -1;
+}
+
+int32_t recv_disc(void)
+{
+	size_t size = 0;
+	uint32_t rand_wait = (rand() & 0xFFFF) + 4000;
+	uint16_t addr;
+	int32_t suc = recv_message(&addr, &size, rand_wait);
+	//uint8_t connected = search_conn(src_addr);
+	uint8_t connected = 1;
+	
+	if (suc == 0)
+		return 0;
+
+	if (suc < 0 || size <= 0)
+		return -1;
+	
+	if (suc == MRXFCG_E)
+	{
+		if (recv_buf[0] == MT_BROADCAST)
+		{
+			//toggle_led(green);
+			int8_t suc;
+			suc = insert_addr(addr);
+			if (suc == -2)
+				return 4; // list is full
+			for (size_t i = 0; i < NEIGHBOUR_NUM; i++)
+			{
+				suc = insert_addr(((uint16_t*)(recv_buf+1))[i]);
+				if (suc == -1)
+					return 1; // no new address
+			}
+			return 1;
+		}
+		else
+			return 2;
+
+		if (recv_buf[0] == 2)
+			return 2;
+		
+		if (connected)
+			// Normal exchange
+			return 3;
+	}
+	return suc;
+}
+
+double loc_init_fun(uint16_t addr)
+{
+	sys_state_t state;
 	uint64_t rx_time = 0;
 	uint64_t tx_time = 0;
 	uint64_t m_rx_time = 0;
@@ -137,43 +316,29 @@ void loc_init_fun(uint16_t addr)
 	int64_t rt_init = 0;
 	int64_t rt_resp = 0;
 	eventmask_t evt = 0;
-	panadr_t panadr;
-	uint8_t data[29] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-	uint8_t recv[29] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+	uint16_t recv_addr;
+	size_t recv_size;
 
+	uint8_t data[2] = {MT_LOC_REQ,0};
 	double tof = 0.0;
-	double distance = 0.0;
+	double distance = -1.0;
 	float clock_offset_r = 0.0;
-	float distances[20] = {0,0,0,0,0};
-	uint8_t cnt = 0;
+	//float distances[20] = {0,0,0,0,0};
+	//uint8_t cnt = 0;
 
-	dw_read(DW_REG_INFO.PAN_ADR, panadr.reg, DW_REG_INFO.PAN_ADR.size, 0);
-	encode_MHR(def_frame_ctrl, data, 0x0, panadr.pan_id, addr, panadr.short_addr);
-	dw_clear_register(tx_ctrl.reg, sizeof(tx_ctrl.reg));
-	tx_ctrl.TFLEN = sizeof(data)+2;
-	tx_ctrl.TXBR = BR_6_8MBPS;
-	tx_ctrl.TXPRF = PRF_16MHZ;
-	tx_ctrl.TXPL = PL_128;
-
-	w4r.mask = 0;
-	dw_clear_register(dx_time.reg, sizeof(dx_time.reg));
-	w4r.ACK_TIM = 1;
-	dw_start_tx(tx_ctrl, data, dx_time, w4r);
-	evt = chEvtWaitOneTimeout(MRXPHE_E | MRXFCE_E | MLDEERR_E | MRXFCG_E, TIME_MS2I(30));
-	if (evt == MRXFCG_E)
+	evt = send_message_w4r(addr, data, sizeof(data), 0, &recv_addr, &recv_size);
+	if (evt == MRXFCG_E && recv_buf[0] == MT_LOC_RESP)
 	{
 		toggle_led(green);
 		tx_time = dw_get_tx_time();
 		rx_time = dw_get_rx_time();
-		dw_read(DW_REG_INFO.RX_BUFFER, recv, sizeof(recv), 0);
-		memcpy(&m_tx_time, recv+9, 5);
-		memcpy(&m_rx_time, recv+17, 5);
+		memcpy(&m_tx_time, recv_buf+1, 5);
+		memcpy(&m_rx_time, recv_buf+9, 5);
 
 		rt_init = (rx_time) - (tx_time);
 		rt_resp = (m_tx_time) - (m_rx_time);
 
 		clock_offset_r = dw_get_car_int() * ((998.4e6/2.0/1024.0/131072.0) * (-1.0e6/6489.6e6) / 1.0e6);
-		
 		//rt_resp *= (1.0f - clock_offset_r);
 
 		tof = (rt_init - rt_resp)/2.0f;
@@ -182,76 +347,57 @@ void loc_init_fun(uint16_t addr)
 		distance = tof * 299702547;
 		distance *= 100;
 
-		if (distance > 0 && distance < 1000)
-			distances[cnt] = distance;
+		// if (distance > 0 && distance < 1000)
+		// 	distances[cnt] = distance;
 
-		cnt++;
-		if (cnt == 10)
-			cnt = 0;
+		// cnt++;
+		// if (cnt == 10)
+		// 	cnt = 0;
 
-		distance = 0;
+		// distance = 0;
+		// for (int i = 0; i < 10; i++)
+		// 	distance += distances[i];
 
-		for (int i = 0; i < 10; i++)
-			distance += distances[i];
+		// distance /= 10;
 
-		distance /= 10;
-
-		chprintf((BaseSequentialStream*)&SD1, "Distance: %dcm\n", (int)distance);
+		// chprintf((BaseSequentialStream*)&SD1, "Distance: %dcm\n", (int)distance);
 	}
 	else
 		dw_soft_reset_rx();
 	evt = 0;
 	state = dw_transceiver_off();
 	chThdSleepMilliseconds(50);
+	return distance;
 }
 
-void loc_resp_fun(uint16_t addr)
+void loc_resp_fun()
 {
 	sys_state_t state;
-	tx_fctrl_t tx_ctrl;
-	dx_time_t dx_time;
-	ack_resp_t_t w4r;
+	uint32_t d_time;
 	uint64_t rx_time = 0;
 	uint64_t tx_time = 0;
 	uint64_t delay_tx = 0;
 	eventmask_t evt = 0;
-	uint16_t tx_ant_d;
-	panadr_t panadr;
+	tx_antd_t tx_ant_d;
+	uint16_t src_addr;
+	size_t size_recv;
 
-	dw_read(DW_REG_INFO.TX_ANTD, &tx_ant_d, DW_REG_INFO.TX_ANTD.size, 0);
+	dw_read(DW_REG_INFO.TX_ANTD, (uint8_t*)(&tx_ant_d), DW_REG_INFO.TX_ANTD.size, 0);
 
-	uint8_t data[29] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-	uint8_t recv[29] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+	uint8_t data[17] = {MT_LOC_RESP,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-	dw_read(DW_REG_INFO.PAN_ADR, panadr.reg, DW_REG_INFO.PAN_ADR.size, 0);
-	encode_MHR(def_frame_ctrl, data, 0x0, panadr.pan_id, addr, panadr.short_addr);
-	dw_clear_register(tx_ctrl.reg, sizeof(tx_ctrl.reg));
-	tx_ctrl.TFLEN = sizeof(data)+2;
-	tx_ctrl.TXBR = BR_6_8MBPS;
-	tx_ctrl.TXPRF = PRF_16MHZ;
-	tx_ctrl.TXPL = PL_128;
-
-	w4r.mask = 0;
-	dw_clear_register(dx_time.reg, sizeof(dx_time.reg));
-	dw_start_rx(dx_time);
-	evt = chEvtWaitOneTimeout(MRXPHE_E | MRXFCE_E | MLDEERR_E | MRXFCG_E, TIME_MS2I(31));
-	if (evt == MRXFCG_E)
+	int32_t suc = recv_message(&src_addr, &size_recv, 61000);
+	if (suc == MRXFCG_E && recv_buf[0] == MT_LOC_REQ)
 	{
 		toggle_led(green);
-		dw_read(DW_REG_INFO.RX_BUFFER, recv, sizeof(recv), 0);
 		rx_time = dw_get_rx_time();
 		delay_tx = (uint64_t)rx_time + (uint64_t)(65536*3000);
 		tx_time = (uint64_t)delay_tx + (uint64_t)tx_ant_d;
-		dx_time.time32 = (uint32_t)(delay_tx >> 8);
-		memcpy(data+9, &tx_time, 8);
-		memcpy(data+17, &rx_time, 8);
-		dw_start_tx(tx_ctrl, data, dx_time, w4r);
-		evt = chEvtWaitOneTimeout(MTXFRS_E, TIME_MS2I(30));
-		if (!evt)
-			dw_soft_reset_rx();
+		d_time = (uint32_t)(delay_tx >> 8);
+		memcpy(data+1, &tx_time, 8);
+		memcpy(data+9, &rx_time, 8);
+		send_message_delay(src_addr, data, sizeof(data), d_time);
 	}
-	else
-		dw_soft_reset_rx();
 	evt = 0;
 	state = dw_transceiver_off();
 	chThdSleepMilliseconds(51);
@@ -259,7 +405,87 @@ void loc_resp_fun(uint16_t addr)
 
 void loc_disc_fun(void)
 {
+	init_neigh();
+	disc_state_t disc_state = DISC_INIT;
+	uint8_t disc_to_cnt = 0;
+	uint8_t message[7] = {1,0,0,0,0,0,0};
+	uint8_t recv_b[10];
+	uint16_t src_addr;
+	size_t size;
+	uint8_t ttl_rx = 0;
+	sys_state_t state;
+	int32_t suc;
 
+	while (disc_state != DISC_3WH)
+	{
+		memcpy(message+1, neighbours.addrs, sizeof(neighbours.addrs));
+		switch (disc_state)
+		{
+			case DISC_INIT:
+				disc_to_cnt = 0;
+				disc_state = DISC_WAIT_RX;
+				break;
+			case DISC_BROAD:
+				message[0] = 1;
+				suc = send_message(0xFFFF, message, sizeof(message));
+				if (suc < 0)
+					disc_state = DISC_TX_ERR;
+				else 
+					disc_state = DISC_WAIT_RX;
+				break;
+			case DISC_WAIT_RX:
+				suc = recv_disc();
+				switch (suc)
+				{
+					case 0:
+						disc_to_cnt++;
+						disc_state = DISC_BROAD;
+						state = dw_transceiver_off();
+						chThdSleepMilliseconds(10);
+						break;
+					case 1:
+						disc_state = DISC_WAIT_RX;
+						break;
+					case 2:
+						disc_state = DISC_3WH;
+						break;
+					case 4:
+						disc_state = DISC_3WH; // Will be DISC_ST_CONN
+						toggle_led(blue);
+						break;
+					default:
+						disc_state = DISC_TX_ERR;
+						break;
+				}
+				break;
+			case DISC_3WH:
+				break;
+			case DISC_IDLE:
+				break;
+			case DISC_TX_ERR:
+				state = dw_transceiver_off();
+				chThdSleepMilliseconds(10);
+				disc_state = DISC_INIT;
+				break;
+			case DISC_RX_ERR:
+				state = dw_transceiver_off();
+				chThdSleepMilliseconds(10);
+				disc_state = DISC_INIT;
+				break;
+		}
+
+		if (disc_to_cnt > 8)
+		{
+			disc_state = DISC_3WH;
+		}
+	}
+}
+
+void get_distance_to(uint16_t addr)
+{
+	// uint8_t pos = search_addr(addr);
+	// if (pos >= 0 && pos < NEIGHBOUR_NUM)
+	distances_neigh[0] = loc_init_fun(addr);
 }
 
 THD_FUNCTION(DW_CONTROLLER, arg)
@@ -276,9 +502,6 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	// dw_read(DW_REG_INFO.RX_FWTO, fwto, DW_REG_INFO.RX_FWTO.size, 0);
 
 	sys_state_t state;
-	tx_fctrl_t tx_ctrl;
-	dx_time_t dx_time;
-	ack_resp_t_t w4r;
 	sys_mask_t irq_mask;
 	MHR_16_t MHR;
 	panadr_t panadr;
@@ -291,118 +514,47 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	irq_mask.MRXPHE = 0b1;
 	irq_mask.MRXFCE = 0b1;
 	irq_mask.MRXRFSL = 0b1;
-	irq_mask.MLDEERR = 0b1;
+	//irq_mask.MLDEERR = 0b1;
 	irq_mask.MAFFREJ = 0b1;
 	
 	sdStart(&SD1, &serial_cfg);
 
 	uint64_t id = get_hardware_id();
 	srand(id);
-	dw_write(DW_REG_INFO.PAN_ADR, &id, 2, 0);
+	dw_write(DW_REG_INFO.PAN_ADR, (uint8_t*)(&id), 2, 0);
+	dw_read(DW_REG_INFO.PAN_ADR, panadr_own.reg, DW_REG_INFO.PAN_ADR.size, 0);
 	uint16_t tx_ant_d = 63520;
 	uint16_t rx_ant_d = 63520;
 	eventmask_t evt = 0;
 	
 	dw_set_irq(irq_mask);
 
-	dw_write(DW_REG_INFO.LDE_CTRL, &rx_ant_d, DW_SUBREG_INFO.LDE_RXANTD.size, DW_SUBREG_INFO.LDE_RXANTD.offset);
-	dw_write(DW_REG_INFO.TX_ANTD, &tx_ant_d, DW_REG_INFO.TX_ANTD.size, 0);
+	dw_write(DW_REG_INFO.LDE_CTRL, (uint8_t*)(&rx_ant_d), DW_SUBREG_INFO.LDE_RXANTD.size, DW_SUBREG_INFO.LDE_RXANTD.offset);
+	dw_write(DW_REG_INFO.TX_ANTD, (uint8_t*)(&tx_ant_d), DW_REG_INFO.TX_ANTD.size, 0);
 
-	uint8_t data[10] = {0,0,0,0,0,0,0,0,0,0};
-	uint8_t recv[10] = {0,0,0,0,0,0,0,0,0,0};
-
-	uint16_t addrs[3] = {0,0,0};
-	uint8_t end[3] = {0,0,0};
-
-	dw_read(DW_REG_INFO.PAN_ADR, addrs, 2, 0);
-	uint8_t finish[3] = {0,0,0};
-
-	while (!(finish[0] == 0x1 && finish[1] == 0x1 && finish[2] == 0x1) && !(end[0] == 0x1 && end[1] == 0x1 && end[2] == 0x1))
-	{
-		dw_clear_register(dx_time.reg, sizeof(dx_time.reg));
-		dw_start_rx(dx_time);
-		evt = chEvtWaitOneTimeout(MRXPHE_E | MRXFCE_E | MLDEERR_E | MRXFCG_E, TIME_MS2I(300+(id&0x3F)));
-		if (evt == MRXFCG_E)
-		{
-			toggle_led(green);
-			dw_read(DW_REG_INFO.RX_BUFFER, recv, sizeof(recv), 0);
-			MHR = decode_MHR(recv);
-			if (addrs[1] == 0)
-				addrs[1] = MHR.src_addr;
-			if (addrs[1] != 0 && addrs[1] != MHR.src_addr)
-			{
-				addrs[2] = MHR.src_addr;
-			}
-
-			if (recv[9] == 0xD)
-			{
-				for (int i = 1; i < 3; i++)
-				{
-					if (addrs[i] == MHR.src_addr)
-						end[i] = 0x1;
-				}
-			}
-
-			if (recv[9] == 0xC)
-			{
-				for (int i = 1; i < 3; i++)
-				{
-					if (addrs[i] == MHR.src_addr)
-						finish[i] = 0x1;
-				}
-			}
-			dw_clear_register(recv, sizeof(recv));
-		}
-		else
-		{
-			dw_soft_reset_rx();
-			state = dw_transceiver_off();
-			dw_read(DW_REG_INFO.PAN_ADR, panadr.reg, DW_REG_INFO.PAN_ADR.size, 0);
-			encode_MHR(def_frame_ctrl, data, 0x0, panadr.pan_id, 0xFFFF, panadr.short_addr);
-			dw_clear_register(tx_ctrl.reg, sizeof(tx_ctrl.reg));
-			tx_ctrl.TFLEN = sizeof(data)+2;
-			tx_ctrl.TXBR = BR_6_8MBPS;
-			tx_ctrl.TXPRF = PRF_16MHZ;
-			tx_ctrl.TXPL = PL_128;
-			w4r.mask = 0;
-			dw_clear_register(dx_time.reg, sizeof(dx_time.reg));
-			dw_start_tx(tx_ctrl, data, dx_time, w4r);
-			dw_clear_register(data, sizeof(data));
-			evt = chEvtWaitOneTimeout(MTXFRS_E, TIME_MS2I(30));
-			if (!evt)
-				dw_soft_reset_rx();
-			chThdSleepMilliseconds(50);
-		}
-		evt = 0;
-		state = dw_transceiver_off();
-		chThdSleepMilliseconds(51);
-
-		if (addrs[0] != 0x0 && addrs[1] != 0x0 && addrs[2] != 0x0)
-		{
-			end[0] = 0x1;
-			data[9] = 0xD;
-		}
-
-		if ((addrs[0] != 0x0 && addrs[1] != 0x0 && addrs[2] != 0x0) && (end[0] == 0x1 && end[1] == 0x1 && end[2] == 0x1))
-		{
-			finish[0] = 0x1;
-			data[9] = 0xC;
-		}
-	}
 	while (true) {	
-		toggle_led(blue);
-		chThdSleepMilliseconds(500);
+		if (neighbours.addrs[0] == 0)
+			loc_disc_fun();
+		if (panadr_own.short_addr < neighbours.addrs[0])
+			get_distance_to(neighbours.addrs[0]);
+		else
+			loc_resp_fun();
+		
+		chprintf((BaseSequentialStream*)&SD1, "Distance: %dcm\n", (int)distances_neigh[0]);
 	}
 }
 
 THD_FUNCTION(SYSTEM_STATUS, arg)
 {
-	loc_state_t loc_state = LOC_DISC;
+	// loc_state_t loc_state = LOC_DISC;
 
-	uint16_t addrs[3] = {0,0,0};
+	// uint16_t addrs[3] = {0,0,0};
 
-	dw_read(DW_REG_INFO.PAN_ADR, addrs, 2, 0);
+	// dw_read(DW_REG_INFO.PAN_ADR, addrs, 2, 0);
 
+	loc_disc_fun();
+	get_distance_to(neighbours.addrs[0]);
+	get_distance_to(neighbours.addrs[1]);
 }
 
 void set_fast_spi_freq(void)
@@ -433,12 +585,12 @@ uint64_t get_hardware_id(void)
 	spi1_lock();
 	chThdSleepMicroseconds(1);
 	spi1_unlock();
-	dw_read(DW_REG_INFO.OTP_IF, &part_id, sizeof(part_id), DW_SUBREG_INFO.OTP_RDAT.offset);
+	dw_read(DW_REG_INFO.OTP_IF, (uint8_t*)(&part_id), sizeof(part_id), DW_SUBREG_INFO.OTP_RDAT.offset);
 	dw_command_read_OTP(LOTID);
 	spi1_lock();
 	chThdSleepMicroseconds(1);
 	spi1_unlock();
-	dw_read(DW_REG_INFO.OTP_IF, &lot_id, sizeof(lot_id), DW_SUBREG_INFO.OTP_RDAT.offset);
+	dw_read(DW_REG_INFO.OTP_IF, (uint8_t*)(&lot_id), sizeof(lot_id), DW_SUBREG_INFO.OTP_RDAT.offset);
 
 	id = (uint64_t)part_id | ((uint64_t)lot_id << 32);
 

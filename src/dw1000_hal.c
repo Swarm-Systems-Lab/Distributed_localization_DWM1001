@@ -94,12 +94,6 @@ void dw_set_spi_recv(void (*spi_recv_func)(size_t, const uint8_t*))
 	_dw_spi_hal_set._dw_spi_recv = spi_recv_func;
 }
 
-void dw_clear_register(uint8_t* reg, size_t size)
-{
-	for (size_t i = 0; i < size; i++)
-		reg[i] = 0;
-}
-
 int8_t validate_spi_hal(void)
 {
 	return 0;
@@ -404,7 +398,7 @@ void dw_command_read_OTP(uint16_t address)
 	otp_ctrl.OTPRDEN = 1;
 
 	_dw_spi_hal_set._dw_spi_lock(); 
-	_dw_spi_transaction(0, DW_REG_INFO.OTP_IF.id, &otp_addr, DW_SUBREG_INFO.OTP_ADDR.size, DW_SUBREG_INFO.OTP_ADDR.offset);
+	_dw_spi_transaction(0, DW_REG_INFO.OTP_IF.id, (uint8_t*)(&otp_addr), DW_SUBREG_INFO.OTP_ADDR.size, DW_SUBREG_INFO.OTP_ADDR.offset);
 	_dw_spi_transaction(0, DW_REG_INFO.OTP_IF.id, otp_ctrl.reg, DW_SUBREG_INFO.OTP_CTRL.size, DW_SUBREG_INFO.OTP_CTRL.offset);
 	otp_ctrl.mask = 0;
 	_dw_spi_transaction(0, DW_REG_INFO.OTP_IF.id, otp_ctrl.reg, DW_SUBREG_INFO.OTP_CTRL.size, DW_SUBREG_INFO.OTP_CTRL.offset);
@@ -415,7 +409,7 @@ uint64_t dw_get_tx_time(void)
 {
 	tx_time_t time;
 	uint64_t timestamp = 0;
-	dw_clear_register(time.reg, sizeof(time.reg));
+	memset(time.reg, 0, sizeof(time.reg));
 
 	dw_read(DW_REG_INFO.TX_TIME, time.reg, DW_REG_INFO.TX_TIME.size, 0);
 
@@ -428,7 +422,7 @@ uint64_t dw_get_rx_time(void)
 {
 	rx_time_t time;
 	uint64_t timestamp = 0;
-	dw_clear_register(time.reg, sizeof(time.reg));
+	memset(time.reg, 0, sizeof(time.reg));
 
 	dw_read(DW_REG_INFO.RX_TIME, time.reg, DW_REG_INFO.RX_TIME.size, 0);
 
@@ -476,11 +470,11 @@ void default_config(void)
 	dw_write(DW_REG_INFO.SYS_CFG, sys_cfg.reg, DW_REG_INFO.SYS_CFG.size, 0);
 
  	_dw_spi_hal_set._dw_spi_lock(); 
-	_dw_spi_transaction(0, DW_SUBREG_INFO.AGC_TUNE1.parent.id, &agc_tune1, DW_SUBREG_INFO.AGC_TUNE1.size, DW_SUBREG_INFO.AGC_TUNE1.offset);
-	_dw_spi_transaction(0, DW_SUBREG_INFO.AGC_TUNE2.parent.id, &agc_tune2, DW_SUBREG_INFO.AGC_TUNE2.size, DW_SUBREG_INFO.AGC_TUNE2.offset);
-	_dw_spi_transaction(0, DW_SUBREG_INFO.DRX_TUNE2.parent.id, &drx_tune2, DW_SUBREG_INFO.DRX_TUNE2.size, DW_SUBREG_INFO.DRX_TUNE2.offset);
+	_dw_spi_transaction(0, DW_SUBREG_INFO.AGC_TUNE1.parent.id, (uint8_t*)(&agc_tune1), DW_SUBREG_INFO.AGC_TUNE1.size, DW_SUBREG_INFO.AGC_TUNE1.offset);
+	_dw_spi_transaction(0, DW_SUBREG_INFO.AGC_TUNE2.parent.id, (uint8_t*)(&agc_tune2), DW_SUBREG_INFO.AGC_TUNE2.size, DW_SUBREG_INFO.AGC_TUNE2.offset);
+	_dw_spi_transaction(0, DW_SUBREG_INFO.DRX_TUNE2.parent.id, (uint8_t*)(&drx_tune2), DW_SUBREG_INFO.DRX_TUNE2.size, DW_SUBREG_INFO.DRX_TUNE2.offset);
 	_dw_spi_transaction(0, DW_SUBREG_INFO.LDE_CFG1.parent.id, lde_cfg1.reg, DW_SUBREG_INFO.LDE_CFG1.size, DW_SUBREG_INFO.LDE_CFG1.offset);
-	_dw_spi_transaction(0, DW_SUBREG_INFO.LDE_CFG2.parent.id, &lde_cfg2, DW_SUBREG_INFO.LDE_CFG2.size, DW_SUBREG_INFO.LDE_CFG2.offset);
+	_dw_spi_transaction(0, DW_SUBREG_INFO.LDE_CFG2.parent.id, (uint8_t*)(&lde_cfg2), DW_SUBREG_INFO.LDE_CFG2.size, DW_SUBREG_INFO.LDE_CFG2.offset);
 	_dw_spi_transaction(0, DW_REG_INFO.TX_POWER.id, tx_power.reg, DW_REG_INFO.TX_POWER.size, 0);
 	_dw_spi_transaction(0, DW_SUBREG_INFO.RF_TXCTRL.parent.id, rf_txctrl.reg, DW_SUBREG_INFO.RF_TXCTRL.size, DW_SUBREG_INFO.RF_TXCTRL.offset);
 	_dw_spi_transaction(0, DW_SUBREG_INFO.TC_PGDELAY.parent.id, &tc_pgdelay, DW_SUBREG_INFO.TC_PGDELAY.size, DW_SUBREG_INFO.TC_PGDELAY.offset);

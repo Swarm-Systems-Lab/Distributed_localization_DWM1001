@@ -19,7 +19,7 @@
 // TODO THIS IS FOR SAME PAN, DIFFERENT PAN NOT IMPLEMENTED
 //TODO memomry unsafe check size of MHR
 // TODO remove magic numbers for sizes of memcpy
-void encode_MHR(frame_control_t frame_control, uint8_t* MHR, uint8_t seq_num, uint16_t pan_id, uint64_t dest_addr, uint64_t src_addr)
+size_t encode_MHR(frame_control_t frame_control, uint8_t* MHR, uint8_t seq_num, uint16_t pan_id, uint64_t dest_addr, uint64_t src_addr)
 {
 	size_t dest_addr_size = 0;
 	size_t src_addr_size = 0;
@@ -52,6 +52,8 @@ void encode_MHR(frame_control_t frame_control, uint8_t* MHR, uint8_t seq_num, ui
 		memcpy(MHR+MHR_size, &src_addr, src_addr_size);
 		MHR_size += src_addr_size;
 	}
+
+	return MHR_size;
 
 	// TODO fix useless check too late and not filling with dead
 	// if (sizeof(MHR) < MHR_size)
