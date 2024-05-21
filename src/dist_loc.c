@@ -18,22 +18,21 @@
 
 thread_reference_t irq_evt = NULL;
 
+	// MHR.frame_control.frame_type = FT_DATA;
+	// MHR.frame_control.sec_en = 0b0;
+	// MHR.frame_control.frame_pending = 0b0;
+	// MHR.frame_control.ack_req = 0b0;
+	// MHR.frame_control.pan_id_compress = 0b1;
+	// MHR.frame_control.dest_addr_mode = SHORT_16;
+	// MHR.frame_control.frame_version = 0x1;
+	// MHR.frame_control.src_addr_mode = SHORT_16;
 frame_control_t def_frame_ctrl = {.mask=0x9841};
-// MHR.frame_control.frame_type = FT_DATA;
-// MHR.frame_control.sec_en = 0b0;
-// MHR.frame_control.frame_pending = 0b0;
-// MHR.frame_control.ack_req = 0b0;
-// MHR.frame_control.pan_id_compress = 0b1;
-// MHR.frame_control.dest_addr_mode = SHORT_16;
-// MHR.frame_control.frame_version = 0x1;
-// MHR.frame_control.src_addr_mode = SHORT_16;
-
-address_list_t neighbours;
 
 panadr_t panadr_own;
-
 uint8_t recv_buf[128];
+uint8_t send_buf[128];
 
+address_list_t neighbours;
 double distances_neigh[NEIGHBOUR_NUM];
 
 SPIConfig spi_cfg = 
@@ -233,17 +232,19 @@ void init_neigh(void)
 
 int8_t search_addr(uint16_t addr)
 {
-	int8_t pos = -1;
+	if (addr == 0 || addr == panadr_own.short_addr)
+		return -2;
+	
 	if (neighbours.last_p > 0)
 	{
 		for (size_t i = 0; i < neighbours.last_p; i++)
 		{
-			if (addr == neighbours.addrs[i] || addr == 0 || addr == panadr_own.short_addr)
-				pos = i;
+			if (addr == neighbours.addrs[i])
+				return i;
 		}
 	}
 
-	return pos;
+	return -1;
 }
 
 int8_t insert_addr(uint16_t addr)
@@ -251,7 +252,7 @@ int8_t insert_addr(uint16_t addr)
 	if (neighbours.last_p >= NEIGHBOUR_NUM)
 		return -2;
 
-	if (search_addr(addr) < 0)
+	if (search_addr(addr) == -1)
 	{
 		neighbours.addrs[neighbours.last_p] = addr;
 		neighbours.last_p++;
@@ -321,10 +322,7 @@ double loc_init_fun(uint16_t addr)
 
 	uint8_t data[2] = {MT_LOC_REQ,0};
 	double tof = 0.0;
-	double distance = -1.0;
 	float clock_offset_r = 0.0;
-	//float distances[20] = {0,0,0,0,0};
-	//uint8_t cnt = 0;
 
 	evt = send_message_w4r(addr, data, sizeof(data), 0, &recv_addr, &recv_size);
 	if (evt == MRXFCG_E && recv_buf[0] == MT_LOC_RESP)
@@ -339,26 +337,10 @@ double loc_init_fun(uint16_t addr)
 		rt_resp = (m_tx_time) - (m_rx_time);
 
 		clock_offset_r = dw_get_car_int() * ((998.4e6/2.0/1024.0/131072.0) * (-1.0e6/6489.6e6) / 1.0e6);
-		//rt_resp *= (1.0f - clock_offset_r);
+		rt_resp *= (1.0f - clock_offset_r);
 
 		tof = (rt_init - rt_resp)/2.0f;
 		tof = tof * (1.0f/(float)(499.2e6*128.0));
-
-		distance = tof * 299702547;
-		distance *= 100;
-
-		// if (distance > 0 && distance < 1000)
-		// 	distances[cnt] = distance;
-
-		// cnt++;
-		// if (cnt == 10)
-		// 	cnt = 0;
-
-		// distance = 0;
-		// for (int i = 0; i < 10; i++)
-		// 	distance += distances[i];
-
-		// distance /= 10;
 
 		// chprintf((BaseSequentialStream*)&SD1, "Distance: %dcm\n", (int)distance);
 	}
@@ -366,8 +348,8 @@ double loc_init_fun(uint16_t addr)
 		dw_soft_reset_rx();
 	evt = 0;
 	state = dw_transceiver_off();
-	chThdSleepMilliseconds(50);
-	return distance;
+	chThdSleepMilliseconds(40);
+	return tof;
 }
 
 void loc_resp_fun()
@@ -386,7 +368,7 @@ void loc_resp_fun()
 
 	uint8_t data[17] = {MT_LOC_RESP,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-	int32_t suc = recv_message(&src_addr, &size_recv, 61000);
+	int32_t suc = recv_message(&src_addr, &size_recv, 51000);
 	if (suc == MRXFCG_E && recv_buf[0] == MT_LOC_REQ)
 	{
 		toggle_led(green);
@@ -400,7 +382,7 @@ void loc_resp_fun()
 	}
 	evt = 0;
 	state = dw_transceiver_off();
-	chThdSleepMilliseconds(51);
+	chThdSleepMilliseconds(41);
 }
 
 void loc_disc_fun(void)
@@ -408,7 +390,7 @@ void loc_disc_fun(void)
 	init_neigh();
 	disc_state_t disc_state = DISC_INIT;
 	uint8_t disc_to_cnt = 0;
-	uint8_t message[7] = {1,0,0,0,0,0,0};
+	uint8_t message[7] = {MT_BROADCAST,0,0,0,0,0,0};
 	uint8_t recv_b[10];
 	uint16_t src_addr;
 	size_t size;
@@ -483,10 +465,25 @@ void loc_disc_fun(void)
 
 void get_distance_to(uint16_t addr)
 {
-	// uint8_t pos = search_addr(addr);
-	// if (pos >= 0 && pos < NEIGHBOUR_NUM)
-	distances_neigh[0] = loc_init_fun(addr);
+	uint8_t pos = search_addr(addr);
+	if (pos >= 0 && pos < NEIGHBOUR_NUM)
+	{
+		double tof = loc_init_fun(addr);
+		if (tof > 0.0 && tof < 1e-5)
+		{
+			double distance = tof * 299702547;
+			distance *= 100;
+			distances_neigh[pos] = distances_neigh[pos]*NEIGHBOUR_NUM/(NEIGHBOUR_NUM+1) + distance/(NEIGHBOUR_NUM+1);
+		}
+	}
 }
+
+// {
+// 	uint32_t dirty_regs;
+
+// 	uint8_t recv_buf[128];
+// 	uint8_t send_buf[128];
+// }
 
 THD_FUNCTION(DW_CONTROLLER, arg)
 {
@@ -529,18 +526,28 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	
 	dw_set_irq(irq_mask);
 
+	dw_config_t t;
+	int sizeconfig = sizeof(t);
+	chprintf((BaseSequentialStream*)&SD1, "size: %d\n", sizeconfig);
+
+
 	dw_write(DW_REG_INFO.LDE_CTRL, (uint8_t*)(&rx_ant_d), DW_SUBREG_INFO.LDE_RXANTD.size, DW_SUBREG_INFO.LDE_RXANTD.offset);
 	dw_write(DW_REG_INFO.TX_ANTD, (uint8_t*)(&tx_ant_d), DW_REG_INFO.TX_ANTD.size, 0);
 
 	while (true) {	
-		if (neighbours.addrs[0] == 0)
-			loc_disc_fun();
-		if (panadr_own.short_addr < neighbours.addrs[0])
-			get_distance_to(neighbours.addrs[0]);
-		else
-			loc_resp_fun();
+		//if (neighbours.addrs[0] == 0)
+		loc_disc_fun();
+		// if (panadr_own.short_addr < neighbours.addrs[0])
+		// 	get_distance_to(neighbours.addrs[0]);
+		// else
+		// {
+		// 	chprintf((BaseSequentialStream*)&SD1, "AAAAAAAAAAAAAAAA\n");
+		// 	loc_resp_fun();
+		// }
+		for (int i = 0; i < NEIGHBOUR_NUM; i++)
+			chprintf((BaseSequentialStream*)&SD1, "neigh: %d\n", neighbours.addrs[i]);
 		
-		chprintf((BaseSequentialStream*)&SD1, "Distance: %dcm\n", (int)distances_neigh[0]);
+		//chprintf((BaseSequentialStream*)&SD1, "Distance: %dcm\n", (int)distances_neigh[0]);
 	}
 }
 

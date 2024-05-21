@@ -136,30 +136,6 @@ typedef enum dw_preamble_length
 
 // typedef enum dw_modes
 
-// typedef enum dw_ref_tx_power
-// {
-// 	TX_POW_CH1_2_16_S		= 0x0, 
-// 	TX_POW_CH1_2_16_S		= 0x1,
-// 	TX_POW_CH1_2_16_S		= 0x5,
-// 	TX_POW_CH1_2_16_S		= 0x9,
-// 	TX_POW_CH1_2_16_S		= 0xD,
-// 	TX_POW_CH1_2_16_S		= 0x0, 
-// 	TX_POW_CH1_2_16_S		= 0x1,
-// 	TX_POW_CH1_2_16_S		= 0x5,
-// 	TX_POW_CH1_2_16_S		= 0x9,
-// 	TX_POW_CH1_2_16_S		= 0xD,
-// 	TX_POW_CH1_2_16_S		= 0x0, 
-// 	TX_POW_CH1_2_16_S		= 0x1,
-// 	TX_POW_CH1_2_16_S		= 0x5,
-// 	TX_POW_CH1_2_16_S		= 0x9,
-// 	TX_POW_CH1_2_16_S		= 0xD,
-// 	TX_POW_CH1_2_16_S		= 0x0, 
-// 	TX_POW_CH1_2_16_S		= 0x1,
-// 	TX_POW_CH1_2_16_S		= 0x5,
-// 	TX_POW_CH1_2_16_S		= 0x9,
-// 	TX_POW_CH1_2_16_S		= 0xD,
-// } ref_tx_power_t;
-
 // TODO priority for interrupts?
 
 typedef struct dw_spi_hal
@@ -221,11 +197,6 @@ typedef struct dw_op_mode
 	txprf_t prf;
 	preamble_length_t preamble_length;
 } dw_op_mode_t;
-
-// typedef struct dw_config
-// {
-
-// } dw_config_t;
 
 typedef struct dw_spi_header
 {
@@ -922,13 +893,12 @@ typedef struct dw_rx_sniff
 	{
 		struct
 		{
-			uint32_t SNIFF_ONT	:4;
-			uint32_t 			:4;
-			uint32_t SNIFF_OFFT	:8;
-			uint32_t 			:16;
+			uint16_t SNIFF_ONT	:4;
+			uint16_t 			:4;
+			uint16_t SNIFF_OFFT	:8;
 		};
-		uint8_t reg[4];
-		uint32_t mask;
+		uint8_t reg[2];
+		uint16_t mask;
 	};
 } rx_sniff_t;
 
@@ -976,11 +946,14 @@ typedef struct dw_chan_ctrl
 	};
 } chan_ctrl_t;
 
+// User defined Start of Frame delimiter (PHY)
+
 // typedef struct dw_usr_sfd
 // {
 // 	/* data */
 // } usr_sfd_t;
 
+typedef uint8_t agc_ctrl1_t;
 typedef uint16_t agc_tune1_t;
 typedef uint32_t agc_tune2_t;
 typedef uint16_t agc_tune3_t;
@@ -997,13 +970,24 @@ typedef struct dw_agc_stat1
 			uint32_t			:12;
 		};
 		uint8_t reg[3];
+		uint32_t mask;
 	};
 } agc_stat1_t;
 
-// typedef struct dw_agc_ctrl
-// {
-// 	/* data */
-// } agc_ctrl_t;
+typedef struct dw_agc_tune
+{
+	agc_tune1_t agc_tune1;
+	agc_tune2_t agc_tune2;
+	agc_tune3_t agc_tune3;
+} agc_tune_t;
+
+// TODO doesnt respect reserved addresses cannot be used directly
+typedef struct dw_agc_ctrl_R
+{
+	agc_ctrl1_t agc_ctrl1;
+	agc_tune_t agc_tune;
+	agc_stat1_t agc_stat1;
+} agc_ctrl_R_t;
 
 typedef struct dw_ec_ctrl
 {
@@ -1034,10 +1018,14 @@ typedef struct dw_ext_sync
 	ec_golp_t ec_golp;
 } ext_sync_t;
 
+// Accumulator memory
+
 // typedef struct dw_acc_mem
 // {
 // 	/* data */
 // } acc_mem_t;
+
+// GPIO control
 
 // typedef struct dw_gpio_ctrl
 // {
@@ -1051,32 +1039,32 @@ typedef uint32_t drx_tune2_t;
 typedef uint16_t drx_sfdtoc_t;
 typedef uint16_t drx_pretoc_t;
 typedef uint16_t drx_tune4h_t;
+typedef uint32_t drx_car_int_t;
 typedef uint16_t rxpacc_nosat_t;
 
-#pragma pack (1)
+// TODO subreg comp not memory accurate
 typedef struct dw_drx_conf
 {
-	union 
-	{
-		struct
-		{
-			uint16_t drx_res1;
-			drx_tune0b_t drx_tune0b;
-			drx_tune1a_t drx_tune1a;
-			drx_tune1b_t drx_tune1b;
-			drx_tune2_t drx_tune2;
-			uint8_t drx_res2[20];
-			drx_sfdtoc_t drx_sfdtoc; // TODO Warning do not set to 0
-			uint16_t drx_res3;
-			drx_pretoc_t drx_pretoc;
-			drx_tune4h_t drx_tune4h;
-			uint8_t drx_car_int[3];
-			uint8_t reserved;
-			rxpacc_nosat_t rxpacc_nosat;
-		};
-		uint8_t reg[46];
-	};
+	drx_tune0b_t drx_tune0b;
+	drx_tune1a_t drx_tune1a;
+	drx_tune1b_t drx_tune1b;
+	drx_tune2_t drx_tune2;
+	drx_sfdtoc_t drx_sfdtoc; // TODO Warning do not set to 0
+	drx_pretoc_t drx_pretoc;
+	drx_tune4h_t drx_tune4h;
 } drx_conf_t;
+
+typedef struct dw_drx_conf_info
+{
+	drx_car_int_t drx_car_int;
+	rxpacc_nosat_t rxpacc_nosat;
+} drx_conf_info_t;
+
+typedef struct dw_drx_conf_R
+{
+	drx_conf_t drx_conf;
+	drx_conf_info_t drx_conf_info;
+} drx_conf_R_t;
 
 typedef struct dw_rf_conf
 {
@@ -1137,10 +1125,19 @@ typedef struct dw_ldotune
 	uint8_t reg[5];
 } ldotune_t;
 
-// typedef struct dw_rf_conf
-// {
-// 	/* data */
-// } rf_conf_t;
+typedef struct dw_rf_conf_S
+{
+	rf_conf_t rf_conf;
+	rf_rxctrlh_t rf_rxctrlh;
+	rf_txctrl_t rf_txctrl;
+} rf_conf_S_t;
+
+typedef struct dw_rf_conf_R
+{
+	rf_conf_S_t rf_conf_S;
+	rf_status_t rf_status;
+	ldotune_t ldotune;
+} rf_conf_R_t;
 
 typedef uint8_t tc_sarc_t;
 
@@ -1192,19 +1189,38 @@ typedef uint16_t tc_pg_status_t;
 typedef uint8_t tc_pgdelay_t;
 typedef uint8_t tc_pgtest_t;
 
-// typedef struct dw_tx_cal
-// {
-// 	/* data */
-// } tx_cal_t;
+typedef struct dw_tc_sar_read
+{
+	tc_sarl_t tc_sarl;
+	tc_sarw_t tc_sarw;
+} tc_sar_read_t;
+
+typedef struct dw_tc_pg_conf
+{
+	tc_pg_ctrl_t tc_pg_ctrl;
+	tc_pgdelay_t tc_pgdelay;
+	tc_pgtest_t tc_pgtest;
+} tc_pg_conf_t;
+
+// TODO not in order
+typedef struct dw_tx_cal_R
+{
+	tc_sarc_t tc_sarc;
+	tc_sar_read_t tc_sar_read;
+	tc_pg_conf_t tc_pg_conf;
+	tc_pg_status_t tc_pg_status;
+} tx_cal_R_t;
 
 typedef uint32_t fs_pllcfg_t;
 typedef uint8_t fs_plltune_t;
 typedef uint8_t fs_xtalt_t; // TODO high 3 bits must be 0b011
 
-// typedef struct dw_fs_ctrl
-// {
-// 	/* data */
-// } fs_ctrl_t;
+typedef struct dw_fs_ctrl_R
+{
+	fs_pllcfg_t fs_pllcfg;
+	fs_plltune_t fs_plltune;
+	fs_xtalt_t fs_xtalt;
+} fs_ctrl_R_t;
 
 typedef struct dw_aon_wcfg
 {
@@ -1286,6 +1302,14 @@ typedef struct dw_aon_cfg1
 	};
 } aon_cfg1_t;
 
+typedef struct dw_aon_conf
+{
+	aon_wcfg_t aon_wcfg;
+	aon_cfg0_t aon_cfg0;
+	aon_cfg1_t aon_cfg1;
+} aon_conf_t;
+
+#pragma pack (1)
 typedef struct dw_aon
 {
 	union
@@ -1364,23 +1388,16 @@ typedef struct dw_otp_sf
 	};
 } otp_sf_t;
 
-typedef struct dw_otp_if
+typedef struct dw_otp_if_R
 {
-	union 
-	{
-		struct 
-		{
-			otp_wdat_t otp_wdat;
-			otp_addr_t otp_addr;
-			otp_ctrl_t otp_ctrl;
-			otp_stat_t otp_stat;
-			otp_rdat_t otp_rdat;
-			otp_srdat_t otp_srdat;
-			otp_sf_t otp_sf;
-		};
-		uint8_t reg[19]; // TODO CHECK DOC AS IT IS 18
-	};
-} otp_if_t;
+	otp_wdat_t otp_wdat;
+	otp_addr_t otp_addr;
+	otp_ctrl_t otp_ctrl;
+	otp_stat_t otp_stat;
+	otp_rdat_t otp_rdat;
+	otp_srdat_t otp_srdat;
+	otp_sf_t otp_sf;
+} otp_if_t_R;
 
 typedef uint16_t lde_thresh_t;
 
@@ -1404,10 +1421,27 @@ typedef uint16_t lde_rxantd_t;
 typedef uint16_t lde_cfg2_t;
 typedef uint16_t lde_repc_t;
 
-// typedef struct dw_lde_ctrl
-// {
-// 	/* data */
-// } lde_ctrl_t;
+typedef struct dw_lde_conf
+{
+	lde_cfg1_t lde_cfg1;
+	lde_cfg2_t lde_cfg2;
+	lde_rxantd_t lde_rxantd;
+	lde_repc_t lde_repc;
+} lde_conf_t;
+
+typedef struct dw_lde_info
+{
+	lde_thresh_t lde_thresh;
+	lde_ppindx_t lde_ppindx;
+	lde_ppampl_t lde_ppampl;
+} lde_info_t;
+
+// TODO not memory coherent WARNING
+typedef struct dw_lde_ctrl_R
+{
+	lde_conf_t lde_conf;
+	lde_info_t lde_info;
+} lde_ctrl_R_t;
 
 // TODO Document minimum 2 byte write, reserved bytes as 0
 typedef struct dw_evc_ctrl
@@ -1452,10 +1486,28 @@ typedef struct dw_diag_tmc
 	};
 } diag_tmc_t;
 
-// typedef struct dw_dig_diag
-// {
-// 	/* data */
-// } dig_diag_t;
+typedef struct evc_info
+{
+	evc_phe_t evc_phe;
+	evc_rse_t evc_rse;
+	evc_fcg_t evc_fcg;
+	evc_fce_t evc_fce;
+	evc_ffr_t evc_ffr;
+	evc_ovr_t evc_ovr;
+	evc_pto_t evc_pto;
+	evc_fwto_t evc_fwto;
+	evc_txfs_t evc_txfs;
+	evc_hpw_t evc_hpw;
+	evc_tpw_t evc_tpw;
+} evc_info_t;
+
+// TODO not memory coherent	
+typedef struct dw_dig_diag_R
+{
+	evc_ctrl_t evc_ctrl;
+	evc_info_t evc_info;
+	diag_tmc_t diag_tmc;
+} dig_diag_R_t;
 
 typedef struct dw_psmc_ctrl0
 {
@@ -1531,26 +1583,316 @@ typedef struct dw_psmc_ledc
 	};
 } pmsc_ledc_t;
 
-#pragma pack (1)
-typedef struct dw_pmsc
+//TODO not memory coherent
+typedef struct dw_pmsc_R
 {
-	union
+	pmsc_ctrl0_t pmsc_ctrl0;
+	pmsc_ctrl1_t pmsc_ctrl1;
+	pmsc_snozt_t pmsc_snozt;
+	pmsc_txfseq_t pmsc_txfseq;
+	pmsc_ledc_t pmsc_ledc;
+} pmsc_R_t;
+
+// typedef struct dw_device_conf
+// {
+
+// } dw_device_conf_t
+
+/*
+	0	panadr 0-1 shortaddr
+	1	panadr 2-3 panid
+	2	syscfg 0
+	3	syscfg 1
+	4	syscfg 2
+	5	syscfg 3
+	6	tx_fctrl
+	7	rx_fwto
+	8	sys_mask 0
+	9	sys_mask 1
+	10	sys_mask 2
+	11	sys_mask 3
+	12	tx_antd
+	13	rx_sniff
+	14	tx_power
+	15	chan_ctrl
+	16	agc_ctrl1
+	17	agc_tune1
+	18	agc_tune2
+	19	agc_tune3
+	20	drx_tune0b
+	21	drx_tune1a
+	22	drx_tune1b
+	23	drx_tune2
+	24	drx_sfdtoc
+	25	drx_pretoc
+	26	drx_tune4h
+	27	rf_conf
+	28	rf_rxctrlh
+	29	rf_txctrl
+	30	ldotune
+	31	tc_sarc
+	32	tc_pg_ctrl
+	33 	tc_pgdelay
+	34	tc_pgtest
+	35	fs_pllcfg
+	36	fs_plltune
+	37	fs_xtalt
+	38	aon_wcfg
+	39	aon_cfg0
+	40	aon_cfg1
+	41	lde_cfg1
+	42	lde_cfg2
+	43	lde_rxantd
+	44	lde_repc
+*/
+
+// First index is DIS_STPX, second index is PRF 16 and 64, last index is channel [(1,2),3,4,5,7]
+static const tx_power_t TX_POWER_REF[2][2][5] = 
+{
 	{
-		struct
-		{	
-			pmsc_ctrl0_t pmsc_ctrl0;
-			pmsc_ctrl1_t pmsc_ctrl1;
-			uint32_t PMSC_RES1;
-			pmsc_snozt_t pmsc_snozt;
-			uint8_t RESERVED0[3]; // TODO check
-			uint8_t PMSC_RES2[22];
-			pmsc_txfseq_t pmsc_txfseq;
-			pmsc_ledc_t pmsc_ledc;
-			uint32_t RESERVED1;
-		};
-		uint8_t reg[48];
-	};
-} pmsc_t;
+		{
+			{.mask=0x15355575}, {.mask=0x0F2F4F6F}, {.mask=0x1F1F3F5F}, {.mask=0x0E082848}, {.mask=0x32527292}
+		},
+		{
+			{.mask=0x07274767}, {.mask=0x2B4B6B8B}, {.mask=0x3A5A7A9A}, {.mask=0x25466788}, {.mask=0x5171B1D1}
+		}
+	},
+	{
+		{
+			{.mask=0x75757575}, {.mask=0x6F6F6F6F}, {.mask=0x5F5F5F5F}, {.mask=0x48484848}, {.mask=0x92929292}
+		},
+		{
+			{.mask=0x67676767}, {.mask=0x8B8B8B8B}, {.mask=0x9A9A9A9A}, {.mask=0x85858585}, {.mask=0xD1D1D1D1}
+		}
+	}
+};
+
+// First index is Standard Non-standard SFD, second index is data rate 110kbps, 850kbps, 6.8Mbps
+static const drx_tune0b_t DRX_TUNE0B_REF[2][3] =
+{
+	{
+		0xA, 0x1, 0x1
+	},
+	{
+		0x16, 0x6, 0x2
+	}
+};
+
+// First index is PRF 16 and 64, second index is PAC size 8, 16, 32, 64
+static const drx_tune2_t DRX_TUNE2_REF[2][4] =
+{
+	{
+		0x311A002D, 0x331A0052, 0x351A009A, 0x371A011D
+	},
+	{
+		0x313B006B, 0x333B00BE, 0x353B015E, 0x373B0296
+	}
+};
+
+// Values only applicable for 850 kbps and 6.8Mbps data rates, index is RX_PCODE config
+static const lde_repc_t LDE_REPC_REF[24] =
+{
+	0x5998, 0x5998, 0x51EA, 0x428E, 0x451E, 0x2E14, 0x8000, 0x51EA, 0x28F4, 0x3332, 0x3AE0, 0x3D70,
+	0x3AE0, 0x35C2, 0x2B84, 0x35C2, 0x3332, 0x35C2, 0x35C2, 0x47AE, 0x3AE0, 0x3850, 0x30A2, 0x3850
+};
+
+// static const sys_cfg_t SYS_CFG_DEF =
+// {
+// 	.FFEN		= 0
+// 	.FFBC		= 0
+// 	.FFAB		= 0
+// 	.FFAD		= 0
+// 	.FFAA		= 0
+// 	.FFAM		= 0
+// 	.FFAR		= 0
+// 	.FFA4		= 0
+// 	.FFA5		= 0
+// 	.HIRQ_POL	= 1
+// 	.SPI_EDGE	= 0
+// 	.DIS_FCE	= 0
+// 	.DIS_DRXB	= 1
+// 	.DIS_PHE	= 0
+// 	.DIS_RSDE	= 0
+// 	.FCS_INT2F	= 0
+// 	.PHR_MODE	= 0
+// 	.DIS_STXP	= 0
+// 	.RXM110K	= 0
+// 	.RXWTOE		= 0
+// 	.RXAUTR		= 0
+// 	.AUTOACK	= 0
+// 	.AACKPEND	= 0
+// };
+
+static const tx_power_t TX_POWER_DEF = {.mask=0x0E080222};
+static const drx_tune2_t DRX_TUNE2_DEF = 0x311E0035;
+static const drx_sfdtoc_t DRX_SFDTOC_DEF = 4096+64+1;
+
+static const agc_tune1_t AGC_TUNE1_16_REF = 0x8870;
+static const agc_tune1_t AGC_TUNE1_64_REF = 0x889B;
+static const agc_tune2_t AGC_TUNE2_REF = 0X2502A907;
+static const agc_tune3_t AGC_TUNE3_REF = 0x0035;
+
+static const drx_tune1a_t DRX_TUNE1A_16_REF = 0x87;
+static const drx_tune1a_t DRX_TUNE1A_64_REF = 0x8D;
+
+static const drx_tune1b_t DRX_TUNE1B_1024_REF = 0x64;
+static const drx_tune1b_t DRX_TUNE1B_128_REF = 0x20;
+static const drx_tune1b_t DRX_TUNE1B_64_REF = 0x10;
+
+static const drx_tune4h_t DRX_TUNE4H_64_REF = 0x10;
+static const drx_tune4h_t DRX_TUNE4H_128_REF = 0x28;
+
+static const rf_rxctrlh_t RF_RXCTRL_1_5_REF = 0XD8;
+static const rf_rxctrlh_t RF_RXCTRL_4_7_REF = 0XBC;
+
+static const rf_txctrl_t RF_TXCTRL_1_REF = {.mask=0x00005C40};
+static const rf_txctrl_t RF_TXCTRL_2_REF = {.mask=0x00045CA0};
+static const rf_txctrl_t RF_TXCTRL_3_REF = {.mask=0x00086CC0};
+static const rf_txctrl_t RF_TXCTRL_4_REF = {.mask=0x00045C80};
+static const rf_txctrl_t RF_TXCTRL_5_REF = {.mask=0x001E3FE3};
+static const rf_txctrl_t RF_TXCTRL_7_REF = {.mask=0x001E7DE0};
+
+static const rf_txctrl_t RF_TXCTRL_DEF = {.mask=0x001E3DE0};
+
+static const tc_pgdelay_t TC_PGDELAY_1_REF = 0xC9;
+static const tc_pgdelay_t TC_PGDELAY_2_REF = 0xC2;
+static const tc_pgdelay_t TC_PGDELAY_3_REF = 0xC5;
+static const tc_pgdelay_t TC_PGDELAY_4_REF = 0x95;
+static const tc_pgdelay_t TC_PGDELAY_5_REF = 0xB5;
+static const tc_pgdelay_t TC_PGDELAY_7_REF = 0x93;
+
+static const tc_pgtest_t TC_PGTEST_CW_TEST_MODE = 0x13;
+
+static const fs_pllcfg_t FS_PLLCFG_1_REF = 0x09000407;
+static const fs_pllcfg_t FS_PLLCFG_2_4_REF = 0x08400508;
+static const fs_pllcfg_t FS_PLLCFG_3_REF = 0x08401009;
+static const fs_pllcfg_t FS_PLLCFG_5_7_REF = 0x0800041D;
+
+static const fs_plltune_t FS_PLLTUNE_1_REF = 0x1E;
+static const fs_plltune_t FS_PLLTUNE_2_4_REF = 0x26;
+static const fs_plltune_t FS_PLLTUNE_3_REF = 0x56;
+static const fs_plltune_t FS_PLLTUNE_5_7_REF = 0xBE;
+
+static const fs_plltune_t FS_PLLTUNE_DEF = 0x46;
+
+static const fs_xtalt_t FS_XTALT_DEF = 0x60;
+
+static const lde_cfg2_t LDE_CFG2_DEF = 0x0;
+static const lde_cfg2_t LDE_CFG2_16_REF = 0x1607;
+static const lde_cfg2_t LDE_CFG2_64_REF = 0x0607;
+static const lde_cfg2_t LDE_CFG2_16_NLOS_REF = 0x0003;
+
+static const lde_cfg1_t LDE_CFG1_DEF = {.mask=0x6C};
+static const lde_cfg1_t LDE_CFG1_REF = {.mask=0x6D};
+
+// TODO check definition
+static const uint8_t RX_PCODE_DEF = 4;
+
+extern uint64_t dw_conf_dirty_bits;
+
+// size 109
+typedef struct dw_config
+{
+	panadr_t dw_panadr;				// 4
+	sys_cfg_t dw_sys_cfg;			// 4
+	tx_fctrl_t dw_def_tx_fctrl;		// 5 
+	rx_fwto_t dw_rx_fwto;			// 2
+	sys_mask_t dw_sys_mask;			// 4
+	tx_antd_t dw_tx_antd;			// 2
+	// ack_resp_t					// 0
+	rx_sniff_t dw_rx_sniff;			// 2
+	tx_power_t dw_tx_power;			// 4
+	chan_ctrl_t dw_chan_ctrl;		// 4
+	agc_ctrl1_t dw_agc_ctrl1;		// 1
+	agc_tune_t dw_agc_tune;			// 8 
+	drx_conf_t dw_drx_conf;			// 16
+	rf_conf_S_t dw_rf_conf_S;		// 8
+	ldotune_t dw_ldotune;			// 5
+	tc_sarc_t dw_tc_sarc;			// 1
+	tc_pg_conf_t dw_tc_pg_conf;		// 3
+	fs_ctrl_R_t dw_fs_ctrl;			// 6
+	aon_conf_t dw_aon_conf;			// 6
+	lde_conf_t dw_lde_conf;			// 7
+} dw_config_t;
+
+static const struct dw_config DW_DEFAULT_CONF = 
+{
+	{.mask=0xFFFFFFFF},						// panadr
+	{.mask=0x00001200},						// sys_cfg
+	{.reg={0x0C, 0x40, 0x15, 0x0, 0x0}},	// tx_fctrl
+	0,										// rx_fwto
+	{.mask=0x0},							// sys_mask
+	0,										// tx_antd
+	{.mask=0x0},							// rx_sniff
+	TX_POWER_DEF,							// tx_power
+	{.mask=0x00000055},						// chan_ctrl
+	1,										// agc_ctrl1
+	{
+		AGC_TUNE1_64_REF,					// agc_tune1
+		AGC_TUNE2_REF,						// agc_tune2
+		AGC_TUNE3_REF						// agc_tune3
+	},
+	{
+		DRX_TUNE0B_REF[0][2],				// drx_tune0b
+		DRX_TUNE1A_16_REF,					// drx_tune1a
+		DRX_TUNE1B_128_REF,					// drx_tuneb
+		DRX_TUNE2_DEF,						// drx_tune2
+		DRX_SFDTOC_DEF,						// drx_sfdtoc
+		0x0,								// drx_pretoc
+		DRX_TUNE4H_128_REF					// drx_tune4h
+	},
+	{
+		{.mask=0x0},						// rf_conf
+		RF_RXCTRL_1_5_REF,					// rf_rxctrlh
+		RF_TXCTRL_DEF						// rf_txctrl
+	},
+	{.reg={0x88, 0x88, 0x88, 0x88, 0x88}},	// ldo_tune
+	0,										// tc_sarc
+	{
+		{.mask=0x0},						// tc_pg_ctrl
+		TC_PGDELAY_3_REF,					// tc_pgdelay
+		0x00								// tc_pgtest
+	},
+	{
+		FS_PLLCFG_5_7_REF,					// fs_pllcfg
+		FS_PLLTUNE_DEF,						// fs_plltune
+		FS_XTALT_DEF						// fs_xtalt
+	},
+	{
+		{.mask=0x0},						// aon_wcfg
+		{.mask=0x50FF1FEE},					// aon_cfg0
+		{.mask=0x7}							// aon_cfg1
+	},
+	{
+		LDE_CFG1_DEF,						// lde_cfg1
+		LDE_CFG2_DEF,						// lde_cfg2
+		0x0,								// lde_rxantd
+		LDE_REPC_REF[RX_PCODE_DEF]			// lde_repc
+	}
+};
+
+typedef struct dw_rod_info
+{
+	rx_finfo_t dw_rx_finfo[2];
+	rx_fqual_t dw_rx_fqual[2];
+	rx_ttcki_t dw_rx_ttcki[2];
+	rx_ttcko_t dw_rx_ttcko[2];
+	rx_time_t dw_rx_time[2];
+} dw_rod_info_t;
+
+typedef struct dw_info
+{
+	sys_status_t dw_sys_status;
+	dw_rod_info_t dw_rod_info;
+	tx_time_t dw_tx_time;
+	sys_state_t dw_sys_state;
+	agc_stat1_t dw_agc_stat1;
+	drx_conf_info_t dw_drx_conf_info;
+	rf_status_t dw_rf_status;
+	tc_sar_read_t dw_tc_sar_read;
+	tc_pg_status_t dw_tc_pg_status;
+	lde_info_t dw_lde_info;
+} dw_info_t;
 
 void dw_set_spi_lock(void (*spi_lock_func)(void));
 void dw_set_spi_unlock(void (*spi_unlock_func)(void));
@@ -1672,6 +2014,8 @@ uint64_t dw_get_tx_time(void);
 uint64_t dw_get_rx_time(void);
 
 int32_t dw_get_car_int(void);
+
+void dw_get_full_config(dw_config_t* full_cfg);
 
 void default_config(void);
 

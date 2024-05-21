@@ -27,7 +27,7 @@
 #include "LR-WPANs_MAC.h"
 
 #define THREAD_STACK_SIZE	4096
-#define NEIGHBOUR_NUM		1
+#define NEIGHBOUR_NUM		3
 
 #define MCPLOCK_E	(EVENT_MASK(1))
 #define MESYNCR_E	(EVENT_MASK(2))
@@ -57,6 +57,8 @@
 #define MHPDWARN_E	(EVENT_MASK(27))
 #define MTXBERR_E	(EVENT_MASK(28))
 #define MAFFREJ_E	(EVENT_MASK(29))
+
+#define WAKEUPDW_E	(EVENT_MASK(30))
 
 extern thread_reference_t irq_evt;
 

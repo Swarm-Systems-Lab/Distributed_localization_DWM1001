@@ -449,6 +449,13 @@ int32_t dw_get_car_int(void)
 	return u_car_int;
 }
 
+void dw_get_full_config(dw_config_t* full_cfg)
+{
+	_dw_spi_hal_set._dw_spi_lock();
+	_dw_spi_transaction(1, DW_REG_INFO.PAN_ADR.id, full_cfg->dw_panadr.reg, DW_REG_INFO.PAN_ADR.size, 0);
+	_dw_spi_hal_set._dw_spi_unlock();
+}
+
 void default_config(void)
 {
 	agc_tune1_t agc_tune1 = 0x8870;
