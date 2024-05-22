@@ -1593,11 +1593,6 @@ typedef struct dw_pmsc_R
 	pmsc_ledc_t pmsc_ledc;
 } pmsc_R_t;
 
-// typedef struct dw_device_conf
-// {
-
-// } dw_device_conf_t
-
 /*
 	0	panadr 0-1 shortaddr
 	1	panadr 2-3 panid
@@ -1646,56 +1641,6 @@ typedef struct dw_pmsc_R
 	44	lde_repc
 */
 
-// First index is DIS_STPX, second index is PRF 16 and 64, last index is channel [(1,2),3,4,5,7]
-static const tx_power_t TX_POWER_REF[2][2][5] = 
-{
-	{
-		{
-			{.mask=0x15355575}, {.mask=0x0F2F4F6F}, {.mask=0x1F1F3F5F}, {.mask=0x0E082848}, {.mask=0x32527292}
-		},
-		{
-			{.mask=0x07274767}, {.mask=0x2B4B6B8B}, {.mask=0x3A5A7A9A}, {.mask=0x25466788}, {.mask=0x5171B1D1}
-		}
-	},
-	{
-		{
-			{.mask=0x75757575}, {.mask=0x6F6F6F6F}, {.mask=0x5F5F5F5F}, {.mask=0x48484848}, {.mask=0x92929292}
-		},
-		{
-			{.mask=0x67676767}, {.mask=0x8B8B8B8B}, {.mask=0x9A9A9A9A}, {.mask=0x85858585}, {.mask=0xD1D1D1D1}
-		}
-	}
-};
-
-// First index is Standard Non-standard SFD, second index is data rate 110kbps, 850kbps, 6.8Mbps
-static const drx_tune0b_t DRX_TUNE0B_REF[2][3] =
-{
-	{
-		0xA, 0x1, 0x1
-	},
-	{
-		0x16, 0x6, 0x2
-	}
-};
-
-// First index is PRF 16 and 64, second index is PAC size 8, 16, 32, 64
-static const drx_tune2_t DRX_TUNE2_REF[2][4] =
-{
-	{
-		0x311A002D, 0x331A0052, 0x351A009A, 0x371A011D
-	},
-	{
-		0x313B006B, 0x333B00BE, 0x353B015E, 0x373B0296
-	}
-};
-
-// Values only applicable for 850 kbps and 6.8Mbps data rates, index is RX_PCODE config
-static const lde_repc_t LDE_REPC_REF[24] =
-{
-	0x5998, 0x5998, 0x51EA, 0x428E, 0x451E, 0x2E14, 0x8000, 0x51EA, 0x28F4, 0x3332, 0x3AE0, 0x3D70,
-	0x3AE0, 0x35C2, 0x2B84, 0x35C2, 0x3332, 0x35C2, 0x35C2, 0x47AE, 0x3AE0, 0x3850, 0x30A2, 0x3850
-};
-
 // static const sys_cfg_t SYS_CFG_DEF =
 // {
 // 	.FFEN		= 0
@@ -1723,14 +1668,68 @@ static const lde_repc_t LDE_REPC_REF[24] =
 // 	.AACKPEND	= 0
 // };
 
+static const sys_cfg_t SYS_CFG_DEF = {.mask=0x00001200};
+
+static const tx_fctrl_t TX_FCTRL_DEF =
+{
+	.TFLEN		= 0xC,
+	.TFLE		= 0,
+	.R			= 0,
+	.TXBR		= BR_6_8MBPS,
+	.TR			= 0,
+	.TXPRF		= PRF_16MHZ,
+	.TXPL		= PL_128,
+	.TXBOFFS	= 0,
+	.IFSDELAY	= 0
+};
+
+static const chan_ctrl_t CHAN_CTRL_DEF = {.mask=0x00000055};
+
 static const tx_power_t TX_POWER_DEF = {.mask=0x0E080222};
-static const drx_tune2_t DRX_TUNE2_DEF = 0x311E0035;
-static const drx_sfdtoc_t DRX_SFDTOC_DEF = 4096+64+1;
+
+// First index is DIS_STPX, second index is PRF 16 and 64, last index is channel [(1,2),3,4,5,7]
+static const tx_power_t TX_POWER_REF[2][2][5] = 
+{
+	{
+		{
+			{.mask=0x15355575}, {.mask=0x0F2F4F6F}, {.mask=0x1F1F3F5F}, {.mask=0x0E082848}, {.mask=0x32527292}
+		},
+		{
+			{.mask=0x07274767}, {.mask=0x2B4B6B8B}, {.mask=0x3A5A7A9A}, {.mask=0x25466788}, {.mask=0x5171B1D1}
+		}
+	},
+	{
+		{
+			{.mask=0x75757575}, {.mask=0x6F6F6F6F}, {.mask=0x5F5F5F5F}, {.mask=0x48484848}, {.mask=0x92929292}
+		},
+		{
+			{.mask=0x67676767}, {.mask=0x8B8B8B8B}, {.mask=0x9A9A9A9A}, {.mask=0x85858585}, {.mask=0xD1D1D1D1}
+		}
+	}
+};
 
 static const agc_tune1_t AGC_TUNE1_16_REF = 0x8870;
 static const agc_tune1_t AGC_TUNE1_64_REF = 0x889B;
 static const agc_tune2_t AGC_TUNE2_REF = 0X2502A907;
 static const agc_tune3_t AGC_TUNE3_REF = 0x0035;
+
+static const agc_tune_t AGC_TUNE_DEF = 
+{
+	AGC_TUNE1_64_REF,					// agc_tune1
+	AGC_TUNE2_REF,						// agc_tune2
+	AGC_TUNE3_REF						// agc_tune3
+};
+
+// First index is Standard Non-standard SFD, second index is data rate 110kbps, 850kbps, 6.8Mbps
+static const drx_tune0b_t DRX_TUNE0B_REF[2][3] =
+{
+	{
+		0xA, 0x1, 0x1
+	},
+	{
+		0x16, 0x6, 0x2
+	}
+};
 
 static const drx_tune1a_t DRX_TUNE1A_16_REF = 0x87;
 static const drx_tune1a_t DRX_TUNE1A_64_REF = 0x8D;
@@ -1741,6 +1740,34 @@ static const drx_tune1b_t DRX_TUNE1B_64_REF = 0x10;
 
 static const drx_tune4h_t DRX_TUNE4H_64_REF = 0x10;
 static const drx_tune4h_t DRX_TUNE4H_128_REF = 0x28;
+
+static const drx_tune2_t DRX_TUNE2_DEF = 0x311E0035;
+
+// First index is PRF 16 and 64, second index is PAC size 8, 16, 32, 64
+static const drx_tune2_t DRX_TUNE2_REF[2][4] =
+{
+	{
+		0x311A002D, 0x331A0052, 0x351A009A, 0x371A011D
+	},
+	{
+		0x313B006B, 0x333B00BE, 0x353B015E, 0x373B0296
+	}
+};
+
+static const drx_sfdtoc_t DRX_SFDTOC_DEF = 4096+64+1;
+
+static const drx_conf_t DRX_CONF_DEF =
+{
+	DRX_TUNE0B_REF[0][BR_6_8MBPS],		// drx_tune0b
+	DRX_TUNE1A_16_REF,					// drx_tune1a
+	DRX_TUNE1B_128_REF,					// drx_tuneb
+	DRX_TUNE2_DEF,						// drx_tune2
+	DRX_SFDTOC_DEF,						// drx_sfdtoc
+	0x0,								// drx_pretoc
+	DRX_TUNE4H_128_REF					// drx_tune4h
+};
+
+static const rf_conf_t RF_CONF_DEF = {.mask=0x0};
 
 static const rf_rxctrlh_t RF_RXCTRL_1_5_REF = 0XD8;
 static const rf_rxctrlh_t RF_RXCTRL_4_7_REF = 0XBC;
@@ -1754,6 +1781,17 @@ static const rf_txctrl_t RF_TXCTRL_7_REF = {.mask=0x001E7DE0};
 
 static const rf_txctrl_t RF_TXCTRL_DEF = {.mask=0x001E3DE0};
 
+static const rf_conf_S_t RF_CONF_S_DEF =
+{
+	RF_CONF_DEF,						// rf_conf
+	RF_RXCTRL_1_5_REF,					// rf_rxctrlh
+	RF_TXCTRL_DEF						// rf_txctrl
+};
+
+static const ldotune_t LDOTUNE_DEF = {.reg={0x88, 0x88, 0x88, 0x88, 0x88}};
+
+static const tc_pg_ctrl_t TC_PG_CTRL_DEF = {.mask=0x0};
+
 static const tc_pgdelay_t TC_PGDELAY_1_REF = 0xC9;
 static const tc_pgdelay_t TC_PGDELAY_2_REF = 0xC2;
 static const tc_pgdelay_t TC_PGDELAY_3_REF = 0xC5;
@@ -1762,6 +1800,13 @@ static const tc_pgdelay_t TC_PGDELAY_5_REF = 0xB5;
 static const tc_pgdelay_t TC_PGDELAY_7_REF = 0x93;
 
 static const tc_pgtest_t TC_PGTEST_CW_TEST_MODE = 0x13;
+
+static const tc_pg_conf_t TC_PG_CONF_DEF =
+{
+	TC_PG_CTRL_DEF,						// tc_pg_ctrl
+	TC_PGDELAY_3_REF,					// tc_pgdelay
+	0x00								// tc_pgtest
+};
 
 static const fs_pllcfg_t FS_PLLCFG_1_REF = 0x09000407;
 static const fs_pllcfg_t FS_PLLCFG_2_4_REF = 0x08400508;
@@ -1777,6 +1822,41 @@ static const fs_plltune_t FS_PLLTUNE_DEF = 0x46;
 
 static const fs_xtalt_t FS_XTALT_DEF = 0x60;
 
+static const fs_ctrl_R_t FS_CTRL_R_DEF =
+{
+	FS_PLLCFG_5_7_REF,					// fs_pllcfg
+	FS_PLLTUNE_DEF,						// fs_plltune
+	FS_XTALT_DEF						// fs_xtalt
+};
+
+static const aon_cfg0_t AON_CFG0_DEF = 
+{
+	.SLEEP_EN	= 0b0,
+	.WAKE_PIN	= 0b1,
+	.WAKE_SPI	= 0b1,
+	.WAKE_CNT	= 0b1,
+	.LPDIV_EN	= 0b0,
+	.LPCLKDIVA	= 0b00011111111,
+	.SLEEP_TIM	= 0b0101000011111111
+};
+
+static const aon_wcfg_t AON_WCFG_DEF = {.mask=0x0};
+
+// static const aon_cfg1_t AON_CFG1_DEF = 
+// {
+// 	.SLEEP_CE		= 1,
+// 	.SMXX			= 1,
+// 	.LPOSC_C		= 1
+// };
+static const aon_cfg1_t AON_CFG1_DEF = {.mask=0x7};
+
+static const aon_conf_t AON_CONF_DEF = 
+{
+	AON_WCFG_DEF,						// aon_wcfg
+	AON_CFG0_DEF,						// aon_cfg0
+	AON_CFG1_DEF						// aon_cfg1
+};
+
 static const lde_cfg2_t LDE_CFG2_DEF = 0x0;
 static const lde_cfg2_t LDE_CFG2_16_REF = 0x1607;
 static const lde_cfg2_t LDE_CFG2_64_REF = 0x0607;
@@ -1785,90 +1865,92 @@ static const lde_cfg2_t LDE_CFG2_16_NLOS_REF = 0x0003;
 static const lde_cfg1_t LDE_CFG1_DEF = {.mask=0x6C};
 static const lde_cfg1_t LDE_CFG1_REF = {.mask=0x6D};
 
+// Values only applicable for 850 kbps and 6.8Mbps data rates, index is RX_PCODE config
+static const lde_repc_t LDE_REPC_REF[24] =
+{
+	0x5998, 0x5998, 0x51EA, 0x428E, 0x451E, 0x2E14, 0x8000, 0x51EA, 0x28F4, 0x3332, 0x3AE0, 0x3D70,
+	0x3AE0, 0x35C2, 0x2B84, 0x35C2, 0x3332, 0x35C2, 0x35C2, 0x47AE, 0x3AE0, 0x3850, 0x30A2, 0x3850
+};
+
 // TODO check definition
 static const uint8_t RX_PCODE_DEF = 4;
 
+static const lde_conf_t LDE_CONF_DEF =
+{
+	LDE_CFG1_DEF,						// lde_cfg1
+	LDE_CFG2_DEF,						// lde_cfg2
+	0x0,								// lde_rxantd
+	LDE_REPC_REF[RX_PCODE_DEF]			// lde_repc
+};
+
 extern uint64_t dw_conf_dirty_bits;
+
+typedef struct dw_rx_config
+{
+	rx_fwto_t dw_rx_fwto;			// 2
+	agc_ctrl1_t dw_agc_ctrl1;		// 1
+	agc_tune_t dw_agc_tune;			// 8 
+	drx_conf_t dw_drx_conf;			// 16
+	lde_conf_t dw_lde_conf;			// 7
+} rx_config_t;
+
+static const rx_config_t DW_RX_CONFIG_DEF =
+{
+	0,										// rx_fwto
+	1,										// agc_ctrl1
+	AGC_TUNE_DEF,
+	DRX_CONF_DEF,
+	LDE_CONF_DEF
+};
+
+typedef struct dw_tx_config
+{
+	tx_fctrl_t dw_def_tx_fctrl;		// 5 
+	tx_antd_t dw_tx_antd;			// 2
+	tx_power_t dw_tx_power;			// 4
+	tc_sarc_t dw_tc_sarc;			// 1
+	tc_pg_conf_t dw_tc_pg_conf;		// 3
+} tx_config_t;
+
+static const tx_config_t DW_TX_CONFIG_DEF =
+{
+	TX_FCTRL_DEF,							// tx_fctrl
+	0,										// tx_antd
+	TX_POWER_DEF,							// tx_power
+	0,										// tc_sarc
+	TC_PG_CONF_DEF
+};
 
 // size 109
 typedef struct dw_config
 {
 	panadr_t dw_panadr;				// 4
 	sys_cfg_t dw_sys_cfg;			// 4
-	tx_fctrl_t dw_def_tx_fctrl;		// 5 
-	rx_fwto_t dw_rx_fwto;			// 2
 	sys_mask_t dw_sys_mask;			// 4
-	tx_antd_t dw_tx_antd;			// 2
 	// ack_resp_t					// 0
 	rx_sniff_t dw_rx_sniff;			// 2
-	tx_power_t dw_tx_power;			// 4
 	chan_ctrl_t dw_chan_ctrl;		// 4
-	agc_ctrl1_t dw_agc_ctrl1;		// 1
-	agc_tune_t dw_agc_tune;			// 8 
-	drx_conf_t dw_drx_conf;			// 16
+	tx_config_t dw_tx_config;
+	rx_config_t dw_rx_config;
 	rf_conf_S_t dw_rf_conf_S;		// 8
 	ldotune_t dw_ldotune;			// 5
-	tc_sarc_t dw_tc_sarc;			// 1
-	tc_pg_conf_t dw_tc_pg_conf;		// 3
 	fs_ctrl_R_t dw_fs_ctrl;			// 6
 	aon_conf_t dw_aon_conf;			// 6
-	lde_conf_t dw_lde_conf;			// 7
 } dw_config_t;
 
 static const struct dw_config DW_DEFAULT_CONF = 
 {
 	{.mask=0xFFFFFFFF},						// panadr
-	{.mask=0x00001200},						// sys_cfg
-	{.reg={0x0C, 0x40, 0x15, 0x0, 0x0}},	// tx_fctrl
-	0,										// rx_fwto
+	SYS_CFG_DEF,							// sys_cfg
 	{.mask=0x0},							// sys_mask
-	0,										// tx_antd
 	{.mask=0x0},							// rx_sniff
-	TX_POWER_DEF,							// tx_power
-	{.mask=0x00000055},						// chan_ctrl
-	1,										// agc_ctrl1
-	{
-		AGC_TUNE1_64_REF,					// agc_tune1
-		AGC_TUNE2_REF,						// agc_tune2
-		AGC_TUNE3_REF						// agc_tune3
-	},
-	{
-		DRX_TUNE0B_REF[0][2],				// drx_tune0b
-		DRX_TUNE1A_16_REF,					// drx_tune1a
-		DRX_TUNE1B_128_REF,					// drx_tuneb
-		DRX_TUNE2_DEF,						// drx_tune2
-		DRX_SFDTOC_DEF,						// drx_sfdtoc
-		0x0,								// drx_pretoc
-		DRX_TUNE4H_128_REF					// drx_tune4h
-	},
-	{
-		{.mask=0x0},						// rf_conf
-		RF_RXCTRL_1_5_REF,					// rf_rxctrlh
-		RF_TXCTRL_DEF						// rf_txctrl
-	},
-	{.reg={0x88, 0x88, 0x88, 0x88, 0x88}},	// ldo_tune
-	0,										// tc_sarc
-	{
-		{.mask=0x0},						// tc_pg_ctrl
-		TC_PGDELAY_3_REF,					// tc_pgdelay
-		0x00								// tc_pgtest
-	},
-	{
-		FS_PLLCFG_5_7_REF,					// fs_pllcfg
-		FS_PLLTUNE_DEF,						// fs_plltune
-		FS_XTALT_DEF						// fs_xtalt
-	},
-	{
-		{.mask=0x0},						// aon_wcfg
-		{.mask=0x50FF1FEE},					// aon_cfg0
-		{.mask=0x7}							// aon_cfg1
-	},
-	{
-		LDE_CFG1_DEF,						// lde_cfg1
-		LDE_CFG2_DEF,						// lde_cfg2
-		0x0,								// lde_rxantd
-		LDE_REPC_REF[RX_PCODE_DEF]			// lde_repc
-	}
+	CHAN_CTRL_DEF,							// chan_ctrl
+	DW_TX_CONFIG_DEF,
+	DW_RX_CONFIG_DEF,
+	RF_CONF_S_DEF,
+	LDOTUNE_DEF,							// ldo_tune
+	FS_CTRL_R_DEF,
+	AON_CONF_DEF
 };
 
 typedef struct dw_rod_info
