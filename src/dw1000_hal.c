@@ -456,6 +456,27 @@ void dw_get_full_config(dw_config_t* full_cfg)
 	_dw_spi_hal_set._dw_spi_unlock();
 }
 
+void dw_get_tc_pg_config(tc_pg_conf_t* tc_pg_conf)
+{
+	_dw_spi_hal_set._dw_spi_lock();
+	_dw_spi_transaction(1, DW_SUBREG_INFO.TC_PG_CTRL.parent.id, tc_pg_conf->tc_pg_ctrl.reg, sizeof(tc_pg_conf->tc_pg_ctrl), DW_SUBREG_INFO.TC_PG_CTRL.offset);
+	_dw_spi_transaction(1, DW_SUBREG_INFO.TC_PGDELAY.parent.id, (uint8_t*)(&(tc_pg_conf->tc_pgdelay)), DW_SUBREG_INFO.TC_PGDELAY.size, DW_SUBREG_INFO.TC_PGDELAY.offset);
+	_dw_spi_transaction(1, DW_SUBREG_INFO.TC_PGTEST.parent.id, (uint8_t*)(&(tc_pg_conf->tc_pgtest)), DW_SUBREG_INFO.TC_PGTEST.size, DW_SUBREG_INFO.TC_PGTEST.offset);
+	_dw_spi_hal_set._dw_spi_unlock();
+}
+
+void dw_get_tx_config(tx_config_t* tx_config)
+{
+	_dw_spi_hal_set._dw_spi_lock();
+	_dw_spi_transaction(1, DW_REG_INFO.TX_FCTRL.id, tx_config->dw_def_tx_fctrl.reg, DW_REG_INFO.TX_FCTRL.size, 0);
+	_dw_spi_transaction(1, DW_REG_INFO.TX_ANTD.id, (uint8_t*)(&(tx_config->dw_tx_antd)), DW_REG_INFO.TX_ANTD.size, 0);
+	_dw_spi_transaction(1, DW_REG_INFO.TX_POWER.id, tx_config->dw_tx_power.reg, DW_REG_INFO.TX_POWER.size, 0);
+	_dw_spi_transaction(1, DW_SUBREG_INFO.TC_SARC.parent.id, (uint8_t*)(&(tx_config->dw_tc_sarc)), sizeof(tx_config->dw_tc_sarc), DW_SUBREG_INFO.TC_SARC.offset); // 16 bit subreg with 1 bit, size 1 is enough
+	
+	dw_get_tc_pg_config(&(tx_config->dw_tc_pg_conf));
+	_dw_spi_hal_set._dw_spi_unlock();
+}
+
 void default_config(void)
 {
 	agc_tune1_t agc_tune1 = 0x8870;
@@ -474,6 +495,8 @@ void default_config(void)
 	dw_read(DW_REG_INFO.SYS_CFG, sys_cfg.reg, DW_REG_INFO.SYS_CFG.size, 0);
 	sys_cfg.FFEN = 0b1;
 	sys_cfg.FFAD = 0b1;
+	// TODO auto reenable
+	//sys_cfg.RXAUTR = 0b1;
 	dw_write(DW_REG_INFO.SYS_CFG, sys_cfg.reg, DW_REG_INFO.SYS_CFG.size, 0);
 
  	_dw_spi_hal_set._dw_spi_lock(); 

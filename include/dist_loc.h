@@ -58,21 +58,35 @@
 #define MTXBERR_E	(EVENT_MASK(28))
 #define MAFFREJ_E	(EVENT_MASK(29))
 
-#define WAKEUPDW_E	(EVENT_MASK(30))
+#define DW_COMM_OK_E	(EVENT_MASK(30))
+#define DW_COMM_F_E		(EVENT_MASK(31))
+
+#define MRXERR_E	(MRXPHE_E | MRXFCE_E | MRXRFSL_E | MRXSFDTO_E | MAFFREJ_E | MLDEERR_E)
+
+#define TX_TIMEOUT	TIME_MS2I(10)
+#define CH_TIMEOUT	TIME_S2I(10)
+#define DW_ERR_THRESH	10
+#define TRX_RST_TM	TIME_MS2I(3)
 
 extern thread_reference_t irq_evt;
 
 extern SPIConfig spi_cfg;
 extern SerialConfig serial_cfg;
 
+extern thread_t* dw_thread;
+extern thread_t* peer_conn_thread;
+extern thread_t* peer_disc_thread;
+extern thread_t* comm_thread;
+
 typedef enum loc_state
 {
 	LOC_STANDBY,
+	LOC_DW,
 	LOC_DISC,
-	LOC_INIT,
-	LOC_RESP,
-	LOC_TXERR,
-	LOC_RXERR,
+	LOC_CONN,
+	LOC_COM,
+	LOC_TWR,
+	LOC_DIS_CALC,
 	LOC_ERR
 } loc_state_t;
 
@@ -87,16 +101,52 @@ typedef enum disc_state
 	DISC_IDLE
 } disc_state_t;
 
+typedef enum dw_ctrl_req
+{
+	DW_RECV,
+	DW_SEND,
+	DW_SEND_W4R,
+	DW_SEND_DLY,
+	DW_TRX_ERR,
+	DW_RESET,
+	DW_RECV_TMO,
+	DW_CTRL_YIELD
+} dw_ctrl_req_t;
+
+typedef enum comm_state
+{
+	COMM_RECV,
+	COMM_SEND,
+	COMM_ERR,
+	COMM_IDLE
+} comm_state_t;
+
 typedef enum message_types_dis_loc
 {
 	MT_BROADCAST	= 0x1,
 	MT_SYN,
+	MT_SYN_ACK,
+	MT_ACK,
 	MT_MCONN,
 	MT_DISCONN,
 	MT_LOC_REQ,
 	MT_LOC_RESP,
 	MT_OTHER
 } message_t;
+
+typedef enum thread_msg
+{
+	COMM_RECV_CMD		= 0x1,
+	COMM_SEND_CMD,
+	COMM_SEND_W4R_CMD,
+	COMM_SEND_DLY_CMD,
+	COMM_ERR_RESP,
+	COMM_TMO_RESP,
+	COMM_END,
+	BROAD_RECV,
+	SYN_RECV,
+	CONN_RECV
+} thread_msg_t;
 
 typedef struct address_list
 {
@@ -110,6 +160,26 @@ typedef struct connection_peer
 	uint8_t seq_num;
 	uint8_t ack_num;
 	uint8_t ttl;
+} peer_connection_t;
+
+typedef struct message_meta
+{
+	thread_msg_t message;
+	peer_connection_t* peer;
+	uint8_t seq_num;
+	message_t type;
+	uint8_t size;
+	peer_connection_t* expected_peer;
+	message_t expected_message;
+} message_meta_t;
+
+typedef struct peer_loc
+{
+	uint8_t peer_id;
+	peer_connection_t conn;
+	double pos_x;
+	double pos_y;
+	double pos_z;
 } connection_t;
 
 void ISR_wrapper(void * arg);
@@ -128,6 +198,21 @@ extern THD_FUNCTION(DW_IRQ_HANDLER, arg);
 
 static THD_WORKING_AREA(DW_CONTROLLER_THREAD, THREAD_STACK_SIZE);
 extern THD_FUNCTION(DW_CONTROLLER, arg);
+
+static THD_WORKING_AREA(PEER_DISCOVERY_THREAD, THREAD_STACK_SIZE);
+extern THD_FUNCTION(PEER_DISCOVERY, arg);
+
+// static THD_WORKING_AREA(PEER_CONNECTION_THREAD, THREAD_STACK_SIZE);
+// extern THD_FUNCTION(PEER_CONNECTION, arg);
+
+static THD_WORKING_AREA(COMMS_THREAD, THREAD_STACK_SIZE);
+extern THD_FUNCTION(COMMS, arg);
+
+// static THD_WORKING_AREA(TWR_THREAD, THREAD_STACK_SIZE);
+// extern THD_FUNCTION(TWR, arg);
+
+// static THD_WORKING_AREA(DIS_LOC_THREAD, THREAD_STACK_SIZE);
+// extern THD_FUNCTION(DIS_LOC, arg);
 
 void dw_reset(void);
 
@@ -152,18 +237,48 @@ int8_t insert_addr(uint16_t addr);
 int8_t search_addr(uint16_t addr);
 void init_neigh(void);
 
-int32_t _send_message(uint16_t addr, uint8_t* message, size_t size, uint8_t w4r, uint32_t w_time, uint32_t dly_time);
-int32_t send_message(uint16_t addr, uint8_t* message, size_t size);
-int32_t send_message_w4r(uint16_t addr, uint8_t* message, size_t size, uint32_t time, uint16_t* recv_addr, size_t* recv_size);
-int32_t send_message_delay(uint16_t addr, uint8_t* message, size_t size, uint32_t time);
-void get_message(uint16_t* addr, size_t* size);
-int32_t recv_message(uint16_t* addr, size_t* size, uint32_t timeout);
-int32_t recv_disc(void);
+int32_t get_message(message_meta_t* msg_meta);
+void prepare_message(message_meta_t* msg_meta);
+
+peer_connection_t* search_peer(uint16_t addr);
 
 void get_distance_to(uint16_t addr);
+
+void set_irq_vector(void);
+
+void read_frame(void);
 
 static THD_WORKING_AREA(SYSTEM_STATUS_THREAD, THREAD_STACK_SIZE);
 static THD_FUNCTION(SYSTEM_STATUS, arg);
 
 // static THD_WORKING_AREA(LOCATOR_THREAD, THREAD_STACK_SIZE);
 // static THD_FUNCTION(LOCATOR, arg);
+
+void CPLOCK_handler(void);
+void ESYNCR_handler(void);
+void AAT_handler(void);
+void TXFRB_handler(void);
+void TXPRS_handler(void);
+void TXPHS_handler(void);
+void TXFRS_handler(void);
+void RXPRD_handler(void);
+void RXFSDD_handler(void);
+void LDEDONE_handler(void);
+void RXPHD_handler(void);
+void RXPHE_handler(void);
+void RXDFR_handler(void);
+void RXFCG_handler(void);
+void RXFCE_handler(void);
+void RXRFSL_handler(void);
+void RXRFTO_handler(void);
+void LDEERR_handler(void);
+void RXOVRR_handler(void);
+void RXPTO_handler(void);
+void GPIOIRQ_handler(void);
+void SLP2INIT_handler(void);
+void RFPLLLL_handler(void);
+void CPLLLL_handler(void);
+void RXSFDTO_handler(void);
+void HPDWARN_handler(void);
+void TXBERR_handler(void);
+void AFFREJ_handler(void);

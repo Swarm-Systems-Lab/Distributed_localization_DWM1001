@@ -18,6 +18,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define TRX_RST_TM	10
+
 extern uint64_t hardware_id;
 
 typedef enum dw_reg_file_perms
@@ -1955,17 +1957,17 @@ static const struct dw_config DW_DEFAULT_CONF =
 
 typedef struct dw_rod_info
 {
-	rx_finfo_t dw_rx_finfo[2];
-	rx_fqual_t dw_rx_fqual[2];
-	rx_ttcki_t dw_rx_ttcki[2];
-	rx_ttcko_t dw_rx_ttcko[2];
-	rx_time_t dw_rx_time[2];
+	rx_finfo_t dw_rx_finfo;
+	rx_fqual_t dw_rx_fqual;
+	rx_ttcki_t dw_rx_ttcki;
+	rx_ttcko_t dw_rx_ttcko;
+	rx_time_t dw_rx_time;
 } dw_rod_info_t;
 
 typedef struct dw_info
 {
 	sys_status_t dw_sys_status;
-	dw_rod_info_t dw_rod_info;
+	dw_rod_info_t dw_rod_info[2];
 	tx_time_t dw_tx_time;
 	sys_state_t dw_sys_state;
 	agc_stat1_t dw_agc_stat1;
@@ -2098,6 +2100,12 @@ uint64_t dw_get_rx_time(void);
 int32_t dw_get_car_int(void);
 
 void dw_get_full_config(dw_config_t* full_cfg);
+
+void dw_get_tx_config(tx_config_t* tx_config);
+
+void dw_get_rx_config(rx_config_t* rx_config);
+
+void dw_get_tc_pg_config(tc_pg_conf_t* tc_pg_conf);
 
 void default_config(void);
 
