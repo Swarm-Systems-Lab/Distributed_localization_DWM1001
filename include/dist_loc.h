@@ -26,8 +26,8 @@
 #include "dw1000_hal.h"
 #include "LR-WPANs_MAC.h"
 
-#define THREAD_STACK_SIZE	4096
-#define NEIGHBOUR_NUM		3
+#define THREAD_STACK_SIZE	2048
+#define NEIGHBOUR_NUM		2
 
 #define MCPLOCK_E	(EVENT_MASK(1))
 #define MESYNCR_E	(EVENT_MASK(2))
@@ -66,7 +66,6 @@
 #define TX_TIMEOUT	TIME_MS2I(10)
 #define CH_TIMEOUT	TIME_S2I(10)
 #define DW_ERR_THRESH	10
-#define TRX_RST_TM	TIME_MS2I(3)
 
 extern thread_reference_t irq_evt;
 
@@ -121,6 +120,21 @@ typedef enum comm_state
 	COMM_IDLE
 } comm_state_t;
 
+typedef enum conn_state
+{
+	CONN_SYN_RECV,
+	CONN_SYN_SEND,
+	CONN_SYN_A_SEND,
+	CONN_SYN_A_RECV,
+	CONN_RECV,
+	CONN_SEND,
+	CONN_SEND_ACK,
+	CONN_MNT,
+	CONN_DIS,
+	CONN_ERR,
+	CONN_IDLE
+} conn_state_t;
+
 typedef enum message_types_dis_loc
 {
 	MT_BROADCAST	= 0x1,
@@ -140,12 +154,16 @@ typedef enum thread_msg
 	COMM_SEND_CMD,
 	COMM_SEND_W4R_CMD,
 	COMM_SEND_DLY_CMD,
+	CONN_SYN_RECV_CMD,
+	CONN_SYN_SEND_CMD,
 	COMM_ERR_RESP,
 	COMM_TMO_RESP,
 	COMM_END,
-	BROAD_RECV,
-	SYN_RECV,
-	CONN_RECV
+	COMM_OTHER,
+	BROAD_RECV_CMD,
+	SYN_RECV_CMD,
+	CONN_RECV_CMD,
+	CONN_SEND_CMD
 } thread_msg_t;
 
 typedef struct address_list
@@ -173,6 +191,32 @@ typedef struct message_meta
 	message_t expected_message;
 } message_meta_t;
 
+typedef struct message_req
+{
+	thread_msg_t t_message;
+	uint16_t expected_addr;
+	message_t expected_message;
+} message_req_t;
+
+typedef struct message_cmd
+{
+	thread_msg_t t_message;
+	peer_connection_t* peer;
+	message_t type;
+	uint8_t size;
+} message_cmd_t;
+
+typedef struct message_cmd_req
+{
+	thread_msg_t t_message;
+	peer_connection_t* peer;
+	message_t type;
+	uint8_t size;
+	message_t expected_message;
+} message_cmd_req_t;
+
+
+
 typedef struct peer_loc
 {
 	uint8_t peer_id;
@@ -193,7 +237,7 @@ void spi1_clear_cs(void);
 void spi1_send(size_t count, const uint8_t* buf);
 void spi1_recv(size_t count, const uint8_t* buf);
 
-static THD_WORKING_AREA(DW_IRQ_THREAD, THREAD_STACK_SIZE);
+static THD_WORKING_AREA(DW_IRQ_THREAD, 256);
 extern THD_FUNCTION(DW_IRQ_HANDLER, arg);
 
 static THD_WORKING_AREA(DW_CONTROLLER_THREAD, THREAD_STACK_SIZE);
@@ -202,8 +246,8 @@ extern THD_FUNCTION(DW_CONTROLLER, arg);
 static THD_WORKING_AREA(PEER_DISCOVERY_THREAD, THREAD_STACK_SIZE);
 extern THD_FUNCTION(PEER_DISCOVERY, arg);
 
-// static THD_WORKING_AREA(PEER_CONNECTION_THREAD, THREAD_STACK_SIZE);
-// extern THD_FUNCTION(PEER_CONNECTION, arg);
+static THD_WORKING_AREA(PEER_CONNECTION_THREAD, THREAD_STACK_SIZE);
+extern THD_FUNCTION(PEER_CONNECTION, arg);
 
 static THD_WORKING_AREA(COMMS_THREAD, THREAD_STACK_SIZE);
 extern THD_FUNCTION(COMMS, arg);
@@ -213,6 +257,9 @@ extern THD_FUNCTION(COMMS, arg);
 
 // static THD_WORKING_AREA(DIS_LOC_THREAD, THREAD_STACK_SIZE);
 // extern THD_FUNCTION(DIS_LOC, arg);
+
+static THD_WORKING_AREA(SYSTEM_STATUS_THREAD, 256);
+extern THD_FUNCTION(SYSTEM_STATUS, arg);
 
 void dw_reset(void);
 
@@ -237,8 +284,12 @@ int8_t insert_addr(uint16_t addr);
 int8_t search_addr(uint16_t addr);
 void init_neigh(void);
 
-int32_t get_message(message_meta_t* msg_meta);
-void prepare_message(message_meta_t* msg_meta);
+void init_peers(void);
+peer_connection_t* create_new_peer(uint16_t addr);
+peer_connection_t* get_peer(uint16_t addr);
+
+int32_t get_message(message_req_t* msg_req);
+void prepare_message(message_cmd_t* msg_cmd);
 
 peer_connection_t* search_peer(uint16_t addr);
 
@@ -247,12 +298,6 @@ void get_distance_to(uint16_t addr);
 void set_irq_vector(void);
 
 void read_frame(void);
-
-static THD_WORKING_AREA(SYSTEM_STATUS_THREAD, THREAD_STACK_SIZE);
-static THD_FUNCTION(SYSTEM_STATUS, arg);
-
-// static THD_WORKING_AREA(LOCATOR_THREAD, THREAD_STACK_SIZE);
-// static THD_FUNCTION(LOCATOR, arg);
 
 void CPLOCK_handler(void);
 void ESYNCR_handler(void);
