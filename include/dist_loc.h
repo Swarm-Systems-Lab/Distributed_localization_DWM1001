@@ -141,13 +141,13 @@ typedef enum message_types_dis_loc
 	MT_SYN			= 0x11,
 	MT_SYN_ACK		= 0x12,
 	MT_ACK			= 0x13,
-	MT_MCONN		= 0x14,
-	MT_DISCONN		= 0x15,
+	MT_DISCONN		= 0x14,
+	MT_MCONN		= 0x15,
+	MT_D_RES		= 0x16,
 	MT_D_REQ		= 0x21,
 	MT_D_REQ_ACK	= 0x22,
 	MT_D_INIT		= 0x23,
 	MT_D_RESP		= 0x24,
-	MT_D_RES		= 0x25,
 	MT_OTHER		= 0xFE
 } message_t;
 
@@ -253,7 +253,7 @@ void send_last_message(peer_connection_t* peer);
 void send_d_req(void);
 void send_d_resp(peer_connection_t* peer);
 
-void respond_if_twr(void);
+int8_t respond_if_twr(void);
 
 void compute_distance(void);
 
