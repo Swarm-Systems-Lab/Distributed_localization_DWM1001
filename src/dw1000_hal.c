@@ -495,8 +495,8 @@ void default_config(void)
 	dw_read(DW_REG_INFO.SYS_CFG, sys_cfg.reg, DW_REG_INFO.SYS_CFG.size, 0);
 	sys_cfg.FFEN = 0b1;
 	sys_cfg.FFAD = 0b1;
-	// TODO auto reenable
-	//sys_cfg.RXAUTR = 0b1;
+	//TODO auto reenable
+	sys_cfg.RXAUTR = 0b1;
 	dw_write(DW_REG_INFO.SYS_CFG, sys_cfg.reg, DW_REG_INFO.SYS_CFG.size, 0);
 
  	_dw_spi_hal_set._dw_spi_lock(); 

@@ -59,7 +59,7 @@
 #define MAFFREJ_E	(EVENT_MASK(29))
 
 #define DW_COMM_OK_E	(EVENT_MASK(30))
-#define DW_COMM_F_E		(EVENT_MASK(31))
+#define DW_COMM_SEND_E	(EVENT_MASK(31))
 
 #define MRXERR_E	(MRXPHE_E | MRXFCE_E | MRXRFSL_E | MRXSFDTO_E | MAFFREJ_E | MLDEERR_E)
 
@@ -137,15 +137,18 @@ typedef enum conn_state
 
 typedef enum message_types_dis_loc
 {
-	MT_BROADCAST	= 0x1,
-	MT_SYN,
-	MT_SYN_ACK,
-	MT_ACK,
-	MT_MCONN,
-	MT_DISCONN,
-	MT_LOC_REQ,
-	MT_LOC_RESP,
-	MT_OTHER
+	MT_BROADCAST	= 0x01,
+	MT_SYN			= 0x11,
+	MT_SYN_ACK		= 0x12,
+	MT_ACK			= 0x13,
+	MT_MCONN		= 0x14,
+	MT_DISCONN		= 0x15,
+	MT_D_REQ		= 0x21,
+	MT_D_REQ_ACK	= 0x22,
+	MT_D_INIT		= 0x23,
+	MT_D_RESP		= 0x24,
+	MT_D_RES		= 0x25,
+	MT_OTHER		= 0xFE
 } message_t;
 
 typedef enum thread_msg
@@ -157,8 +160,8 @@ typedef enum thread_msg
 	CONN_SYN_RECV_CMD,
 	CONN_SYN_SEND_CMD,
 	COMM_ERR_RESP,
-	COMM_TMO_RESP,
-	COMM_END,
+	COMM_RECV_TMO,
+	COMM_RECVD,
 	COMM_OTHER,
 	BROAD_RECV_CMD,
 	SYN_RECV_CMD,
@@ -166,65 +169,23 @@ typedef enum thread_msg
 	CONN_SEND_CMD
 } thread_msg_t;
 
-typedef struct address_list
-{
-	uint16_t addrs[NEIGHBOUR_NUM];
-	int8_t last_p;
-} address_list_t;
-
 typedef struct connection_peer
 {
 	uint16_t peer_addr;
 	uint8_t seq_num;
 	uint8_t ack_num;
 	uint8_t ttl;
+	uint8_t last_message[120];
+	uint8_t last_message_size;
+	message_t last_message_type;
 } peer_connection_t;
-
-typedef struct message_meta
-{
-	thread_msg_t message;
-	peer_connection_t* peer;
-	uint8_t seq_num;
-	message_t type;
-	uint8_t size;
-	peer_connection_t* expected_peer;
-	message_t expected_message;
-} message_meta_t;
-
-typedef struct message_req
-{
-	thread_msg_t t_message;
-	uint16_t expected_addr;
-	message_t expected_message;
-} message_req_t;
-
-typedef struct message_cmd
-{
-	thread_msg_t t_message;
-	peer_connection_t* peer;
-	message_t type;
-	uint8_t size;
-} message_cmd_t;
-
-typedef struct message_cmd_req
-{
-	thread_msg_t t_message;
-	peer_connection_t* peer;
-	message_t type;
-	uint8_t size;
-	message_t expected_message;
-} message_cmd_req_t;
-
-
 
 typedef struct peer_loc
 {
 	uint8_t peer_id;
-	peer_connection_t conn;
-	double pos_x;
-	double pos_y;
-	double pos_z;
-} connection_t;
+	peer_connection_t* conn;
+	double distance;
+} peer_info_t;
 
 void ISR_wrapper(void * arg);
 
@@ -243,7 +204,7 @@ extern THD_FUNCTION(DW_IRQ_HANDLER, arg);
 static THD_WORKING_AREA(DW_CONTROLLER_THREAD, THREAD_STACK_SIZE);
 extern THD_FUNCTION(DW_CONTROLLER, arg);
 
-static THD_WORKING_AREA(PEER_DISCOVERY_THREAD, THREAD_STACK_SIZE);
+static THD_WORKING_AREA(PEER_DISCOVERY_THREAD, 1024);
 extern THD_FUNCTION(PEER_DISCOVERY, arg);
 
 static THD_WORKING_AREA(PEER_CONNECTION_THREAD, THREAD_STACK_SIZE);
@@ -252,8 +213,8 @@ extern THD_FUNCTION(PEER_CONNECTION, arg);
 static THD_WORKING_AREA(COMMS_THREAD, THREAD_STACK_SIZE);
 extern THD_FUNCTION(COMMS, arg);
 
-// static THD_WORKING_AREA(TWR_THREAD, THREAD_STACK_SIZE);
-// extern THD_FUNCTION(TWR, arg);
+static THD_WORKING_AREA(TWR_THREAD, THREAD_STACK_SIZE);
+extern THD_FUNCTION(TWR, arg);
 
 // static THD_WORKING_AREA(DIS_LOC_THREAD, THREAD_STACK_SIZE);
 // extern THD_FUNCTION(DIS_LOC, arg);
@@ -280,16 +241,24 @@ double loc_init_fun(uint16_t addr);
 void loc_resp_fun(void);
 void loc_disc_fun(void);
 
-int8_t insert_addr(uint16_t addr);
-int8_t search_addr(uint16_t addr);
-void init_neigh(void);
-
 void init_peers(void);
 peer_connection_t* create_new_peer(uint16_t addr);
 peer_connection_t* get_peer(uint16_t addr);
+peer_connection_t* get_no_peer(void);
+peer_connection_t* get_yes_peer(void);
 
-int32_t get_message(message_req_t* msg_req);
-void prepare_message(message_cmd_t* msg_cmd);
+void send_syn(void);
+void send_ack(peer_connection_t* peer);
+void send_last_message(peer_connection_t* peer);
+void send_d_req(void);
+void send_d_resp(peer_connection_t* peer);
+
+void respond_if_twr(void);
+
+void compute_distance(void);
+
+int32_t get_message(void);
+void prepare_message(void);
 
 peer_connection_t* search_peer(uint16_t addr);
 
