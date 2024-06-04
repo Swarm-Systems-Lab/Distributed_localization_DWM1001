@@ -144,30 +144,13 @@ typedef enum message_types_dis_loc
 	MT_DISCONN		= 0x14,
 	MT_MCONN		= 0x15,
 	MT_D_RES		= 0x16,
+	MT_D_FAIL		= 0x17,
 	MT_D_REQ		= 0x21,
 	MT_D_REQ_ACK	= 0x22,
 	MT_D_INIT		= 0x23,
 	MT_D_RESP		= 0x24,
 	MT_OTHER		= 0xFE
 } message_t;
-
-typedef enum thread_msg
-{
-	COMM_RECV_CMD		= 0x1,
-	COMM_SEND_CMD,
-	COMM_SEND_W4R_CMD,
-	COMM_SEND_DLY_CMD,
-	CONN_SYN_RECV_CMD,
-	CONN_SYN_SEND_CMD,
-	COMM_ERR_RESP,
-	COMM_RECV_TMO,
-	COMM_RECVD,
-	COMM_OTHER,
-	BROAD_RECV_CMD,
-	SYN_RECV_CMD,
-	CONN_RECV_CMD,
-	CONN_SEND_CMD
-} thread_msg_t;
 
 typedef struct connection_peer
 {
@@ -237,9 +220,8 @@ void load_lde(void);
 
 uint64_t load_ldotune(void);
 
-double loc_init_fun(uint16_t addr);
-void loc_resp_fun(void);
-void loc_disc_fun(void);
+void clean_recvd(void);
+void clean_send(void);
 
 void init_peers(void);
 peer_connection_t* create_new_peer(uint16_t addr);
@@ -251,7 +233,6 @@ void send_syn(void);
 void send_ack(peer_connection_t* peer);
 void send_last_message(peer_connection_t* peer);
 void send_d_req(void);
-void send_d_resp(peer_connection_t* peer);
 
 int8_t respond_if_twr(void);
 

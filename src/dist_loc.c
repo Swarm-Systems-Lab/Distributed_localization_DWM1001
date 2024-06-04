@@ -212,9 +212,6 @@ int32_t get_message(void)
 	recvd_header = decode_MHR(recv_buf);
 	recvd_type = recv_buf[sizeof(recvd_header)];
 
-	if (recvd_type == MT_D_RES)
-		memset(recv_buf+recv_size, 2, sizeof(recv_buf)-recv_size);
-
 	if (recvd_header.frame_control.mask != def_frame_ctrl.mask)
 		return 0;
 
@@ -321,9 +318,22 @@ peer_connection_t* get_yes_peer(void)
 
 void clean_recvd(void)
 {
-	recvd_type = 0;
 	memset(&recvd_header, 0, sizeof(recvd_header));
-	memset(recv_buf, 0, sizeof(recv_buf));
+	memset(recv_buf, 0, recv_size);
+
+	recvd_type = 0;
+}
+
+void clean_send(void)
+{
+	memset(send_buf, 0, send_size);
+
+	send_wtime = -1;
+	send_dlytime = 0;
+	msg_size = 0;
+	msg_seq_num = 0;
+	send_type = 0;
+	send_addr = 0;
 }
 
 void send_syn(void)
@@ -392,20 +402,13 @@ void send_d_req(void)
 
 }
 
-void send_d_resp(peer_connection_t* peer)
+void send_d_fail(peer_connection_t* peer)
 {
-	uint64_t rx_time = dw_get_rx_time();
-	uint64_t delay_tx = (uint64_t)rx_time + (uint64_t)(65536*3000);
-	uint64_t tx_time = (uint64_t)delay_tx /*+(uint64_t)tx_ant_d*/;
-
-	memcpy(send_buf, &tx_time, sizeof(tx_time));
-	memcpy(send_buf+sizeof(tx_time), &rx_time, sizeof(rx_time));
-
 	send_wtime = -1;
-	send_dlytime = (uint32_t)(delay_tx >> 8);
-	msg_size = sizeof(tx_time)+sizeof(rx_time);
+	send_dlytime = 0;
+	msg_size = 1;
 	msg_seq_num = peer->seq_num;
-	send_type = MT_D_RESP;
+	send_type = MT_D_FAIL;
 	send_addr = recvd_header.src_addr;
 	
 	chEvtSignal(dw_thread, DW_COMM_SEND_E);
@@ -436,7 +439,7 @@ void compute_distance(void)
 
 	peer_info_t* peer_info = get_peer_info(recvd_header.src_addr);
 
-	if (tof > 0.0 /*&& tof < 1e-5*/ && peer_info)
+	if (tof > 0.0 && tof < 1e-5 && peer_info)
 	{
 		double distance = tof * 299702547;
 		distance *= 100;
@@ -510,15 +513,13 @@ THD_FUNCTION(TWR, arg)
 					else
 						send_ack(peer);
 					break;
-				// case MT_D_INIT:
-				// 	if (peer == twr_peer && twr_state)
-				// 	{
-				// 		twr_state = 1;
-				// 		send_d_resp(peer); // dly
-				// 	}
-				// 	else
-				// 		twr_state = 0;
-				// 	break;
+				case MT_D_INIT:
+					if (!(peer == twr_peer && twr_state))
+					{
+						send_d_fail(twr_peer);
+						twr_state = 0;
+					}
+					break;
 				case MT_D_RESP:
  					if (peer == twr_peer && twr_state)
 					{
@@ -538,6 +539,8 @@ THD_FUNCTION(TWR, arg)
 						chEvtSignal(dw_thread, DW_COMM_SEND_E);
 						chEvtSignal(comm_thread, DW_COMM_SEND_E);
 					}
+					else
+						send_d_fail(twr_peer);
 						
 					twr_state = 0;
 					break;
@@ -565,7 +568,9 @@ THD_FUNCTION(PEER_DISCOVERY, arg)
 		recvd_msg = chMsgGet(comm_thread);
 		chMsgRelease(comm_thread, MSG_OK);
 		chThdYield();
-		if (recvd_msg == COMM_RECV_TMO && current_peer_n < (1<<skip_cnt) && !twr_state)
+		if (twr_state)
+			twr_state = 0;
+		if (recvd_msg == COMM_RECV_TMO && current_peer_n < (1<<skip_cnt))
 		{
 			skip_cnt = 0;
 			send_wtime = -1;
@@ -581,13 +586,10 @@ THD_FUNCTION(PEER_DISCOVERY, arg)
 		else
 		{
 			skip_cnt++;
-			if (!twr_state)
-			{
-				if (current_peer_c_n == 0 || current_peer_c_n < current_peer_n)
-					send_syn();
-				else
-					send_d_req();
-			}
+			if (current_peer_c_n == 0 || current_peer_c_n < current_peer_n)
+				send_syn();
+			else
+				send_d_req();
 			chThdSleepMilliseconds(10*skip_cnt);
 		}
 	}
@@ -652,6 +654,12 @@ THD_FUNCTION(PEER_CONNECTION, arg)
 					// else
 					// 	send_last_message(peer);
 					break;
+				case MT_D_FAIL:
+					twr_state = 0;
+					if (peer->ack_num == recvd_header.seq_num)
+						peer->ack_num++;
+					send_ack(peer);
+					break;
 				case MT_D_RES:
 					// Add returned distance if sensible
 					double distance = 0;
@@ -712,7 +720,10 @@ THD_FUNCTION(COMMS, arg)
 					comm_state = COMM_IDLE;
 				}
 				else if (evt == DW_COMM_SEND_E)
-					comm_state = COMM_SEND;
+				{
+					if (send_wtime < 0)
+						comm_state = COMM_SEND;
+				}
 				else
 					comm_state = COMM_ERR;
 				break;
@@ -792,7 +803,7 @@ int8_t respond_if_twr(void)
 	memcpy(&rx_time, recv_info.dw_rx_time.RX_STAMP, sizeof(recv_info.dw_rx_time.RX_STAMP));
 	if (!rx_time)
 		memcpy(&rx_time, recv_info.dw_rx_time.RX_RAWST, sizeof(recv_info.dw_rx_time.RX_RAWST));
-	uint64_t delay_tx = (uint64_t)rx_time + (uint64_t)(65536*5000);
+	uint64_t delay_tx = (uint64_t)rx_time + (uint64_t)(65536*3000);
 	uint64_t tx_time = (uint64_t)delay_tx +(uint64_t)tx_antd;
 
 	memcpy(send_buf, &tx_time, sizeof(tx_time));
@@ -805,7 +816,7 @@ int8_t respond_if_twr(void)
 
 	// TODO message sent without header but received with header??????????
 	// maybe sent twice after???
-	//prepare_message();
+	prepare_message();
 	tx_ctrl.TFLEN = send_size+2; // TODO magic
 
 	dx_time.time32 = (uint32_t)(delay_tx >> 8);
@@ -853,8 +864,8 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	dw_write(DW_REG_INFO.PAN_ADR, (uint8_t*)(&id), 2, 0);
 	dw_read(DW_REG_INFO.PAN_ADR, panadr_own.reg, DW_REG_INFO.PAN_ADR.size, 0);
 
-	tx_antd = 33520;
-	uint16_t rx_ant_d = 33520;
+	tx_antd = 31900;
+	uint16_t rx_ant_d = 31900;
 	dw_write(DW_REG_INFO.LDE_CTRL, (uint8_t*)(&rx_ant_d), DW_SUBREG_INFO.LDE_RXANTD.size, DW_SUBREG_INFO.LDE_RXANTD.offset);
 	dw_write(DW_REG_INFO.TX_ANTD, (uint8_t*)(&tx_antd), DW_REG_INFO.TX_ANTD.size, 0);
 
@@ -872,7 +883,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	dw_ctrl_req_t last_state = DW_RESET;
 	uint8_t err_cnt = 0;
 	uint8_t rst_cnt = 0;
-	uint8_t twr_ret;
+	int8_t twr_ret;
 
 	barrier();
 
@@ -904,7 +915,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 					dw_ctrl_req = DW_CTRL_YIELD;
 				else
 					dw_ctrl_req = DW_TRX_ERR;
-				memset(send_buf, 0, send_size);
+				clean_send();
 				break;
 			case DW_SEND_W4R:
 				w4r.W4R_TIM = send_wtime;
@@ -930,7 +941,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 					dw_soft_reset_rx();
 				}
 				if (evt != DW_COMM_SEND_E)
-					memset(send_buf, 0, send_size);
+					clean_send();
 				break;
 			case DW_SEND_DLY:
 				dx_time.time32 = send_dlytime;
@@ -940,7 +951,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 					dw_ctrl_req = DW_CTRL_YIELD;
 				else
 					dw_ctrl_req = DW_TRX_ERR;
-				memset(send_buf, 0, send_size);
+				clean_send();
 				break;
 			case DW_TRX_ERR:
 				state = dw_transceiver_off();
@@ -1002,19 +1013,16 @@ THD_FUNCTION(SYSTEM_STATUS, arg)
 
 	while (true)
 	{
-		for (int i = 0; i < NEIGHBOUR_NUM; i++)
-		{
-			chprintf((BaseSequentialStream*)&SD1, "peer_ack_num: %d\npeer_seq_num: %d\npeer_addr: %d\n", peers[i].ack_num, peers[i].seq_num, peers[i].peer_addr);
-			chprintf((BaseSequentialStream*)&SD1, "d: %d\n", peers_info[i].distance);
-		}
+		// for (int i = 0; i < NEIGHBOUR_NUM; i++)
+		// {
+		// 	chprintf((BaseSequentialStream*)&SD1, "peer_ack_num: %d\npeer_seq_num: %d\npeer_addr: %d\n", peers[i].ack_num, peers[i].seq_num, peers[i].peer_addr);
+		// 	chprintf((BaseSequentialStream*)&SD1, "d: %d\n", peers_info[i].distance);
+		// }
 
 		chThdSleepMilliseconds(500);
 	}
 }
 
-// THD_FUNCTION(DIS_LOC, arg)
-// {
-// 	(void)arg;
 // 	// sys_cfg_t cfdf;
 // 	// cfdf.mask = 0;
 // 	// cfdf.HIRQ_POL = 1;
@@ -1024,59 +1032,6 @@ THD_FUNCTION(SYSTEM_STATUS, arg)
 // 	// uint8_t fwto[2] = {0xFF, 0xFE};
 // 	// dw_write(DW_REG_INFO.RX_FWTO, fwto, DW_REG_INFO.RX_FWTO.size, 0);
 // 	// dw_read(DW_REG_INFO.RX_FWTO, fwto, DW_REG_INFO.RX_FWTO.size, 0);
-
-// 	sys_state_t state;
-// 	sys_mask_t irq_mask;
-// 	MHR_16_t MHR;
-// 	panadr_t panadr;
-
-// 	irq_mask.mask = 0U;
-// 	irq_mask.MTXFRS = 0b1;
-// 	irq_mask.MRXFCG = 0b1;
-// 	//irq_mask.MLDEDONE = 0b1;
-// 	// irq_mask.MRXRFTO = 0b1;
-// 	irq_mask.MRXPHE = 0b1;
-// 	irq_mask.MRXFCE = 0b1;
-// 	irq_mask.MRXRFSL = 0b1;
-// 	//irq_mask.MLDEERR = 0b1;
-// 	irq_mask.MAFFREJ = 0b1;
-	
-// 	sdStart(&SD1, &serial_cfg);
-
-// 	uint64_t id = get_hardware_id();
-// 	srand(id);
-// 	dw_write(DW_REG_INFO.PAN_ADR, (uint8_t*)(&id), 2, 0);
-// 	dw_read(DW_REG_INFO.PAN_ADR, panadr_own.reg, DW_REG_INFO.PAN_ADR.size, 0);
-// 	uint16_t tx_ant_d = 63520;
-// 	uint16_t rx_ant_d = 63520;
-// 	eventmask_t evt = 0;
-	
-// 	dw_set_irq(irq_mask);
-
-// 	dw_config_t t;
-// 	int sizeconfig = sizeof(t);
-// 	chprintf((BaseSequentialStream*)&SD1, "size: %d\n", sizeconfig);
-
-
-// 	dw_write(DW_REG_INFO.LDE_CTRL, (uint8_t*)(&rx_ant_d), DW_SUBREG_INFO.LDE_RXANTD.size, DW_SUBREG_INFO.LDE_RXANTD.offset);
-// 	dw_write(DW_REG_INFO.TX_ANTD, (uint8_t*)(&tx_ant_d), DW_REG_INFO.TX_ANTD.size, 0);
-
-// 	while (true) {	
-// 		//if (neighbours.addrs[0] == 0)
-// 		loc_disc_fun();
-// 		// if (panadr_own.short_addr < neighbours.addrs[0])
-// 		// 	get_distance_to(neighbours.addrs[0]);
-// 		// else
-// 		// {
-// 		// 	chprintf((BaseSequentialStream*)&SD1, "AAAAAAAAAAAAAAAA\n");
-// 		// 	loc_resp_fun();
-// 		// }
-// 		for (int i = 0; i < NEIGHBOUR_NUM; i++)
-// 			chprintf((BaseSequentialStream*)&SD1, "neigh: %d\n", neighbours.addrs[i]);
-		
-// 		//chprintf((BaseSequentialStream*)&SD1, "Distance: %dcm\n", (int)distances_neigh[0]);
-// 	}
-// }
 
 void set_fast_spi_freq(void)
 {
