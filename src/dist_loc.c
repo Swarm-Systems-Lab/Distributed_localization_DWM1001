@@ -212,6 +212,9 @@ int32_t get_message(void)
 	recvd_header = decode_MHR(recv_buf);
 	recvd_type = recv_buf[sizeof(recvd_header)];
 
+	if (recvd_type == MT_D_RES)
+		memset(recv_buf+recv_size, 2, sizeof(recv_buf)-recv_size);
+
 	if (recvd_header.frame_control.mask != def_frame_ctrl.mask)
 		return 0;
 
@@ -901,6 +904,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 					dw_ctrl_req = DW_CTRL_YIELD;
 				else
 					dw_ctrl_req = DW_TRX_ERR;
+				memset(send_buf, 0, send_size);
 				break;
 			case DW_SEND_W4R:
 				w4r.W4R_TIM = send_wtime;
@@ -917,8 +921,6 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 						twr_ret = respond_if_twr();
 						if (twr_ret < 0)
 							dw_ctrl_req = DW_TRX_ERR;
-						if (recv_buf[9] == MT_D_RESP)
-							dw_ctrl_req = DW_CTRL_YIELD;
 						dw_ctrl_req = DW_CTRL_YIELD;
 					}
 					else if (evt == 0 || evt == DW_COMM_SEND_E)
@@ -927,6 +929,8 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 						dw_ctrl_req = DW_TRX_ERR;
 					dw_soft_reset_rx();
 				}
+				if (evt != DW_COMM_SEND_E)
+					memset(send_buf, 0, send_size);
 				break;
 			case DW_SEND_DLY:
 				dx_time.time32 = send_dlytime;
@@ -936,6 +940,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 					dw_ctrl_req = DW_CTRL_YIELD;
 				else
 					dw_ctrl_req = DW_TRX_ERR;
+				memset(send_buf, 0, send_size);
 				break;
 			case DW_TRX_ERR:
 				state = dw_transceiver_off();
