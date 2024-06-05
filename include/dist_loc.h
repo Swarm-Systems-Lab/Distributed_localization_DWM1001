@@ -27,7 +27,7 @@
 #include "LR-WPANs_MAC.h"
 
 #define THREAD_STACK_SIZE	2048
-#define NEIGHBOUR_NUM		1
+#define NEIGHBOUR_NUM		2
 
 #define MCPLOCK_E	(EVENT_MASK(1))
 #define MESYNCR_E	(EVENT_MASK(2))
@@ -153,7 +153,7 @@ typedef enum message_types_dis_loc
 typedef struct connection_peer
 {
 	uint16_t peer_addr;
-	uint8_t seq_ack_n;
+	uint8_t seq_ack_n;				// 0b	000 	ack	000	seq
 	uint8_t ttl;
 	uint8_t last_message[120];
 	uint8_t last_message_size;
@@ -166,6 +166,7 @@ typedef struct peer_loc
 	uint8_t peer_id;
 	peer_connection_t* conn;
 	double distance;
+	uint8_t d_measures;
 } peer_info_t;
 
 void ISR_wrapper(void * arg);
@@ -224,9 +225,9 @@ void clean_send(void);
 void init_peers(void);
 peer_connection_t* create_new_peer(uint16_t addr);
 peer_connection_t* get_peer(uint16_t addr);
-peer_connection_t* get_no_peer(void);
-peer_connection_t* get_yes_peer(void);
-void remove_peer(peer_connection_t* peer);
+peer_connection_t* get_unconn_peer(void);
+peer_connection_t* get_conn_peer(void);
+void disconnect_peer(peer_connection_t* peer);
 
 void send_syn(void);
 void send_ack(peer_connection_t* peer);

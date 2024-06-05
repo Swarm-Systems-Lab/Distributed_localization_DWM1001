@@ -235,8 +235,7 @@ void prepare_message(void)
 			peer->last_message_size = msg_size;
 			peer->last_message_type = send_type;
 		}
-		else
-			peer->last_cmd_type = send_type;
+		peer->last_cmd_type = send_type;
 	}
 
 	send_header.frame_control = def_frame_ctrl;
@@ -261,6 +260,7 @@ void init_peers(void)
 		peers[i].last_message_type = 0;
 		peers_info[i].conn = peers+i;
 		peers_info[i].distance = 0.0;
+		peers_info[i].d_measures = 0;
 		peers_info[i].peer_id = i;
 	}
 }
@@ -308,10 +308,18 @@ peer_info_t* get_peer_info(uint16_t addr)
 	return NULL;
 }
 
-void remove_peer(peer_connection_t* peer)
+void connect_peer(peer_connection_t* peer)
+{
+	peer->seq_ack_n = 0x11;
+	current_peer_c_n++;
+	peer->ttl = 0;
+}
+
+void disconnect_peer(peer_connection_t* peer)
 {
 	peer_info_t* peer_info = get_peer_info(peer->peer_addr);
 	peer_info->distance = 0.0;
+	peer_info->d_measures = 0;
 	peer->peer_addr = 0;
 	peer->seq_ack_n = 0;
 	peer->last_message_size = 0;
@@ -321,24 +329,46 @@ void remove_peer(peer_connection_t* peer)
 	current_peer_n--;
 }
 
-peer_connection_t* get_no_peer(void)
+peer_connection_t* get_unconn_peer(void)
 {
+	if ((current_peer_n-current_peer_c_n) <= 0)
+		return NULL;
+
+	uint8_t rnd_peer = rand() / (RAND_MAX/(current_peer_n-current_peer_c_n) + 1);
+	int16_t tried_cnt = -1;
+
 	for (size_t i = 0; i < NEIGHBOUR_NUM; i++)
 	{
 		if (peers[i].peer_addr > 0 && peers[i].ttl == 255)
+			tried_cnt++;
+		if (tried_cnt == rnd_peer)
 			return peers+i;
 	}
+
 	return NULL;
 }
 
-peer_connection_t* get_yes_peer(void)
+peer_connection_t* get_conn_peer(void)
 {
+	if (current_peer_c_n == 0)
+		return NULL;
+
+	uint8_t d_measures_min = 255;
+	peer_connection_t* peer_min = NULL;
+
 	for (size_t i = 0; i < NEIGHBOUR_NUM; i++)
 	{
 		if (peers[i].peer_addr > 0 && peers[i].ttl < PEER_CONN_TTL)
-			return peers+i;
+		{
+			if (peers_info[i].d_measures <= d_measures_min)
+			{
+				d_measures_min = peers_info[i].d_measures;
+				peer_min = peers+i;
+			}
+		}
 	}
-	return NULL;
+
+	return peer_min;
 }
 
 
@@ -364,7 +394,7 @@ void clean_send(void)
 
 void send_syn(void)
 {
-	peer_connection_t* peer = get_no_peer();
+	peer_connection_t* peer = get_unconn_peer();
 
 	if (peer)
 		send_conn_msg(peer, 1, MT_SYN);
@@ -377,7 +407,7 @@ void send_conn_msg(peer_connection_t* peer, uint8_t size, message_t type)
 	send_wtime = -1;
 	send_dlytime = 0;
 	msg_size = size;
-	msg_seq_num = peer->seq_ack_n&0x0F;
+	msg_seq_num = peer->seq_ack_n&0x01;
 	send_type = type;
 	send_addr = peer->peer_addr;
 
@@ -390,7 +420,7 @@ void send_ack(peer_connection_t* peer)
 	send_wtime = -1;
 	send_dlytime = 0;
 	msg_size = 1;
-	msg_seq_num = peer->seq_ack_n&0xF0;
+	msg_seq_num = peer->seq_ack_n&0x10;
 	send_type = MT_ACK;
 	send_addr = peer->peer_addr;
 	
@@ -406,7 +436,7 @@ void send_last_message(peer_connection_t* peer)
 
 void send_d_req(void)
 {
-	peer_connection_t* peer = get_yes_peer();
+	peer_connection_t* peer = get_conn_peer();
 
 	if (peer)
 		send_conn_msg(peer, 1, MT_D_REQ);
@@ -442,6 +472,7 @@ void compute_distance(void)
 		double distance = tof * 299702547;
 		distance *= 100;
 		peer_info->distance = (peer_info->distance)*NEIGHBOUR_NUM/(NEIGHBOUR_NUM+1) + distance/(NEIGHBOUR_NUM+1);
+		peer_info->d_measures++;
 	}
 }
 
@@ -478,7 +509,7 @@ THD_FUNCTION(TWR, arg)
 						send_wtime = 0;
 						send_dlytime = 0;
 						msg_size = 1;
-						msg_seq_num = peer->seq_ack_n&0xF0;
+						msg_seq_num = peer->seq_ack_n&0x10;
 						send_type = MT_D_REQ_ACK;
 						send_addr = recvd_header.src_addr;
 						
@@ -501,7 +532,7 @@ THD_FUNCTION(TWR, arg)
 						send_wtime = 0;
 						send_dlytime = 0;
 						msg_size = 1;
-						msg_seq_num = peer->seq_ack_n&0x0F;
+						msg_seq_num = peer->seq_ack_n&0x01;
 						send_type = MT_D_INIT;
 						send_addr = recvd_header.src_addr;
 						
@@ -616,7 +647,7 @@ THD_FUNCTION(PEER_CONNECTION, arg)
 			{
 				case MT_SYN:
 					if (peer->ttl < PEER_CONN_TTL)
-						remove_peer(peer);
+						disconnect_peer(peer);
 					else
 					{
 						peer->seq_ack_n = 0x10;
@@ -625,31 +656,27 @@ THD_FUNCTION(PEER_CONNECTION, arg)
 					break;
 				case MT_SYN_ACK:
 					if (peer->ttl < PEER_CONN_TTL)
-						remove_peer(peer);
+						disconnect_peer(peer);
 					else
 					{
-						if (peer->seq_ack_n = 0x01)
+						if (peer->last_cmd_type == MT_SYN)
 						{
-							peer->seq_ack_n = 0x11;
+							connect_peer(peer);
 							send_ack(peer);
-							current_peer_c_n++;
-							peer->ttl = 0;
-							// Connection made
 						}
+						else
+							disconnect_peer(peer);
 					}
 					break;
 				case MT_ACK:
 					if ((peer->seq_ack_n&0x01) == !((recvd_header.seq_num&0x10)>>4)) // seq num == not ack_num
 					{
 						// Make connection
-						if (peer->last_cmd_type == MT_SYN_ACK )
+						if (peer->last_cmd_type == MT_SYN_ACK)
 						{
 							if (peer->ttl == 255)
 							{
-								current_peer_c_n++;
-								peer->ttl = 0;
-								peer->seq_ack_n ^= 0x01; // Flips 0 bit (seq_num) 
-								// Connection made
+								connect_peer(peer);
 								send_d_req();
 							}
 						}
@@ -668,7 +695,7 @@ THD_FUNCTION(PEER_CONNECTION, arg)
 							peer->ttl++;
 						}
 						else
-							remove_peer(peer);
+							disconnect_peer(peer);
 					}
 					break;
 				case MT_D_FAIL:
@@ -690,7 +717,7 @@ THD_FUNCTION(PEER_CONNECTION, arg)
 					{
 						peer->ttl++;
 						if (peer->ttl >= PEER_CONN_TTL)
-							remove_peer(peer);
+							disconnect_peer(peer);
 					}
 					send_ack(peer);
 					break;
@@ -1053,6 +1080,7 @@ THD_FUNCTION(SYSTEM_STATUS, arg)
 	{
 		for (int i = 0; i < NEIGHBOUR_NUM; i++)
 		{
+			peers_info[i].d_measures = 0;
 			chprintf((BaseSequentialStream*)&SD1, "peer_addr: %d\n", peers[i].peer_addr);
 			chprintf((BaseSequentialStream*)&SD1, "peer_seq_ack: %x\nttl: %d\n", peers[i].seq_ack_n, peers[i].ttl);
 			chprintf((BaseSequentialStream*)&SD1, "d: %d\n", (int)peers_info[i].distance);
