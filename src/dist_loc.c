@@ -41,8 +41,6 @@ thread_reference_t irq_evt = NULL;
 	// MHR.frame_control.src_addr_mode = SHORT_16;
 frame_control_t def_frame_ctrl = {.mask=0x9841};
 
-peer_connection_t broad_peer = {.peer_addr = 0xFFFF, .ttl = 0, .seq_num = 0, .ack_num = 0};
-
 peer_connection_t peers[NEIGHBOUR_NUM];
 uint8_t current_peer_n = 0;
 uint8_t current_peer_c_n = 0;
@@ -227,6 +225,20 @@ void prepare_message(void)
 {
 	MHR_16_t send_header;
 
+	peer_connection_t* peer = get_peer(send_addr);
+
+	if (peer)
+	{
+		if (send_type > MT_ACK)
+		{
+			memcpy(peer->last_message, send_buf, msg_size);
+			peer->last_message_size = msg_size;
+			peer->last_message_type = send_type;
+		}
+		else
+			peer->last_cmd_type = send_type;
+	}
+
 	send_header.frame_control = def_frame_ctrl;
 	send_header.dest_addr = send_addr;
 	send_header.src_addr = panadr_own.short_addr;
@@ -242,10 +254,11 @@ void init_peers(void)
 {
 	for (size_t i = 0; i < NEIGHBOUR_NUM; i++)
 	{
-		peers[i].ack_num = 0;
 		peers[i].peer_addr = 0;
-		peers[i].seq_num = 0;
-		peers[i].ttl = 0;
+		peers[i].seq_ack_n = 0;
+		peers[i].ttl = 255;
+		peers[i].last_message_size = 0;
+		peers[i].last_message_type = 0;
 		peers_info[i].conn = peers+i;
 		peers_info[i].distance = 0.0;
 		peers_info[i].peer_id = i;
@@ -295,11 +308,24 @@ peer_info_t* get_peer_info(uint16_t addr)
 	return NULL;
 }
 
+void remove_peer(peer_connection_t* peer)
+{
+	peer_info_t* peer_info = get_peer_info(peer->peer_addr);
+	peer_info->distance = 0.0;
+	peer->peer_addr = 0;
+	peer->seq_ack_n = 0;
+	peer->last_message_size = 0;
+	peer->last_message_type = 0;
+	peers->ttl = 255;
+	current_peer_c_n--;
+	current_peer_n--;
+}
+
 peer_connection_t* get_no_peer(void)
 {
 	for (size_t i = 0; i < NEIGHBOUR_NUM; i++)
 	{
-		if (peers[i].peer_addr > 0 && peers[i].seq_num == 0 && peers[i].ack_num == 0)
+		if (peers[i].peer_addr > 0 && peers[i].ttl == 255)
 			return peers+i;
 	}
 	return NULL;
@@ -309,7 +335,7 @@ peer_connection_t* get_yes_peer(void)
 {
 	for (size_t i = 0; i < NEIGHBOUR_NUM; i++)
 	{
-		if (peers[i].peer_addr > 0 && peers[i].seq_num > 0 && peers[i].ack_num > 0)
+		if (peers[i].peer_addr > 0 && peers[i].ttl < PEER_CONN_TTL)
 			return peers+i;
 	}
 	return NULL;
@@ -341,18 +367,22 @@ void send_syn(void)
 	peer_connection_t* peer = get_no_peer();
 
 	if (peer)
-	{
-		send_wtime = -1;
-		send_dlytime = 0;
-		msg_size = 1;
-		msg_seq_num = 0;
-		send_type = MT_SYN;
-		send_addr = peer->peer_addr;
-		
-		chEvtSignal(dw_thread, DW_COMM_SEND_E);
-		chEvtSignal(comm_thread, DW_COMM_SEND_E);
-	}
+		send_conn_msg(peer, 1, MT_SYN);
+}
 
+void send_conn_msg(peer_connection_t* peer, uint8_t size, message_t type)
+{
+	if (peer->ttl > PEER_CONN_TTL && send_type > MT_ACK)
+		return;
+	send_wtime = -1;
+	send_dlytime = 0;
+	msg_size = size;
+	msg_seq_num = peer->seq_ack_n&0x0F;
+	send_type = type;
+	send_addr = peer->peer_addr;
+
+	chEvtSignal(dw_thread, DW_COMM_SEND_E);
+	chEvtSignal(comm_thread, DW_COMM_SEND_E);
 }
 
 void send_ack(peer_connection_t* peer)
@@ -360,9 +390,9 @@ void send_ack(peer_connection_t* peer)
 	send_wtime = -1;
 	send_dlytime = 0;
 	msg_size = 1;
-	msg_seq_num = peer->ack_num;
+	msg_seq_num = peer->seq_ack_n&0xF0;
 	send_type = MT_ACK;
-	send_addr = recvd_header.src_addr;
+	send_addr = peer->peer_addr;
 	
 	chEvtSignal(dw_thread, DW_COMM_SEND_E);
 	chEvtSignal(comm_thread, DW_COMM_SEND_E);
@@ -371,16 +401,7 @@ void send_ack(peer_connection_t* peer)
 void send_last_message(peer_connection_t* peer)
 {
 	memcpy(send_buf, peer->last_message, peer->last_message_size);
-
-	send_wtime = -1;
-	send_dlytime = 0;
-	msg_size = peer->last_message_size;
-	msg_seq_num = peer->seq_num;
-	send_type = peer->last_message_type;
-	send_addr = peer->peer_addr;
-	
-	chEvtSignal(dw_thread, DW_COMM_SEND_E);
-	chEvtSignal(comm_thread, DW_COMM_SEND_E);
+	send_conn_msg(peer, peer->last_message_size, peer->last_message_type);
 }
 
 void send_d_req(void)
@@ -388,31 +409,8 @@ void send_d_req(void)
 	peer_connection_t* peer = get_yes_peer();
 
 	if (peer)
-	{
-		send_wtime = -1;
-		send_dlytime = 0;
-		msg_size = 1;
-		msg_seq_num = peer->seq_num;
-		send_type = MT_D_REQ;
-		send_addr = peer->peer_addr;
-		
-		chEvtSignal(dw_thread, DW_COMM_SEND_E);
-		chEvtSignal(comm_thread, DW_COMM_SEND_E);
-	}
+		send_conn_msg(peer, 1, MT_D_REQ);
 
-}
-
-void send_d_fail(peer_connection_t* peer)
-{
-	send_wtime = -1;
-	send_dlytime = 0;
-	msg_size = 1;
-	msg_seq_num = peer->seq_num;
-	send_type = MT_D_FAIL;
-	send_addr = recvd_header.src_addr;
-	
-	chEvtSignal(dw_thread, DW_COMM_SEND_E);
-	chEvtSignal(comm_thread, DW_COMM_SEND_E);
 }
 
 void compute_distance(void)
@@ -465,7 +463,7 @@ THD_FUNCTION(TWR, arg)
 		recvd_msg = chMsgGet(comm_thread);
 		chMsgRelease(comm_thread, MSG_OK);
 		chThdYield();
-		if (recvd_msg == COMM_RECVD)
+		if (recvd_msg == MSG_OK)
 		{
 			peer = get_peer(recvd_header.src_addr);
 			if (peer == NULL)
@@ -473,14 +471,14 @@ THD_FUNCTION(TWR, arg)
 			switch (recvd_type)
 			{
 				case MT_D_REQ:
-					if (peer->ack_num == recvd_header.seq_num)
+					if (((peer->seq_ack_n&0x10)>>4) == (recvd_header.seq_num&0x01)  && peer->ttl < PEER_CONN_TTL)
 					{
-						peer->ack_num++;
+						peer->seq_ack_n ^= 0x10; // Flips 4 bit (ack_num) 
 						//send_d_req_ack(peer); // w4r
 						send_wtime = 0;
 						send_dlytime = 0;
 						msg_size = 1;
-						msg_seq_num = peer->ack_num;
+						msg_seq_num = peer->seq_ack_n&0xF0;
 						send_type = MT_D_REQ_ACK;
 						send_addr = recvd_header.src_addr;
 						
@@ -494,16 +492,16 @@ THD_FUNCTION(TWR, arg)
 						send_ack(peer);
 					break;
 				case MT_D_REQ_ACK:
- 					if (peer->seq_num == recvd_header.seq_num-1)
+ 					if (peer->last_message_type == MT_D_REQ  && peer->ttl < PEER_CONN_TTL)
 					{
-						peer->seq_num++;
+						peer->seq_ack_n ^= 0x01; // Flips 0 bit (seq_num) 
 						twr_state = 1;
 						twr_peer = peer;
 						//send_d_init(); // w4r
 						send_wtime = 0;
 						send_dlytime = 0;
 						msg_size = 1;
-						msg_seq_num = peer->seq_num;
+						msg_seq_num = peer->seq_ack_n&0x0F;
 						send_type = MT_D_INIT;
 						send_addr = recvd_header.src_addr;
 						
@@ -516,7 +514,7 @@ THD_FUNCTION(TWR, arg)
 				case MT_D_INIT:
 					if (!(peer == twr_peer && twr_state))
 					{
-						send_d_fail(twr_peer);
+						send_conn_msg(twr_peer, 1, MT_D_FAIL);
 						twr_state = 0;
 					}
 					break;
@@ -529,18 +527,10 @@ THD_FUNCTION(TWR, arg)
 						peer_info_t* peer_info = get_peer_info(recvd_header.src_addr);
 						memcpy(send_buf, &(peer_info->distance), sizeof(peer_info->distance));
 
-						send_wtime = -1;
-						send_dlytime = 0;
-						msg_size = sizeof(peer_info->distance);
-						msg_seq_num = peer->seq_num;
-						send_type = MT_D_RES;
-						send_addr = recvd_header.src_addr;
-						
-						chEvtSignal(dw_thread, DW_COMM_SEND_E);
-						chEvtSignal(comm_thread, DW_COMM_SEND_E);
+						send_conn_msg(peer, sizeof(peer_info->distance), MT_D_RES);
 					}
 					else
-						send_d_fail(twr_peer);
+						send_conn_msg(twr_peer, 1, MT_D_FAIL);
 						
 					twr_state = 0;
 					break;
@@ -570,27 +560,30 @@ THD_FUNCTION(PEER_DISCOVERY, arg)
 		chThdYield();
 		if (twr_state)
 			twr_state = 0;
-		if (recvd_msg == COMM_RECV_TMO && current_peer_n < (1<<skip_cnt))
-		{
-			skip_cnt = 0;
-			send_wtime = -1;
-			send_dlytime = 0;
-			msg_size = 1;
-			msg_seq_num = 0;
-			send_type = MT_BROADCAST;
-			send_addr = 0xFFFF;
-			
-			chEvtSignal(dw_thread, DW_COMM_SEND_E);
-			chEvtSignal(comm_thread, DW_COMM_SEND_E);
-		}
 		else
 		{
-			skip_cnt++;
-			if (current_peer_c_n == 0 || current_peer_c_n < current_peer_n)
-				send_syn();
+			if (recvd_msg == MSG_OK && current_peer_n < (1<<skip_cnt) && current_peer_n < NEIGHBOUR_NUM)
+			{
+				skip_cnt = 0;
+				send_wtime = -1;
+				send_dlytime = 0;
+				msg_size = 1;
+				msg_seq_num = 0;
+				send_type = MT_BROADCAST;
+				send_addr = 0xFFFF;
+				
+				chEvtSignal(dw_thread, DW_COMM_SEND_E);
+				chEvtSignal(comm_thread, DW_COMM_SEND_E);
+			}
 			else
-				send_d_req();
-			chThdSleepMilliseconds(10*skip_cnt);
+			{
+				skip_cnt++;
+				if (current_peer_c_n == 0 || current_peer_c_n < current_peer_n)
+					send_syn();
+				else
+					send_d_req();
+				chThdSleepMilliseconds(10*skip_cnt);
+			}
 		}
 	}
 }
@@ -602,6 +595,7 @@ THD_FUNCTION(PEER_CONNECTION, arg)
 	msg_t recvd_msg;
 	peer_connection_t* peer;
 	init_peers();
+	double distance = 0;
 	peer_conn_thread = chThdGetSelfX();
 
 	barrier();
@@ -613,7 +607,7 @@ THD_FUNCTION(PEER_CONNECTION, arg)
 		recvd_msg = chMsgGet(comm_thread);
 		chMsgRelease(comm_thread, MSG_OK);
 		chThdYield();
-		if (recvd_msg == COMM_RECVD)
+		if (recvd_msg == MSG_OK)
 		{
 			peer = get_peer(recvd_header.src_addr);
 			if (peer == NULL)
@@ -621,55 +615,83 @@ THD_FUNCTION(PEER_CONNECTION, arg)
 			switch (recvd_type)
 			{
 				case MT_SYN:
-					peer->ack_num = 1;
-
-					// send syn+ack
-					send_wtime = -1;
-					send_dlytime = 0;
-					msg_size = 1;
-					msg_seq_num = 0;
-					send_type = MT_SYN_ACK;
-					send_addr = recvd_header.src_addr;
-					
-					chEvtSignal(dw_thread, DW_COMM_SEND_E);
-					chEvtSignal(comm_thread, DW_COMM_SEND_E);
+					if (peer->ttl < PEER_CONN_TTL)
+						remove_peer(peer);
+					else
+					{
+						peer->seq_ack_n = 0x10;
+						send_conn_msg(peer, 1, MT_SYN_ACK);
+					} 
 					break;
 				case MT_SYN_ACK:
-					peer->seq_num = 1;
-					peer->ack_num = 1;
-					current_peer_c_n++;
-					send_ack(peer);
-					break;
-				case MT_ACK:
-					if (peer->seq_num == recvd_header.seq_num-1)
+					if (peer->ttl < PEER_CONN_TTL)
+						remove_peer(peer);
+					else
 					{
- 						peer->seq_num++;
-						if (peer->seq_num == 1 && peer->ack_num == 1)
+						if (peer->seq_ack_n = 0x01)
 						{
+							peer->seq_ack_n = 0x11;
+							send_ack(peer);
 							current_peer_c_n++;
-							send_d_req();
+							peer->ttl = 0;
+							// Connection made
 						}
 					}
-					// TODO
-					// else
-					// 	send_last_message(peer);
+					break;
+				case MT_ACK:
+					if ((peer->seq_ack_n&0x01) == !((recvd_header.seq_num&0x10)>>4)) // seq num == not ack_num
+					{
+						// Make connection
+						if (peer->last_cmd_type == MT_SYN_ACK )
+						{
+							if (peer->ttl == 255)
+							{
+								current_peer_c_n++;
+								peer->ttl = 0;
+								peer->seq_ack_n ^= 0x01; // Flips 0 bit (seq_num) 
+								// Connection made
+								send_d_req();
+							}
+						}
+						else
+						{
+							if (peer->ttl < PEER_CONN_TTL)
+								peer->seq_ack_n ^= 0x01; // Flips 0 bit (seq_num)  
+						}
+						// TODO check multiple positive acks (not suppose to happen)
+					}
+					else
+					{
+						if (peer->ttl < PEER_CONN_TTL)
+						{
+							send_last_message(peer);
+							peer->ttl++;
+						}
+						else
+							remove_peer(peer);
+					}
 					break;
 				case MT_D_FAIL:
 					twr_state = 0;
-					if (peer->ack_num == recvd_header.seq_num)
-						peer->ack_num++;
+					if ((peer->seq_ack_n&0x01) == ((recvd_header.seq_num&0x10)>>4))
+						peer->seq_ack_n ^= 0x10; // Flips 4 bit (ack_num) 
 					send_ack(peer);
 					break;
 				case MT_D_RES:
 					// Add returned distance if sensible
-					double distance = 0;
 					memcpy(&distance, recv_buf, sizeof(distance));
 					peer_info_t* peer_info = get_peer_info(recvd_header.src_addr);
 					peer_info->distance = (peer_info->distance)*NEIGHBOUR_NUM/(NEIGHBOUR_NUM+1) + distance/(NEIGHBOUR_NUM+1);
 					// NO BREAK
 				case MT_MCONN:
-					if (peer->ack_num == recvd_header.seq_num)
-						peer->ack_num++;
+					if (((peer->seq_ack_n&0x10)>>4) == (recvd_header.seq_num&0x01)  && peer->ttl < PEER_CONN_TTL)
+						peer->seq_ack_n ^= 0x10; // Flips 4 bit (ack_num) 
+					else
+					{
+						peer->ttl++;
+						if (peer->ttl >= PEER_CONN_TTL)
+							remove_peer(peer);
+					}
 					send_ack(peer);
 					break;
 				default:
@@ -679,6 +701,23 @@ THD_FUNCTION(PEER_CONNECTION, arg)
 	}
 }
 
+void proccess_message(void)
+{
+	uint8_t is_timeout = 0;
+
+	switch (recvd_type&0xF0)
+	{
+		case 0:
+			is_timeout = 1;
+			break;
+		case 0x10:
+			chMsgSend(peer_conn_thread, MSG_OK);
+			break;
+		case 0x20:
+			chMsgSend(twr_thread, MSG_OK);
+			break;
+	}
+}
 
 THD_FUNCTION(COMMS, arg)
 {
@@ -750,16 +789,17 @@ THD_FUNCTION(COMMS, arg)
 			case COMM_IDLE:
 				if (last_state == COMM_RECV)
 				{
+					// decide
 					switch (recvd_type&0xF0)
 					{
 						case 0:
-							chMsgSend(peer_disc_thread, COMM_RECV_TMO);
+							chMsgSend(peer_disc_thread, MSG_OK);
 							break;
 						case 0x10:
-							chMsgSend(peer_conn_thread, COMM_RECVD);
+							chMsgSend(peer_conn_thread, MSG_OK);
 							break;
 						case 0x20:
-							chMsgSend(twr_thread, COMM_RECVD);
+							chMsgSend(twr_thread, MSG_OK);
 							break;
 					}
 				}
@@ -773,7 +813,7 @@ THD_FUNCTION(COMMS, arg)
 
 		if (wrong_message_cnt > 100)
 		{
-			chMsgSend(caller_thread, COMM_OTHER);
+			chMsgSend(caller_thread, MSG_RESET);
 			wrong_message_cnt = 0;
 		}
 	}
@@ -814,8 +854,6 @@ int8_t respond_if_twr(void)
 	send_type = MT_D_RESP;
 	send_addr = recvd_header.src_addr;
 
-	// TODO message sent without header but received with header??????????
-	// maybe sent twice after???
 	prepare_message();
 	tx_ctrl.TFLEN = send_size+2; // TODO magic
 
@@ -1013,11 +1051,12 @@ THD_FUNCTION(SYSTEM_STATUS, arg)
 
 	while (true)
 	{
-		// for (int i = 0; i < NEIGHBOUR_NUM; i++)
-		// {
-		// 	chprintf((BaseSequentialStream*)&SD1, "peer_ack_num: %d\npeer_seq_num: %d\npeer_addr: %d\n", peers[i].ack_num, peers[i].seq_num, peers[i].peer_addr);
-		// 	chprintf((BaseSequentialStream*)&SD1, "d: %d\n", peers_info[i].distance);
-		// }
+		for (int i = 0; i < NEIGHBOUR_NUM; i++)
+		{
+			chprintf((BaseSequentialStream*)&SD1, "peer_addr: %d\n", peers[i].peer_addr);
+			chprintf((BaseSequentialStream*)&SD1, "peer_seq_ack: %x\nttl: %d\n", peers[i].seq_ack_n, peers[i].ttl);
+			chprintf((BaseSequentialStream*)&SD1, "d: %d\n", (int)peers_info[i].distance);
+		}
 
 		chThdSleepMilliseconds(500);
 	}

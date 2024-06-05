@@ -27,7 +27,7 @@
 #include "LR-WPANs_MAC.h"
 
 #define THREAD_STACK_SIZE	2048
-#define NEIGHBOUR_NUM		2
+#define NEIGHBOUR_NUM		1
 
 #define MCPLOCK_E	(EVENT_MASK(1))
 #define MESYNCR_E	(EVENT_MASK(2))
@@ -66,6 +66,7 @@
 #define TX_TIMEOUT	TIME_MS2I(10)
 #define CH_TIMEOUT	TIME_S2I(10)
 #define DW_ERR_THRESH	10
+#define PEER_CONN_TTL	16
 
 extern thread_reference_t irq_evt;
 
@@ -80,25 +81,22 @@ extern thread_t* comm_thread;
 typedef enum loc_state
 {
 	LOC_STANDBY,
-	LOC_DW,
-	LOC_DISC,
-	LOC_CONN,
-	LOC_COM,
+	LOC_INIT,
+	LOC_SOME_NEIGH,
+	LOC_FULL_NEIGH,
 	LOC_TWR,
-	LOC_DIS_CALC,
 	LOC_ERR
 } loc_state_t;
 
-typedef enum disc_state
+typedef enum twr_state
 {
-	DISC_INIT,
-	DISC_BROAD,
-	DISC_WAIT_RX,
-	DISC_TX_ERR,
-	DISC_RX_ERR,
-	DISC_3WH,
-	DISC_IDLE
-} disc_state_t;
+	TWR_REQ_SENT,		// start TWR
+	TWR_REQ_RECVD,		// start TWR send ack and wait for init
+	TWR_REQ_ACK_RECVD,	// send init and wait for resp
+	TWR_INIT_RECVD, 	// resp sent automatically
+	TWR_RESP_RECVD,		// finish TWR
+	TWR_FAIL
+} twr_state_t;
 
 typedef enum dw_ctrl_req
 {
@@ -155,12 +153,12 @@ typedef enum message_types_dis_loc
 typedef struct connection_peer
 {
 	uint16_t peer_addr;
-	uint8_t seq_num;
-	uint8_t ack_num;
+	uint8_t seq_ack_n;
 	uint8_t ttl;
 	uint8_t last_message[120];
 	uint8_t last_message_size;
 	message_t last_message_type;
+	message_t last_cmd_type;
 } peer_connection_t;
 
 typedef struct peer_loc
@@ -228,11 +226,14 @@ peer_connection_t* create_new_peer(uint16_t addr);
 peer_connection_t* get_peer(uint16_t addr);
 peer_connection_t* get_no_peer(void);
 peer_connection_t* get_yes_peer(void);
+void remove_peer(peer_connection_t* peer);
 
 void send_syn(void);
 void send_ack(peer_connection_t* peer);
 void send_last_message(peer_connection_t* peer);
 void send_d_req(void);
+
+void send_conn_msg(peer_connection_t* peer, uint8_t size, message_t type);
 
 int8_t respond_if_twr(void);
 
