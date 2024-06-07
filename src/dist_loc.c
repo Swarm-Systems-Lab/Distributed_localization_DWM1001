@@ -574,6 +574,7 @@ void handle_twr_fail(void)
 	twr_peer->seq_ack_n = twr_peer_seq;
 	// EXPONENTIAL BACKOFF !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	send_conn_msg(twr_peer, 1, MT_D_FAIL);
+	twr_peer = NULL;
 	twr_fail_cnt++;
 }
 
@@ -653,6 +654,7 @@ void twr_handle(peer_connection_t* peer)
 			twr_state = TWR_NO_TWR;
 			twr_peer->seq_ack_n = twr_peer_seq;
 			twr_fail_cnt++;
+			twr_peer = NULL;
 			send_d_req();
 			break;
 		case MT_D_RES:
@@ -902,6 +904,10 @@ THD_FUNCTION(COMMS, arg)
 
 	barrier();
 
+	chMtxLock(&dw_mutex);
+	chEvtWaitOne(DW_COMM_OK_E);
+	chMtxUnlock(&dw_mutex);
+
 	while (true)
 	{
 		switch (comm_state)
@@ -940,9 +946,7 @@ THD_FUNCTION(COMMS, arg)
 					comm_state = COMM_ERR;
 				break;
 			case COMM_ERR:
-				// if (!evt)
-				// 	// danger thread no responding reset mcu?
-				//chMsgSend(caller_thread, COMM_ERR_RESP);
+				// Thread not responding reset thread?
 				comm_state = COMM_IDLE;
 				break;
 			case COMM_IDLE:
@@ -1008,18 +1012,12 @@ int8_t respond_if_twr(void)
 		
 }
 
-THD_FUNCTION(DW_CONTROLLER, arg)
+void dw_setup(void)
 {
-	(void)arg;
-
 	dw_reset();
 	spi_hal_init();
 	default_config();
 	load_lde();
-
-	chMtxObjectInit(&dw_mutex);
-	dw_thread = chThdGetSelfX();
-	set_irq_vector();
 
 	sys_mask_t irq_mask;
 
@@ -1055,6 +1053,13 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	uint16_t rx_ant_d = 31900;
 	dw_write(DW_REG_INFO.LDE_CTRL, (uint8_t*)(&rx_ant_d), DW_SUBREG_INFO.LDE_RXANTD.size, DW_SUBREG_INFO.LDE_RXANTD.offset);
 	dw_write(DW_REG_INFO.TX_ANTD, (uint8_t*)(&tx_antd), DW_REG_INFO.TX_ANTD.size, 0);
+}
+
+THD_FUNCTION(DW_CONTROLLER, arg)
+{
+	(void)arg;
+
+	dw_setup();
 
 	dx_time_t dx_time;
 	tx_fctrl_t tx_ctrl;
@@ -1071,6 +1076,12 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	uint8_t err_cnt = 0;
 	uint8_t rst_cnt = 0;
 	int8_t twr_ret;
+
+	chMtxObjectInit(&dw_mutex);
+	dw_thread = chThdGetSelfX();
+	set_irq_vector();
+
+	chMtxLock(&dw_mutex);
 
 	barrier();
 
@@ -1146,11 +1157,8 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				dw_ctrl_req = last_state;
 				break;
 			case DW_CTRL_YIELD:
-				if (last_state != DW_RESET)
-				{
-					chEvtSignal(comm_thread, DW_COMM_OK_E);
-					chMtxUnlock(&dw_mutex);
-				}
+				chMtxUnlock(&dw_mutex);
+				chEvtSignal(comm_thread, DW_COMM_OK_E);
 				chEvtWaitOne(DW_COMM_OK_E);
 				chMtxLock(&dw_mutex);
 				chThdSleepMilliseconds(TRX_RST_TM);
@@ -1162,12 +1170,8 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				dw_ctrl_req = DW_CTRL_YIELD;
 				break;
 			case DW_RESET:
-				dw_reset();
-				spi_hal_init();
-				default_config();
-				load_lde();
-				set_irq_vector();
-				rst_cnt = 0;
+				dw_setup();
+				rst_cnt++;
 				dw_ctrl_req = DW_CTRL_YIELD;
 				chEvtSignal(comm_thread, DW_COMM_OK_E);
 				break;
@@ -1179,7 +1183,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 
 		if (err_cnt > DW_ERR_THRESH)
 		{
-			rst_cnt++;
+			dw_ctrl_req = DW_RESET;
 			err_cnt = 0;
 		}
 	}
