@@ -27,7 +27,10 @@
 #include "LR-WPANs_MAC.h"
 
 #define THREAD_STACK_SIZE	2048
-#define NEIGHBOUR_NUM		2
+#define NEIGHBOUR_NUM		3
+#define MIN_D_MEASURES		10
+#define CONN_MSG_TMO		10
+#define CONN_MSG_TMO_MAX	1
 
 #define MCPLOCK_E	(EVENT_MASK(1))
 #define MESYNCR_E	(EVENT_MASK(2))
@@ -59,12 +62,11 @@
 #define MAFFREJ_E	(EVENT_MASK(29))
 
 #define DW_COMM_OK_E	(EVENT_MASK(30))
-#define DW_COMM_SEND_E	(EVENT_MASK(31))
 
 #define MRXERR_E	(MRXPHE_E | MRXFCE_E | MRXRFSL_E | MRXSFDTO_E | MAFFREJ_E | MLDEERR_E)
 
 #define TX_TIMEOUT	TIME_MS2I(10)
-#define CH_TIMEOUT	TIME_S2I(10)
+#define CH_TIMEOUT	TIME_S2I(5)
 #define DW_ERR_THRESH	10
 #define PEER_CONN_TTL	16
 
@@ -82,8 +84,7 @@ typedef enum loc_state
 {
 	LOC_STANDBY,
 	LOC_INIT,
-	LOC_SOME_NEIGH,
-	LOC_FULL_NEIGH,
+	LOC_COMM,
 	LOC_TWR,
 	LOC_ERR
 } loc_state_t;
@@ -94,7 +95,8 @@ typedef enum twr_state
 	TWR_REQ_RECVD,		// start TWR send ack and wait for init
 	TWR_REQ_ACK_RECVD,	// send init and wait for resp
 	TWR_INIT_RECVD, 	// resp sent automatically
-	TWR_RESP_RECVD,		// finish TWR
+	TWR_RESP_RECVD,		// send res and wait res_ack
+	TWR_NO_TWR,			
 	TWR_FAIL
 } twr_state_t;
 
@@ -140,21 +142,43 @@ typedef enum message_types_dis_loc
 	MT_SYN_ACK		= 0x12,
 	MT_ACK			= 0x13,
 	MT_DISCONN		= 0x14,
-	MT_MCONN		= 0x15,
-	MT_D_RES		= 0x16,
-	MT_D_FAIL		= 0x17,
 	MT_D_REQ		= 0x21,
 	MT_D_REQ_ACK	= 0x22,
 	MT_D_INIT		= 0x23,
 	MT_D_RESP		= 0x24,
+	MT_D_FAIL		= 0x25,
+	MT_D_RES		= 0x26,
+	MT_D_RES_ACK	= 0x27,
+	MT_MCONN		= 0x31,
 	MT_OTHER		= 0xFE
 } message_t;
+
+typedef enum loc_action
+{
+	LOC_RESP,
+	LOC_RESP_BTMO,
+	LOC_RESP_NOW,
+	LOC_NO_RESP,
+	LOC_ACT_ERR,
+	LOC_STOP
+} loc_action_t;
+
+typedef struct send_msg_meta
+{
+	int32_t wtime;
+	uint32_t dlytime;
+	uint8_t size;
+	uint8_t seq_ack_num;
+	message_t type;
+	uint16_t addr;
+} send_msg_meta_t;
 
 typedef struct connection_peer
 {
 	uint16_t peer_addr;
 	uint8_t seq_ack_n;				// 0b	000 	ack	000	seq
 	uint8_t ttl;
+	virtual_timer_t tmo_timer;
 	uint8_t last_message[120];
 	uint8_t last_message_size;
 	message_t last_message_type;
@@ -186,17 +210,8 @@ extern THD_FUNCTION(DW_IRQ_HANDLER, arg);
 static THD_WORKING_AREA(DW_CONTROLLER_THREAD, THREAD_STACK_SIZE);
 extern THD_FUNCTION(DW_CONTROLLER, arg);
 
-static THD_WORKING_AREA(PEER_DISCOVERY_THREAD, 1024);
-extern THD_FUNCTION(PEER_DISCOVERY, arg);
-
-static THD_WORKING_AREA(PEER_CONNECTION_THREAD, THREAD_STACK_SIZE);
-extern THD_FUNCTION(PEER_CONNECTION, arg);
-
-static THD_WORKING_AREA(COMMS_THREAD, THREAD_STACK_SIZE);
+static THD_WORKING_AREA(COMMS_THREAD, 4098);
 extern THD_FUNCTION(COMMS, arg);
-
-static THD_WORKING_AREA(TWR_THREAD, THREAD_STACK_SIZE);
-extern THD_FUNCTION(TWR, arg);
 
 // static THD_WORKING_AREA(DIS_LOC_THREAD, THREAD_STACK_SIZE);
 // extern THD_FUNCTION(DIS_LOC, arg);
