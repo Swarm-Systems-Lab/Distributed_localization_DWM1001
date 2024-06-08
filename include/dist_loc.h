@@ -27,7 +27,7 @@
 #include "LR-WPANs_MAC.h"
 
 #define THREAD_STACK_SIZE	2048
-#define NEIGHBOUR_NUM		3
+#define NEIGHBOUR_NUM		2
 #define MIN_D_MEASURES		10
 #define CONN_MSG_TMO		10
 #define CONN_MSG_TMO_MAX	1
@@ -189,9 +189,16 @@ typedef struct peer_loc
 {
 	uint8_t peer_id;
 	peer_connection_t* conn;
-	double distance;
+	float calc_distance;
+	float recvd_distance;
 	uint8_t d_measures;
 } peer_info_t;
+
+typedef struct euclidean_d_m
+{
+	uint16_t addrs[NEIGHBOUR_NUM+1];
+	float distances[NEIGHBOUR_NUM+1][NEIGHBOUR_NUM+1];
+} euclidean_d_m_t;
 
 void ISR_wrapper(void * arg);
 
