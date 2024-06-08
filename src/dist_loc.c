@@ -84,6 +84,7 @@ uint8_t recv_tmo_cnt = 0;
 uint8_t twr_fail_cnt = 0;
 
 euclidean_d_m_t euclidean_d_m;
+float peer_positions[NEIGHBOUR_NUM+1][3];
 
 virtual_timer_t comm_watchdog;
 
@@ -1142,8 +1143,8 @@ void dw_setup(void)
 	dw_write(DW_REG_INFO.PAN_ADR, (uint8_t*)(&id), 2, 0);
 	dw_read(DW_REG_INFO.PAN_ADR, panadr_own.reg, DW_REG_INFO.PAN_ADR.size, 0);
 
-	tx_antd = 31900;
-	uint16_t rx_ant_d = 31900;
+	tx_antd = 0;
+	uint16_t rx_ant_d = 0;
 	dw_write(DW_REG_INFO.LDE_CTRL, (uint8_t*)(&rx_ant_d), DW_SUBREG_INFO.LDE_RXANTD.size, DW_SUBREG_INFO.LDE_RXANTD.offset);
 	dw_write(DW_REG_INFO.TX_ANTD, (uint8_t*)(&tx_antd), DW_REG_INFO.TX_ANTD.size, 0);
 }
@@ -1283,6 +1284,22 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 
 }
 
+void update_peer_pos(void)
+{
+	float d = peers_info[0].calc_distance;
+	float d0 = get_distance(panadr_own.short_addr, peers[1].peer_addr);
+	float d1 = get_distance(peers[0].peer_addr, peers[1].peer_addr);
+
+	d = 4;
+	d0 = (float)sqrt(13.0);
+	d1 = (float)sqrt(13.0);
+
+	peer_positions[1][0] = d;
+
+	peer_positions[2][0] = (d*d+d0*d0-d1*d1)/(2*d);
+	peer_positions[2][1] = (float)(sqrt((double)(d0*d0 - (peer_positions[2][0])*(peer_positions[2][0]))));
+}
+
 THD_FUNCTION(SYSTEM_STATUS, arg)
 {
 	(void)arg;
@@ -1291,6 +1308,13 @@ THD_FUNCTION(SYSTEM_STATUS, arg)
 
 	//chVTObjectInit(&comm_watchdog);
 	init_d_m();
+
+	peer_positions[0][0] = 0;
+	peer_positions[0][1] = 0;
+	peer_positions[0][2] = 0;
+	peer_positions[1][1] = 0;
+	peer_positions[1][2] = 0;
+	peer_positions[2][2] = 0;
 
 	sdStart(&SD1, &serial_cfg);
 
@@ -1306,6 +1330,9 @@ THD_FUNCTION(SYSTEM_STATUS, arg)
 			euclidean_d_m.distances[0][i] = peers_info[i-1].calc_distance;
 			euclidean_d_m.distances[i][0] = peers_info[i-1].recvd_distance;
 		}
+
+		update_peer_pos();
+
 		for (uint8_t i = 0; i < NEIGHBOUR_NUM; i++)
 		{
 			peers_info[i].d_measures = 0;
@@ -1314,6 +1341,13 @@ THD_FUNCTION(SYSTEM_STATUS, arg)
 			// chprintf((BaseSequentialStream*)&SD1, "peer_addr: %d\n", peers[i].peer_addr);
 			// chprintf((BaseSequentialStream*)&SD1, "peer_seq_ack: %x\nttl: %d\n", peers[i].seq_ack_n, peers[i].ttl);
 			// chprintf((BaseSequentialStream*)&SD1, "d: %d\n", (int)peers_info[i].distance);
+		}
+
+		for (uint8_t i = 1; i < NEIGHBOUR_NUM+1; i++)
+		{
+			chprintf((BaseSequentialStream*)&SD1, "(%d,%d,%d)\n", (int)peer_positions[0][0], (int)peer_positions[0][1], (int)peer_positions[0][2]);
+			chprintf((BaseSequentialStream*)&SD1, "(%d,%d,%d)\n", (int)peer_positions[1][0], (int)peer_positions[1][1], (int)peer_positions[1][2]);
+			chprintf((BaseSequentialStream*)&SD1, "(%d,%d,%d)\n", (int)peer_positions[2][0], (int)peer_positions[2][1], (int)peer_positions[2][2]);
 		}
 
 		chprintf((BaseSequentialStream*)&SD1, "\n\t| ");
