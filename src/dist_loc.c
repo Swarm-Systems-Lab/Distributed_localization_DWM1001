@@ -1343,41 +1343,53 @@ THD_FUNCTION(SYSTEM_STATUS, arg)
 			// chprintf((BaseSequentialStream*)&SD1, "d: %d\n", (int)peers_info[i].distance);
 		}
 
-		for (uint8_t i = 1; i < NEIGHBOUR_NUM+1; i++)
-		{
-			chprintf((BaseSequentialStream*)&SD1, "(%d,%d,%d)\n", (int)peer_positions[0][0], (int)peer_positions[0][1], (int)peer_positions[0][2]);
-			chprintf((BaseSequentialStream*)&SD1, "(%d,%d,%d)\n", (int)peer_positions[1][0], (int)peer_positions[1][1], (int)peer_positions[1][2]);
-			chprintf((BaseSequentialStream*)&SD1, "(%d,%d,%d)\n", (int)peer_positions[2][0], (int)peer_positions[2][1], (int)peer_positions[2][2]);
-		}
+		// for (uint8_t i = 1; i < NEIGHBOUR_NUM+1; i++)
+		// {
+		// 	chprintf((BaseSequentialStream*)&SD1, "(%d,%d,%d)\n", (int)peer_positions[0][0], (int)peer_positions[0][1], (int)peer_positions[0][2]);
+		// 	chprintf((BaseSequentialStream*)&SD1, "(%d,%d,%d)\n", (int)peer_positions[1][0], (int)peer_positions[1][1], (int)peer_positions[1][2]);
+		// 	chprintf((BaseSequentialStream*)&SD1, "(%d,%d,%d)\n", (int)peer_positions[2][0], (int)peer_positions[2][1], (int)peer_positions[2][2]);
+		// }
 
-		chprintf((BaseSequentialStream*)&SD1, "\n\t| ");
+		// chprintf((BaseSequentialStream*)&SD1, "\n\t| ");
 
-		for (uint8_t j = 0; j < NEIGHBOUR_NUM+1; j++)
-		{
-			chprintf((BaseSequentialStream*)&SD1, "%d\t", (int)euclidean_d_m.addrs[j]);
-			chprintf((BaseSequentialStream*)&SD1, "| ");
-		}
-		chprintf((BaseSequentialStream*)&SD1, "\n");
-		chprintf((BaseSequentialStream*)&SD1, "-------------------------------------\n");
+		// for (uint8_t j = 0; j < NEIGHBOUR_NUM+1; j++)
+		// {
+		// 	chprintf((BaseSequentialStream*)&SD1, "%d\t", (int)euclidean_d_m.addrs[j]);
+		// 	chprintf((BaseSequentialStream*)&SD1, "| ");
+		// }
+		// chprintf((BaseSequentialStream*)&SD1, "\n");
+		// chprintf((BaseSequentialStream*)&SD1, "-------------------------------------\n");
+
+		// for (uint8_t i = 0; i < NEIGHBOUR_NUM+1; i++)
+		// {
+		// 	chprintf((BaseSequentialStream*)&SD1, "%d\t", (int)euclidean_d_m.addrs[i]);
+		// 	chprintf((BaseSequentialStream*)&SD1, "| ");
+
+		// 	for (uint8_t j = 0; j < NEIGHBOUR_NUM+1; j++)
+		// 	{
+		// 		chprintf((BaseSequentialStream*)&SD1, "%d\t", (int)euclidean_d_m.distances[i][j]);
+		// 		chprintf((BaseSequentialStream*)&SD1, "| ");
+		// 	}
+
+		// 	chprintf((BaseSequentialStream*)&SD1, "\n");
+		// 	chprintf((BaseSequentialStream*)&SD1, "-------------------------------------\n");
+		// }
+
+		// chprintf((BaseSequentialStream*)&SD1, "\nXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n");
+
+
 
 		for (uint8_t i = 0; i < NEIGHBOUR_NUM+1; i++)
 		{
-			chprintf((BaseSequentialStream*)&SD1, "%d\t", (int)euclidean_d_m.addrs[i]);
-			chprintf((BaseSequentialStream*)&SD1, "| ");
-
 			for (uint8_t j = 0; j < NEIGHBOUR_NUM+1; j++)
-			{
-				chprintf((BaseSequentialStream*)&SD1, "%d\t", (int)euclidean_d_m.distances[i][j]);
-				chprintf((BaseSequentialStream*)&SD1, "| ");
-			}
+				chprintf((BaseSequentialStream*)&SD1, "%d,", (int)(euclidean_d_m.distances[i][j]*1000.0));
 
 			chprintf((BaseSequentialStream*)&SD1, "\n");
-			chprintf((BaseSequentialStream*)&SD1, "-------------------------------------\n");
 		}
 
-		chprintf((BaseSequentialStream*)&SD1, "\nXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n");
+		chprintf((BaseSequentialStream*)&SD1, "\n");
 
-		chThdSleepMilliseconds(2000);
+		chThdSleepMilliseconds(1000);
 	}
 }
 
