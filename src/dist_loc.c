@@ -1197,8 +1197,10 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				else if (evt == 0)
 					dw_ctrl_req = DW_RECV_TMO;
 				else
+				{
 					err_cnt++;
-				dw_soft_reset_rx();
+					dw_soft_reset_rx();
+				}
 				break;
 			case DW_SEND:
 				dw_start_tx(tx_ctrl, send_buf, dx_time, w4r);
@@ -1245,9 +1247,11 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				clean_send();
 				break;
 			case DW_TRX_ERR:
+				dw_soft_reset_rx();
+				chThdSleepMilliseconds(1);
 				state = dw_transceiver_off();
 				err_cnt++;
-				chThdSleepMilliseconds(TRX_RST_TM);
+				chThdSleepMilliseconds(3);
 				dw_ctrl_req = last_state;
 				break;
 			case DW_CTRL_YIELD:
@@ -1255,8 +1259,13 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				chEvtSignal(comm_thread, DW_COMM_OK_E);
 				chEvtWaitOne(DW_COMM_OK_E);
 				chMtxLock(&dw_mutex);
-				chThdSleepMilliseconds(TRX_RST_TM);
+				dw_soft_reset_rx();
+				chThdSleepMilliseconds(1);
 				state = dw_transceiver_off();
+				err_cnt++;
+				chThdSleepMilliseconds(3);
+				// chThdSleepMilliseconds(TRX_RST_TM);
+				// state = dw_transceiver_off();
 				break;
 			case DW_RECV_TMO:
 				memset(recv_buf, 0, sizeof(recv_buf));
