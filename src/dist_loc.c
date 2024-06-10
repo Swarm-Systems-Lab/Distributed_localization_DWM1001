@@ -45,6 +45,7 @@ uint8_t current_peer_c_n = 0;
 
 panadr_t panadr_own;
 tx_antd_t tx_antd;
+uint16_t rx_ant_d;
 
 uint32_t recv_tmo_usec;
 
@@ -621,7 +622,10 @@ void compute_distance(void)
 	uint64_t rx_time = 0;
 	memcpy(&rx_time, recv_info.dw_rx_time.RX_STAMP, sizeof(recv_info.dw_rx_time.RX_STAMP));
 	if (!rx_time)
+	{
 		memcpy(&rx_time, recv_info.dw_rx_time.RX_RAWST, sizeof(recv_info.dw_rx_time.RX_RAWST));
+		rx_time -= rx_ant_d;
+	}
 
 	memcpy(&m_tx_time, recv_buf, sizeof(m_tx_time));
 	memcpy(&m_rx_time, recv_buf+sizeof(m_tx_time), sizeof(m_rx_time));
@@ -1079,7 +1083,10 @@ int8_t respond_if_twr(void)
 	uint64_t rx_time = 0;
 	memcpy(&rx_time, recv_info.dw_rx_time.RX_STAMP, sizeof(recv_info.dw_rx_time.RX_STAMP));
 	if (!rx_time)
+	{
 		memcpy(&rx_time, recv_info.dw_rx_time.RX_RAWST, sizeof(recv_info.dw_rx_time.RX_RAWST));
+		rx_time -= rx_ant_d;
+	}
 	uint64_t delay_tx = (uint64_t)rx_time + (uint64_t)(65536*4000);
 	uint64_t tx_time = (uint64_t)delay_tx +(uint64_t)tx_antd;
 
@@ -1144,7 +1151,23 @@ void dw_setup(void)
 	dw_read(DW_REG_INFO.PAN_ADR, panadr_own.reg, DW_REG_INFO.PAN_ADR.size, 0);
 
 	tx_antd = 0;
-	uint16_t rx_ant_d = 0;
+	rx_ant_d = 0;
+
+	switch (panadr_own.short_addr)
+	{
+		case 5923:
+			tx_antd = 14539;
+			rx_ant_d = 18504;
+			break;
+		case 7090:
+			tx_antd = 14377;
+			rx_ant_d = 18299;
+			break;
+		case 1955:
+			tx_antd = 14089;
+			rx_ant_d = 17931;
+			break;
+	}
 	dw_write(DW_REG_INFO.LDE_CTRL, (uint8_t*)(&rx_ant_d), DW_SUBREG_INFO.LDE_RXANTD.size, DW_SUBREG_INFO.LDE_RXANTD.offset);
 	dw_write(DW_REG_INFO.TX_ANTD, (uint8_t*)(&tx_antd), DW_REG_INFO.TX_ANTD.size, 0);
 }
@@ -1386,7 +1409,11 @@ THD_FUNCTION(SYSTEM_STATUS, arg)
 
 		// chprintf((BaseSequentialStream*)&SD1, "\nXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n");
 
+		chprintf((BaseSequentialStream*)&SD1, "X");
+		for (uint8_t j = 0; j < NEIGHBOUR_NUM+1; j++)
+			chprintf((BaseSequentialStream*)&SD1, "%d,", (int)euclidean_d_m.addrs[j]);
 
+		chprintf((BaseSequentialStream*)&SD1, "\n");
 
 		for (uint8_t i = 0; i < NEIGHBOUR_NUM+1; i++)
 		{
