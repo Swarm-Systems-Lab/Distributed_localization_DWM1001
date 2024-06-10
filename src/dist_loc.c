@@ -621,10 +621,14 @@ void compute_distance(void)
 	uint64_t tx_time = dw_get_tx_time();
 	uint64_t rx_time = 0;
 	memcpy(&rx_time, recv_info.dw_rx_time.RX_STAMP, sizeof(recv_info.dw_rx_time.RX_STAMP));
-	if (!rx_time)
+	uint8_t lde_stat = 0;
+	memcpy(&lde_stat, recv_buf+sizeof(m_tx_time)+sizeof(m_rx_time), sizeof(lde_stat));
+	if (!rx_time || lde_stat)
 	{
 		memcpy(&rx_time, recv_info.dw_rx_time.RX_RAWST, sizeof(recv_info.dw_rx_time.RX_RAWST));
 		rx_time -= rx_ant_d;
+
+		rx_time = tx_time;
 	}
 
 	memcpy(&m_tx_time, recv_buf, sizeof(m_tx_time));
@@ -1078,6 +1082,8 @@ int8_t respond_if_twr(void)
 	w4r.mask = 0;
 	memset(dx_time.reg, 0, sizeof(dx_time.reg));
 
+	uint8_t lde_stat = 0xd;
+
 	recvd_header = decode_MHR(recv_buf);
 
 	uint64_t rx_time = 0;
@@ -1086,6 +1092,7 @@ int8_t respond_if_twr(void)
 	{
 		memcpy(&rx_time, recv_info.dw_rx_time.RX_RAWST, sizeof(recv_info.dw_rx_time.RX_RAWST));
 		rx_time -= rx_ant_d;
+		memcpy(send_buf+sizeof(rx_time)+sizeof(rx_time), &lde_stat, sizeof(lde_stat));
 	}
 	uint64_t delay_tx = (uint64_t)rx_time + (uint64_t)(65536*4000);
 	uint64_t tx_time = (uint64_t)delay_tx +(uint64_t)tx_antd;
@@ -1093,7 +1100,7 @@ int8_t respond_if_twr(void)
 	memcpy(send_buf, &tx_time, sizeof(tx_time));
 	memcpy(send_buf+sizeof(tx_time), &rx_time, sizeof(rx_time));
 
-	send_msg_meta.size = sizeof(tx_time)+sizeof(rx_time);
+	send_msg_meta.size = sizeof(tx_time)+sizeof(rx_time)+sizeof(lde_stat);
 	send_msg_meta.seq_ack_num = 0;
 	send_msg_meta.type = MT_D_RESP;
 	send_msg_meta.addr = recvd_header.src_addr;
@@ -1153,21 +1160,21 @@ void dw_setup(void)
 	tx_antd = 0;
 	rx_ant_d = 0;
 
-	switch (panadr_own.short_addr)
-	{
-		case 5923:
-			tx_antd = 14539;
-			rx_ant_d = 18504;
-			break;
-		case 7090:
-			tx_antd = 14377;
-			rx_ant_d = 18299;
-			break;
-		case 1955:
-			tx_antd = 14089;
-			rx_ant_d = 17931;
-			break;
-	}
+	// switch (panadr_own.short_addr)
+	// {
+	// 	case 5923:
+	// 		tx_antd = 14539;
+	// 		rx_ant_d = 18504;
+	// 		break;
+	// 	case 7090:
+	// 		tx_antd = 14377;
+	// 		rx_ant_d = 18299;
+	// 		break;
+	// 	case 1955:
+	// 		tx_antd = 14089;
+	// 		rx_ant_d = 17931;
+	// 		break;
+	// }
 	dw_write(DW_REG_INFO.LDE_CTRL, (uint8_t*)(&rx_ant_d), DW_SUBREG_INFO.LDE_RXANTD.size, DW_SUBREG_INFO.LDE_RXANTD.offset);
 	dw_write(DW_REG_INFO.TX_ANTD, (uint8_t*)(&tx_antd), DW_REG_INFO.TX_ANTD.size, 0);
 }
