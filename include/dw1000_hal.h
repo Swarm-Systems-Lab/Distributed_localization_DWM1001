@@ -1204,7 +1204,6 @@ typedef struct dw_tc_pg_conf
 	tc_pgtest_t tc_pgtest;
 } tc_pg_conf_t;
 
-// TODO not in order
 typedef struct dw_tx_cal_R
 {
 	tc_sarc_t tc_sarc;
@@ -1438,7 +1437,6 @@ typedef struct dw_lde_info
 	lde_ppampl_t lde_ppampl;
 } lde_info_t;
 
-// TODO not memory coherent WARNING
 typedef struct dw_lde_ctrl_R
 {
 	lde_conf_t lde_conf;
@@ -1503,7 +1501,6 @@ typedef struct evc_info
 	evc_tpw_t evc_tpw;
 } evc_info_t;
 
-// TODO not memory coherent	
 typedef struct dw_dig_diag_R
 {
 	evc_ctrl_t evc_ctrl;
@@ -1585,7 +1582,6 @@ typedef struct dw_psmc_ledc
 	};
 } pmsc_ledc_t;
 
-//TODO not memory coherent
 typedef struct dw_pmsc_R
 {
 	pmsc_ctrl0_t pmsc_ctrl0;
@@ -2108,5 +2104,3 @@ void dw_get_rx_config(rx_config_t* rx_config);
 void dw_get_tc_pg_config(tc_pg_conf_t* tc_pg_conf);
 
 void default_config(void);
-
-//TODO add function to include tx time in uwb message format ieee with delayed tx

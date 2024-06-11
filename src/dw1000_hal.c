@@ -182,7 +182,6 @@ void _dw_spi_transaction(uint8_t is_read_op,  uint8_t reg_id, uint8_t* buf, size
 	}
 	else
 	{
-		// TODO optimize try to use the buf without copying memory
 		size_t spi_trans_size = spi_header.size + count;
 		uint8_t spi_transaction[spi_trans_size];
 		memcpy(spi_transaction, (uint8_t*)&(spi_header.header), spi_header.size);
@@ -285,7 +284,6 @@ void dw_soft_reset_rx(void)
 
 void _dw_irq_handler(void)
 {
-// TODO check if event callbacks are in mutual exclusion
 	sys_status_t current_status;
 	current_status.mask = 1;
 
@@ -495,7 +493,6 @@ void default_config(void)
 	dw_read(DW_REG_INFO.SYS_CFG, sys_cfg.reg, DW_REG_INFO.SYS_CFG.size, 0);
 	sys_cfg.FFEN = 0b1;
 	sys_cfg.FFAD = 0b1;
-	//TODO auto reenable
 	sys_cfg.RXAUTR = 0b1;
 	dw_write(DW_REG_INFO.SYS_CFG, sys_cfg.reg, DW_REG_INFO.SYS_CFG.size, 0);
 

@@ -242,37 +242,53 @@ void load_lde(void);
 
 uint64_t load_ldotune(void);
 
+void set_irq_vector(void);
+
+void dw_setup(void);
+
+void read_frame(void);
+
 void clean_recvd(void);
 void clean_send(void);
-
-void init_peers(void);
-peer_connection_t* create_new_peer(uint16_t addr);
-peer_connection_t* get_peer(uint16_t addr);
-peer_connection_t* get_unconn_peer(void);
-peer_connection_t* get_conn_peer(void);
-void disconnect_peer(peer_connection_t* peer);
-
-void send_syn(void);
-void send_ack(peer_connection_t* peer);
-void send_last_message(peer_connection_t* peer);
-void send_d_req(void);
-
-void send_conn_msg(peer_connection_t* peer, uint8_t size, message_t type);
-
-int8_t respond_if_twr(void);
-
-void compute_distance(void);
 
 int32_t get_message(void);
 void prepare_message(void);
 
-peer_connection_t* search_peer(uint16_t addr);
+int8_t _get_address_index(uint16_t addr);
+float get_distance(uint16_t addr1, uint16_t addr2);
+void set_distance(uint16_t addr1, uint16_t addr2, float distance);
 
-void get_distance_to(uint16_t addr);
+void init_peers(void);
+peer_connection_t* create_new_peer(uint16_t addr);
+peer_connection_t* get_peer(uint16_t addr);
+peer_info_t* get_peer_info(uint16_t addr);
+peer_connection_t* get_unconn_peer(void);
+peer_connection_t* get_conn_peer(void);
 
-void set_irq_vector(void);
+void peer_tmo_cb(virtual_timer_t* vtp, void* arg);
+void connect_peer(peer_connection_t* peer);
+void disconnect_peer(peer_connection_t* peer);
 
-void read_frame(void);
+void send_syn(void);
+void send_broad(void);
+void send_ack(peer_connection_t* peer);
+void send_last_message(peer_connection_t* peer);
+void send_d_req(void);
+void send_d_req_ack(peer_connection_t* peer);
+void send_conn_msg(peer_connection_t* peer, uint8_t size, message_t type);
+void send_w4r_msg(peer_connection_t* peer, uint8_t size, message_t type);
+
+void process_req(void);
+void handle_twr_fail(void);
+void twr_handle(peer_connection_t* peer);
+void conn_handle(peer_connection_t* peer);
+
+void no_resp_action(void);
+void process_message(void);
+
+int8_t respond_if_twr(void);
+
+void compute_distance(void);
 
 void CPLOCK_handler(void);
 void ESYNCR_handler(void);

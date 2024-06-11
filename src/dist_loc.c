@@ -87,8 +87,6 @@ uint8_t twr_fail_cnt = 0;
 euclidean_d_m_t euclidean_d_m;
 float peer_positions[NEIGHBOUR_NUM+1][3];
 
-virtual_timer_t comm_watchdog;
-
 SPIConfig spi_cfg = 
 {
 	.end_cb = NULL,
@@ -182,6 +180,193 @@ void dw_reset(void)
 	spi1_unlock();
 }
 
+void set_fast_spi_freq(void)
+{
+	spi1_lock();	
+	spiStop(&SPID1);
+	spi_cfg.freq = NRF5_SPI_FREQ_8MBPS;
+	spiStart(&SPID1, &spi_cfg);
+	spi1_unlock();	
+}
+
+void set_slow_spi_freq(void)
+{
+	spi1_lock();	
+	spiStop(&SPID1);
+	spi_cfg.freq = NRF5_SPI_FREQ_2MBPS;
+	spiStart(&SPID1, &spi_cfg);
+	spi1_unlock();	
+}
+
+uint64_t get_hardware_id(void)
+{
+	uint64_t id = 0;
+	uint32_t part_id = 0;
+	uint32_t lot_id = 0;
+
+	dw_command_read_OTP(PARTID);
+	spi1_lock();
+	chThdSleepMicroseconds(1);
+	spi1_unlock();
+	dw_read(DW_REG_INFO.OTP_IF, (uint8_t*)(&part_id), sizeof(part_id), DW_SUBREG_INFO.OTP_RDAT.offset);
+	dw_command_read_OTP(LOTID);
+	spi1_lock();
+	chThdSleepMicroseconds(1);
+	spi1_unlock();
+	dw_read(DW_REG_INFO.OTP_IF, (uint8_t*)(&lot_id), sizeof(lot_id), DW_SUBREG_INFO.OTP_RDAT.offset);
+
+	id = (uint64_t)part_id | ((uint64_t)lot_id << 32);
+
+	return id;
+}
+
+void spi_hal_init(void)
+{
+	set_fast_spi_freq();
+	dw_set_spi_lock(spi1_lock);
+	dw_set_spi_unlock(spi1_unlock);
+	dw_set_spi_set_cs(spi1_set_cs);
+	dw_set_spi_clear_cs(spi1_clear_cs);
+	dw_set_spi_send(spi1_send);
+	dw_set_spi_recv(spi1_recv);
+}
+
+void load_lde(void)
+{
+	pmsc_ctrl0_t pmsc_ctrl0;
+	otp_ctrl_t otp_ctrl;
+
+	pmsc_ctrl0.mask = 0x0200;
+	pmsc_ctrl0.ADCCE = 0b1;
+	pmsc_ctrl0.SYSCLKS = 0b10; //125 MHz
+	otp_ctrl.mask = 0;
+	otp_ctrl.LDELOAD = 0b1;
+
+	dw_write(DW_REG_INFO.PMSC, pmsc_ctrl0.reg, 2, DW_SUBREG_INFO.PMSC_CTRL0.offset);
+	dw_write(DW_REG_INFO.OTP_IF, otp_ctrl.reg, DW_SUBREG_INFO.OTP_CTRL.size, DW_SUBREG_INFO.OTP_CTRL.offset);
+	spi1_lock();
+	chThdSleepMicroseconds(150);
+	spi1_unlock();
+	pmsc_ctrl0.mask = 0x0200;
+	dw_write(DW_REG_INFO.PMSC, pmsc_ctrl0.reg, 2, DW_SUBREG_INFO.PMSC_CTRL0.offset);
+}
+
+uint64_t load_ldotune(void)
+{
+	// TODO Check array sizes and otp address magic number
+	ldotune_t ldotune;
+	uint64_t ldotune64 = 0;
+	dw_command_read_OTP(LDOTUNE0);
+	spi1_lock();
+	chThdSleepMicroseconds(1);
+	spi1_unlock();
+	dw_read(DW_REG_INFO.OTP_IF, ldotune.reg, 4, DW_SUBREG_INFO.OTP_RDAT.offset);
+	
+	if (!ldotune.reg[0])
+		return 0;
+
+	dw_command_read_OTP(LDOTUNE1);
+	spi1_lock();
+	chThdSleepMicroseconds(1);
+	spi1_unlock();
+	dw_read(DW_REG_INFO.OTP_IF, ldotune.reg+4, 1, DW_SUBREG_INFO.OTP_RDAT.offset);
+
+	memcpy(&ldotune64, ldotune.reg, DW_SUBREG_INFO.LDO_TUNE.size);
+
+	return ldotune64;
+}
+
+void set_irq_vector(void)
+{
+	irq_vector._dw_CPLOCK_handler		= CPLOCK_handler;
+	irq_vector._dw_ESYNCR_handler		= ESYNCR_handler;
+	irq_vector._dw_AAT_handler			= AAT_handler;
+	irq_vector._dw_TXFRB_handler		= TXFRB_handler;
+	irq_vector._dw_TXPRS_handler		= TXPRS_handler;
+	irq_vector._dw_TXPHS_handler		= TXPHS_handler;
+	irq_vector._dw_TXFRS_handler		= TXFRS_handler;
+	irq_vector._dw_RXPRD_handler		= RXPRD_handler;
+	irq_vector._dw_RXFSDD_handler		= RXFSDD_handler;
+	irq_vector._dw_LDEDONE_handler		= LDEDONE_handler;
+	irq_vector._dw_RXPHD_handler		= RXPHD_handler;
+	irq_vector._dw_RXPHE_handler		= RXPHE_handler;
+	irq_vector._dw_RXDFR_handler		= RXDFR_handler;
+	irq_vector._dw_RXFCG_handler		= RXFCG_handler;
+	irq_vector._dw_RXFCE_handler		= RXFCE_handler;
+	irq_vector._dw_RXRFSL_handler		= RXRFSL_handler;
+	irq_vector._dw_RXRFTO_handler		= RXRFTO_handler;
+	irq_vector._dw_LDEERR_handler		= LDEERR_handler;
+	irq_vector._dw_RXOVRR_handler		= RXOVRR_handler;
+	irq_vector._dw_RXPTO_handler		= RXPTO_handler;
+	irq_vector._dw_GPIOIRQ_handler		= GPIOIRQ_handler;
+	irq_vector._dw_SLP2INIT_handler		= SLP2INIT_handler;
+	irq_vector._dw_RFPLL_LL_handler		= RFPLLLL_handler;
+	irq_vector._dw_CLKPLL_LL_handler	= CPLLLL_handler;
+	irq_vector._dw_RXSFDTO_handler		= RXSFDTO_handler;
+	irq_vector._dw_HPDWARN_handler		= HPDWARN_handler;
+	irq_vector._dw_TXBERR_handler		= TXBERR_handler;
+	irq_vector._dw_AFFREJ_handler		= AFFREJ_handler;
+}
+
+void dw_setup(void)
+{
+	dw_reset();
+	spi_hal_init();
+	default_config();
+	load_lde();
+
+	sys_mask_t irq_mask;
+
+	irq_mask.mask = 0U;
+	irq_mask.MTXFRS = 0b1;
+	irq_mask.MRXFCG = 0b1;
+	//irq_mask.MLDEDONE = 0b1;
+	// irq_mask.MRXRFTO = 0b1;
+	irq_mask.MRXPHE = 0b1;
+	irq_mask.MRXFCE = 0b1;
+	irq_mask.MRXRFSL = 0b1;
+	//irq_mask.MLDEERR = 0b1;
+	irq_mask.MAFFREJ = 0b1;	
+
+	dw_set_irq(irq_mask);
+
+	// sys_cfg_t cfdf;
+	// cfdf.mask = 0;
+	// cfdf.HIRQ_POL = 1;
+	// cfdf.DIS_DRXB = 1;
+	// cfdf.RXWTOE = 1;
+	// dw_write(DW_REG_INFO.SYS_CFG, cfdf.reg, DW_REG_INFO.SYS_CFG.size, 0);
+	// uint8_t fwto[2] = {0xFF, 0xFE};
+	// dw_write(DW_REG_INFO.RX_FWTO, fwto, DW_REG_INFO.RX_FWTO.size, 0);
+	// dw_read(DW_REG_INFO.RX_FWTO, fwto, DW_REG_INFO.RX_FWTO.size, 0);
+
+	uint64_t id = get_hardware_id();
+	srand(id);
+	dw_write(DW_REG_INFO.PAN_ADR, (uint8_t*)(&id), 2, 0);
+	dw_read(DW_REG_INFO.PAN_ADR, panadr_own.reg, DW_REG_INFO.PAN_ADR.size, 0);
+
+	tx_antd = 0;
+	rx_ant_d = 0;
+
+	switch (panadr_own.short_addr)
+	{
+		case 5923:
+			tx_antd = 13659;
+			rx_ant_d = 18523;
+			break;
+		case 7090:
+			tx_antd = 14565;
+			rx_ant_d = 18537;
+			break;
+		case 1955:
+			tx_antd = 14535;
+			rx_ant_d = 18500;
+			break;
+	}
+	dw_write(DW_REG_INFO.LDE_CTRL, (uint8_t*)(&rx_ant_d), DW_SUBREG_INFO.LDE_RXANTD.size, DW_SUBREG_INFO.LDE_RXANTD.offset);
+	dw_write(DW_REG_INFO.TX_ANTD, (uint8_t*)(&tx_antd), DW_REG_INFO.TX_ANTD.size, 0);
+}
+
 void barrier(void)
 {
 	uint8_t release = 1;
@@ -207,42 +392,6 @@ void barrier_init(uint8_t n)
 	barrier_cnt = 0;
 }
 
-// Function to get the index of an address in the addrs array
-int8_t _get_address_index(uint16_t addr) 
-{
-	for (uint8_t i = 0; i < NEIGHBOUR_NUM + 1; i++) 
-	{
-		if (euclidean_d_m.addrs[i] == addr) 
-			return i;
-	}
-	return -1; // Address not found
-}
-
-// Function to get the distance between two nodes
-float get_distance(uint16_t addr1, uint16_t addr2) 
-{
- 	int8_t index1 = _get_address_index(addr1);
-  	int8_t index2 = _get_address_index(addr2);
-
-	if (index1 == -1 || index2 == -1) 
-    	return -1.0f; // Indicate invalid address
-
-	return euclidean_d_m.distances[index1][index2];
-}
-
-// Function to set the distance between two nodes
-void set_distance(uint16_t addr1, uint16_t addr2, float distance) 
-{
-  	int8_t index1 = _get_address_index(addr1);
-  	int8_t index2 = _get_address_index(addr2);
-
-  	if (index1 == -1 || index2 == -1)
-		return; // Do nothing if address is invalid
-
-	if (distance > 0.0)
-		euclidean_d_m.distances[index1][index2] = distance;
-}
-
 // Function to initialize the matrix
 void init_d_m(void) 
 {
@@ -263,25 +412,6 @@ void read_frame(void)
 	_dw_spi_transaction(1, DW_REG_INFO.RX_TIME.id, recv_info.dw_rx_time.reg, DW_REG_INFO.RX_TIME.size, 0);
 	_dw_spi_transaction(1, DW_REG_INFO.RX_BUFFER.id, recv_buf, recv_info.dw_rx_finfo.RXFLEN, 0);
 	recv_size = recv_info.dw_rx_finfo.RXFLEN-2; // TODO 2 magic number FCS
-}
-
-void reset_comms(virtual_timer_t* vtp, void* args)
-{
-	init_peers();
-	recv_tmo_usec = (rand()&0xF000)+40000;
- 	send_msg_meta = send_msg_meta_def;
-	recvd_type = 0;
- 	memset(recv_buf, 0, sizeof(recv_buf));
- 	memset(send_buf, 0, sizeof(send_buf));
-	dw_ctrl_req = DW_CTRL_YIELD;
-	loc_state = LOC_INIT;
-	loc_action = LOC_NO_RESP;
-	twr_state = TWR_NO_TWR;
-	twr_peer = NULL;
-	twr_peer_seq = 0;
-	messages_since_broad = 0;
-	recv_tmo_cnt = 0;
-	twr_fail_cnt = 0;
 }
 
 int32_t get_message(void)
@@ -361,13 +491,10 @@ void init_peers(void)
 
 peer_connection_t* create_new_peer(uint16_t addr)
 {
-	uint8_t pos;
-
 	toggle_led(green);
 
 	for (size_t i = 0; i < NEIGHBOUR_NUM; i++)
 	{
-		pos = i;
 		if (peers[i].peer_addr == addr)
 			return NULL;
 		if (peers[i].peer_addr == 0)
@@ -377,9 +504,8 @@ peer_connection_t* create_new_peer(uint16_t addr)
 			return peers+i;
 		}
 	}
-
-	if (pos == NEIGHBOUR_NUM-1)
-		return NULL;
+		
+	return NULL;
 }
 
 peer_connection_t* get_peer(uint16_t addr)
@@ -402,7 +528,7 @@ peer_info_t* get_peer_info(uint16_t addr)
 	return NULL;
 }
 
-void inc_ttl(virtual_timer_t* vtp, void* arg)
+void peer_tmo_cb(virtual_timer_t* vtp, void* arg)
 {
 	disconnect_peer((peer_connection_t*)arg);
 }
@@ -412,7 +538,7 @@ void connect_peer(peer_connection_t* peer)
 	peer->seq_ack_n = 0x11;
 	current_peer_c_n++;
 	peer->ttl = 0;
-	chVTSet(&(peer->tmo_timer), TIME_S2I(5), inc_ttl, peer);
+	chVTSet(&(peer->tmo_timer), TIME_S2I(5), peer_tmo_cb, peer);
 }
 
 void disconnect_peer(peer_connection_t* peer)
@@ -658,6 +784,39 @@ void compute_distance(void)
 	}
 }
 
+int8_t _get_address_index(uint16_t addr)
+{
+	for (uint8_t i = 0; i < NEIGHBOUR_NUM + 1; i++) 
+	{
+		if (euclidean_d_m.addrs[i] == addr) 
+			return i;
+	}
+	return -1; // Address not found
+}
+
+float get_distance(uint16_t addr1, uint16_t addr2)
+{
+ 	int8_t index1 = _get_address_index(addr1);
+  	int8_t index2 = _get_address_index(addr2);
+
+	if (index1 == -1 || index2 == -1) 
+    	return -1.0f; // Indicate invalid address
+
+	return euclidean_d_m.distances[index1][index2];
+}
+
+void set_distance(uint16_t addr1, uint16_t addr2, float distance)
+{
+  	int8_t index1 = _get_address_index(addr1);
+  	int8_t index2 = _get_address_index(addr2);
+
+  	if (index1 == -1 || index2 == -1)
+		return; // Do nothing if address is invalid
+
+	if (distance > 0.0)
+		euclidean_d_m.distances[index1][index2] = distance;
+}
+
 void handle_twr_fail(void)
 {
 	loc_state = LOC_COMM;
@@ -674,19 +833,18 @@ void twr_handle(peer_connection_t* peer)
 	float distance = 0.0;
 
 	if (twr_state != TWR_NO_TWR && peer != twr_peer)
-		recvd_type == 0;
+		recvd_type = 0;
 
 	loc_action = LOC_RESP_NOW;
 
+	distance = -1.0;
 	switch (recvd_type)
 	{
-		distance = -1.0;
 		case MT_D_REQ:
 			if (/*((peer->seq_ack_n&0x10)>>4) == (recvd_header.seq_num&0x01) &&*/ (twr_state == TWR_NO_TWR || twr_state == TWR_REQ_SENT))
 			{
 				if (twr_state == TWR_REQ_SENT && peer->peer_addr < panadr_own.short_addr)
 				{
-					//chprintf((BaseSequentialStream*)&SD1, "gentle\n");
 					loc_action = LOC_NO_RESP;
 				}
 				else
@@ -702,7 +860,6 @@ void twr_handle(peer_connection_t* peer)
 			else
 			{
 				handle_twr_fail();
-				//chprintf((BaseSequentialStream*)&SD1, "twr_state: %d recvd_header.seq_num: %d peer->seq_ack_n: %d\n", twr_state, recvd_header.seq_num, peer->seq_ack_n);
 			}
 			break;
 		case MT_D_REQ_ACK:
@@ -939,19 +1096,17 @@ void process_message(void)
 		if (recvd_type == 0)
 		{
 			recv_tmo_cnt++;
-			//chprintf((BaseSequentialStream*)&SD1, "timeout\n");
 			if (loc_state == LOC_TWR)
 				handle_twr_fail();
 		}
 		else
 		{
-			//chprintf((BaseSequentialStream*)&SD1, "recv: %d\n", recvd_type);
 			peer = get_peer(recvd_header.src_addr);
 			if (peer != NULL && peer->ttl < PEER_CONN_TTL)
 			{
 				peer_valid = 1;
 				chVTReset(&(peer->tmo_timer));
-				chVTSet(&(peer->tmo_timer), TIME_S2I(5), inc_ttl, peer);
+				chVTSet(&(peer->tmo_timer), TIME_S2I(5), peer_tmo_cb, peer);
 			}
 				
 			if ((recvd_type&0xF0) == 0x20)
@@ -986,10 +1141,6 @@ void process_message(void)
 	// 	if (loc_action != LOC_RESP_NOW)
 	// 		resp_action();
 	// }
-
-	// chVTReset(&comm_watchdog);
-	// chVTSet(&comm_watchdog, CH_TIMEOUT, reset_comms, NULL);
-	//chprintf((BaseSequentialStream*)&SD1, "send: %d\n", send_msg_meta.type);
 }
 
 THD_FUNCTION(COMMS, arg)
@@ -999,7 +1150,6 @@ THD_FUNCTION(COMMS, arg)
 	comm_thread = chThdGetSelfX();
 	comm_state_t comm_state = COMM_RECV;
 	eventmask_t evt = 0;
-	int32_t message_ret = 0;
 	recv_tmo_usec = (rand()&0xF000)+40000;
 
 	init_peers();
@@ -1027,7 +1177,7 @@ THD_FUNCTION(COMMS, arg)
 				evt = chEvtWaitOneTimeout(DW_COMM_OK_E, CH_TIMEOUT);
 				if (evt == DW_COMM_OK_E)
 				{
-					message_ret = get_message();
+					get_message();
 					comm_state = COMM_IDLE;
 				}
 				else
@@ -1120,65 +1270,6 @@ int8_t respond_if_twr(void)
 		
 }
 
-void dw_setup(void)
-{
-	dw_reset();
-	spi_hal_init();
-	default_config();
-	load_lde();
-
-	sys_mask_t irq_mask;
-
-	irq_mask.mask = 0U;
-	irq_mask.MTXFRS = 0b1;
-	irq_mask.MRXFCG = 0b1;
-	//irq_mask.MLDEDONE = 0b1;
-	// irq_mask.MRXRFTO = 0b1;
-	irq_mask.MRXPHE = 0b1;
-	irq_mask.MRXFCE = 0b1;
-	irq_mask.MRXRFSL = 0b1;
-	//irq_mask.MLDEERR = 0b1;
-	irq_mask.MAFFREJ = 0b1;	
-
-	dw_set_irq(irq_mask);
-
-	// sys_cfg_t cfdf;
-	// cfdf.mask = 0;
-	// cfdf.HIRQ_POL = 1;
-	// cfdf.DIS_DRXB = 1;
-	// cfdf.RXWTOE = 1;
-	// dw_write(DW_REG_INFO.SYS_CFG, cfdf.reg, DW_REG_INFO.SYS_CFG.size, 0);
-	// uint8_t fwto[2] = {0xFF, 0xFE};
-	// dw_write(DW_REG_INFO.RX_FWTO, fwto, DW_REG_INFO.RX_FWTO.size, 0);
-	// dw_read(DW_REG_INFO.RX_FWTO, fwto, DW_REG_INFO.RX_FWTO.size, 0);
-
-	uint64_t id = get_hardware_id();
-	srand(id);
-	dw_write(DW_REG_INFO.PAN_ADR, (uint8_t*)(&id), 2, 0);
-	dw_read(DW_REG_INFO.PAN_ADR, panadr_own.reg, DW_REG_INFO.PAN_ADR.size, 0);
-
-	tx_antd = 0;
-	rx_ant_d = 0;
-
-	// switch (panadr_own.short_addr)
-	// {
-	// 	case 5923:
-	// 		tx_antd = 14539;
-	// 		rx_ant_d = 18504;
-	// 		break;
-	// 	case 7090:
-	// 		tx_antd = 14377;
-	// 		rx_ant_d = 18299;
-	// 		break;
-	// 	case 1955:
-	// 		tx_antd = 14089;
-	// 		rx_ant_d = 17931;
-	// 		break;
-	// }
-	dw_write(DW_REG_INFO.LDE_CTRL, (uint8_t*)(&rx_ant_d), DW_SUBREG_INFO.LDE_RXANTD.size, DW_SUBREG_INFO.LDE_RXANTD.offset);
-	dw_write(DW_REG_INFO.TX_ANTD, (uint8_t*)(&tx_antd), DW_REG_INFO.TX_ANTD.size, 0);
-}
-
 THD_FUNCTION(DW_CONTROLLER, arg)
 {
 	(void)arg;
@@ -1189,7 +1280,6 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	tx_fctrl_t tx_ctrl;
 	ack_resp_t_t w4r;
 	eventmask_t evt = 0;
-	sys_state_t state;
 	memset(tx_ctrl.reg, 0, sizeof(tx_ctrl.reg));
 	tx_ctrl.TXBR = BR_6_8MBPS;
 	tx_ctrl.TXPRF = PRF_16MHZ;
@@ -1279,7 +1369,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 			case DW_TRX_ERR:
 				dw_soft_reset_rx();
 				chThdSleepMilliseconds(1);
-				state = dw_transceiver_off();
+				dw_transceiver_off();
 				err_cnt++;
 				chThdSleepMilliseconds(3);
 				dw_ctrl_req = last_state;
@@ -1291,7 +1381,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				chMtxLock(&dw_mutex);
 				dw_soft_reset_rx();
 				chThdSleepMilliseconds(1);
-				state = dw_transceiver_off();
+				dw_transceiver_off();
 				err_cnt++;
 				chThdSleepMilliseconds(3);
 				// chThdSleepMilliseconds(TRX_RST_TM);
@@ -1325,18 +1415,18 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 
 void update_peer_pos(void)
 {
-	float d = peers_info[0].calc_distance;
-	float d0 = get_distance(panadr_own.short_addr, peers[1].peer_addr);
-	float d1 = get_distance(peers[0].peer_addr, peers[1].peer_addr);
+	float d = (get_distance(panadr_own.short_addr, peers[0].peer_addr) + get_distance(peers[0].peer_addr, panadr_own.short_addr))/2.0f;;
+	float d0 = (get_distance(panadr_own.short_addr, peers[1].peer_addr) + get_distance(peers[1].peer_addr, panadr_own.short_addr))/2.0f;
+	float d1 = (get_distance(peers[0].peer_addr, peers[1].peer_addr) + get_distance(peers[1].peer_addr, peers[0].peer_addr))/2.0f;
 
-	d = 4;
-	d0 = (float)sqrt(13.0);
-	d1 = (float)sqrt(13.0);
+	if (d > 0.1)
+		peer_positions[1][0] = d;
 
-	peer_positions[1][0] = d;
-
-	peer_positions[2][0] = (d*d+d0*d0-d1*d1)/(2*d);
-	peer_positions[2][1] = (float)(sqrt((double)(d0*d0 - (peer_positions[2][0])*(peer_positions[2][0]))));
+	if (d0 > 0.1 && d1 > 0.1)
+	{
+		peer_positions[2][0] = (d*d+d0*d0-d1*d1)/(2*d);
+		peer_positions[2][1] = (float)(sqrt((double)(d0*d0 - (peer_positions[2][0])*(peer_positions[2][0]))));
+	}
 }
 
 THD_FUNCTION(SYSTEM_STATUS, arg)
@@ -1351,8 +1441,11 @@ THD_FUNCTION(SYSTEM_STATUS, arg)
 	peer_positions[0][0] = 0;
 	peer_positions[0][1] = 0;
 	peer_positions[0][2] = 0;
+	peer_positions[1][0] = 0;
 	peer_positions[1][1] = 0;
 	peer_positions[1][2] = 0;
+	peer_positions[2][0] = 0;
+	peer_positions[2][1] = 0;
 	peer_positions[2][2] = 0;
 
 	sdStart(&SD1, &serial_cfg);
@@ -1360,7 +1453,6 @@ THD_FUNCTION(SYSTEM_STATUS, arg)
 	barrier();
 	euclidean_d_m.addrs[0] = panadr_own.short_addr;
 
-	//chVTSet(&comm_watchdog, CH_TIMEOUT, reset_comms, NULL);
 	while (true)
 	{
 		for (uint8_t i = 1; i < NEIGHBOUR_NUM+1; i++)
@@ -1382,12 +1474,10 @@ THD_FUNCTION(SYSTEM_STATUS, arg)
 			// chprintf((BaseSequentialStream*)&SD1, "d: %d\n", (int)peers_info[i].distance);
 		}
 
-		// for (uint8_t i = 1; i < NEIGHBOUR_NUM+1; i++)
-		// {
-		// 	chprintf((BaseSequentialStream*)&SD1, "(%d,%d,%d)\n", (int)peer_positions[0][0], (int)peer_positions[0][1], (int)peer_positions[0][2]);
-		// 	chprintf((BaseSequentialStream*)&SD1, "(%d,%d,%d)\n", (int)peer_positions[1][0], (int)peer_positions[1][1], (int)peer_positions[1][2]);
-		// 	chprintf((BaseSequentialStream*)&SD1, "(%d,%d,%d)\n", (int)peer_positions[2][0], (int)peer_positions[2][1], (int)peer_positions[2][2]);
-		// }
+		chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[0][0], (int)peer_positions[0][1]);
+		chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[1][0], (int)peer_positions[1][1]);
+		chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[2][0], (int)peer_positions[2][1]);
+		chprintf((BaseSequentialStream*)&SD1, "\n");
 
 		// chprintf((BaseSequentialStream*)&SD1, "\n\t| ");
 
@@ -1416,152 +1506,24 @@ THD_FUNCTION(SYSTEM_STATUS, arg)
 
 		// chprintf((BaseSequentialStream*)&SD1, "\nXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n");
 
-		chprintf((BaseSequentialStream*)&SD1, "X");
-		for (uint8_t j = 0; j < NEIGHBOUR_NUM+1; j++)
-			chprintf((BaseSequentialStream*)&SD1, "%d,", (int)euclidean_d_m.addrs[j]);
+		// chprintf((BaseSequentialStream*)&SD1, "X");
+		// for (uint8_t j = 0; j < NEIGHBOUR_NUM+1; j++)
+		// 	chprintf((BaseSequentialStream*)&SD1, "%d,", (int)euclidean_d_m.addrs[j]);
 
-		chprintf((BaseSequentialStream*)&SD1, "\n");
+		// chprintf((BaseSequentialStream*)&SD1, "\n");
 
-		for (uint8_t i = 0; i < NEIGHBOUR_NUM+1; i++)
-		{
-			for (uint8_t j = 0; j < NEIGHBOUR_NUM+1; j++)
-				chprintf((BaseSequentialStream*)&SD1, "%d,", (int)(euclidean_d_m.distances[i][j]*1000.0));
+		// for (uint8_t i = 0; i < NEIGHBOUR_NUM+1; i++)
+		// {
+		// 	for (uint8_t j = 0; j < NEIGHBOUR_NUM+1; j++)
+		// 		chprintf((BaseSequentialStream*)&SD1, "%d,", (int)(euclidean_d_m.distances[i][j]*1000.0));
 
-			chprintf((BaseSequentialStream*)&SD1, "\n");
-		}
+		// 	chprintf((BaseSequentialStream*)&SD1, "\n");
+		// }
 
-		chprintf((BaseSequentialStream*)&SD1, "\n");
+		// chprintf((BaseSequentialStream*)&SD1, "\n");
 
 		chThdSleepMilliseconds(1000);
 	}
-}
-
-void set_fast_spi_freq(void)
-{
-	spi1_lock();	
-	spiStop(&SPID1);
-	spi_cfg.freq = NRF5_SPI_FREQ_8MBPS;
-	spiStart(&SPID1, &spi_cfg);
-	spi1_unlock();	
-}
-
-void set_slow_spi_freq(void)
-{
-	spi1_lock();	
-	spiStop(&SPID1);
-	spi_cfg.freq = NRF5_SPI_FREQ_2MBPS;
-	spiStart(&SPID1, &spi_cfg);
-	spi1_unlock();	
-}
-
-uint64_t get_hardware_id(void)
-{
-	uint64_t id = 0;
-	uint32_t part_id = 0;
-	uint32_t lot_id = 0;
-
-	dw_command_read_OTP(PARTID);
-	spi1_lock();
-	chThdSleepMicroseconds(1);
-	spi1_unlock();
-	dw_read(DW_REG_INFO.OTP_IF, (uint8_t*)(&part_id), sizeof(part_id), DW_SUBREG_INFO.OTP_RDAT.offset);
-	dw_command_read_OTP(LOTID);
-	spi1_lock();
-	chThdSleepMicroseconds(1);
-	spi1_unlock();
-	dw_read(DW_REG_INFO.OTP_IF, (uint8_t*)(&lot_id), sizeof(lot_id), DW_SUBREG_INFO.OTP_RDAT.offset);
-
-	id = (uint64_t)part_id | ((uint64_t)lot_id << 32);
-
-	return id;
-}
-
-void spi_hal_init(void)
-{
-	set_fast_spi_freq();
-	dw_set_spi_lock(spi1_lock);
-	dw_set_spi_unlock(spi1_unlock);
-	dw_set_spi_set_cs(spi1_set_cs);
-	dw_set_spi_clear_cs(spi1_clear_cs);
-	dw_set_spi_send(spi1_send);
-	dw_set_spi_recv(spi1_recv);
-}
-
-void load_lde(void)
-{
-	pmsc_ctrl0_t pmsc_ctrl0;
-	otp_ctrl_t otp_ctrl;
-
-	pmsc_ctrl0.mask = 0x0200;
-	pmsc_ctrl0.ADCCE = 0b1;
-	pmsc_ctrl0.SYSCLKS = 0b10; //125 MHz
-	otp_ctrl.mask = 0;
-	otp_ctrl.LDELOAD = 0b1;
-
-	dw_write(DW_REG_INFO.PMSC, pmsc_ctrl0.reg, 2, DW_SUBREG_INFO.PMSC_CTRL0.offset);
-	dw_write(DW_REG_INFO.OTP_IF, otp_ctrl.reg, DW_SUBREG_INFO.OTP_CTRL.size, DW_SUBREG_INFO.OTP_CTRL.offset);
-	spi1_lock();
-	chThdSleepMicroseconds(150);
-	spi1_unlock();
-	pmsc_ctrl0.mask = 0x0200;
-	dw_write(DW_REG_INFO.PMSC, pmsc_ctrl0.reg, 2, DW_SUBREG_INFO.PMSC_CTRL0.offset);
-}
-
-uint64_t load_ldotune(void)
-{
-	// TODO Check array sizes and otp address magic number
-	ldotune_t ldotune;
-	uint64_t ldotune64 = 0;
-	dw_command_read_OTP(LDOTUNE0);
-	spi1_lock();
-	chThdSleepMicroseconds(1);
-	spi1_unlock();
-	dw_read(DW_REG_INFO.OTP_IF, ldotune.reg, 4, DW_SUBREG_INFO.OTP_RDAT.offset);
-	
-	if (!ldotune.reg[0])
-		return 0;
-
-	dw_command_read_OTP(LDOTUNE1);
-	spi1_lock();
-	chThdSleepMicroseconds(1);
-	spi1_unlock();
-	dw_read(DW_REG_INFO.OTP_IF, ldotune.reg+4, 1, DW_SUBREG_INFO.OTP_RDAT.offset);
-
-	memcpy(&ldotune64, ldotune.reg, DW_SUBREG_INFO.LDO_TUNE.size);
-
-	return ldotune64;
-}
-
-void set_irq_vector(void)
-{
-	irq_vector._dw_CPLOCK_handler		= CPLOCK_handler;
-	irq_vector._dw_ESYNCR_handler		= ESYNCR_handler;
-	irq_vector._dw_AAT_handler			= AAT_handler;
-	irq_vector._dw_TXFRB_handler		= TXFRB_handler;
-	irq_vector._dw_TXPRS_handler		= TXPRS_handler;
-	irq_vector._dw_TXPHS_handler		= TXPHS_handler;
-	irq_vector._dw_TXFRS_handler		= TXFRS_handler;
-	irq_vector._dw_RXPRD_handler		= RXPRD_handler;
-	irq_vector._dw_RXFSDD_handler		= RXFSDD_handler;
-	irq_vector._dw_LDEDONE_handler		= LDEDONE_handler;
-	irq_vector._dw_RXPHD_handler		= RXPHD_handler;
-	irq_vector._dw_RXPHE_handler		= RXPHE_handler;
-	irq_vector._dw_RXDFR_handler		= RXDFR_handler;
-	irq_vector._dw_RXFCG_handler		= RXFCG_handler;
-	irq_vector._dw_RXFCE_handler		= RXFCE_handler;
-	irq_vector._dw_RXRFSL_handler		= RXRFSL_handler;
-	irq_vector._dw_RXRFTO_handler		= RXRFTO_handler;
-	irq_vector._dw_LDEERR_handler		= LDEERR_handler;
-	irq_vector._dw_RXOVRR_handler		= RXOVRR_handler;
-	irq_vector._dw_RXPTO_handler		= RXPTO_handler;
-	irq_vector._dw_GPIOIRQ_handler		= GPIOIRQ_handler;
-	irq_vector._dw_SLP2INIT_handler		= SLP2INIT_handler;
-	irq_vector._dw_RFPLL_LL_handler		= RFPLLLL_handler;
-	irq_vector._dw_CLKPLL_LL_handler	= CPLLLL_handler;
-	irq_vector._dw_RXSFDTO_handler		= RXSFDTO_handler;
-	irq_vector._dw_HPDWARN_handler		= HPDWARN_handler;
-	irq_vector._dw_TXBERR_handler		= TXBERR_handler;
-	irq_vector._dw_AFFREJ_handler		= AFFREJ_handler;
 }
 
 void CPLOCK_handler(void)
