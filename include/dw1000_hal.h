@@ -18,7 +18,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TRX_RST_TM	10
+#define TRX_RST_TM		10
+#define CAR_INT_CTE 	((998.4e6/2.0/1024.0/131072.0) * (-1.0e6/6489.6e6) / 1.0e6)
+#define DW_TIME_U		(499.2e6*128.0)
+#define C_ATM			299702547
 
 extern uint64_t hardware_id;
 

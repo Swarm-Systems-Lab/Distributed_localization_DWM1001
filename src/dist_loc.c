@@ -400,7 +400,7 @@ void init_d_m(void)
 	{
 		euclidean_d_m.addrs[i] = 0;
 		for (uint8_t j = 0; j < NEIGHBOUR_NUM + 1; j++) 
-			euclidean_d_m.distances[i][j] = -1.0f;
+			euclidean_d_m.distances[i][j] = MIN_DIST;
 
 		euclidean_d_m.distances[i][i] = 0.0f;
 	}
@@ -480,8 +480,8 @@ void init_peers(void)
 		peers[i].last_message_size = 0;
 		peers[i].last_message_type = 0;
 		peers_info[i].conn = peers+i;
-		peers_info[i].calc_distance = -1.0;
-		peers_info[i].recvd_distance = -1.0;
+		peers_info[i].calc_distance = MIN_DIST;
+		peers_info[i].recvd_distance = MIN_DIST;
 		peers_info[i].d_measures = 0;
 		peers_info[i].peer_id = i;
 	}
@@ -546,8 +546,8 @@ void disconnect_peer(peer_connection_t* peer)
 	peer_info_t* peer_info = get_peer_info(peer->peer_addr);
 	if (peer->ttl < 255)
 	{
-		peer_info->calc_distance = -1.0;
-		peer_info->recvd_distance = -1.0;
+		peer_info->calc_distance = MIN_DIST;
+		peer_info->recvd_distance = MIN_DIST;
 		peer_info->d_measures = 0;
 		peer->peer_addr = 0;
 		peer->seq_ack_n = 0;
@@ -564,7 +564,7 @@ peer_connection_t* get_unconn_peer(void)
 	if ((current_peer_n-current_peer_c_n) <= 0)
 		return NULL;
 
-	uint8_t rnd_peer = rand() / (RAND_MAX/(current_peer_n-current_peer_c_n) + 1);
+	uint8_t rnd_peer = rand() / (RAND_MAX/(current_peer_n-current_peer_c_n));
 	int16_t tried_cnt = -1;
 
 	for (size_t i = 0; i < NEIGHBOUR_NUM; i++)
@@ -583,7 +583,7 @@ peer_connection_t* get_conn_peer(void)
 	if (current_peer_c_n == 0)
 		return NULL;
 
-	uint8_t d_measures_min = 255;
+	uint32_t d_measures_min = 1<<(sizeof(d_measures_min)-1);
 	peer_connection_t* peer_min = NULL;
 
 	for (size_t i = 0; i < NEIGHBOUR_NUM; i++)
@@ -740,6 +740,20 @@ void process_req(void)
 	}
 }
 
+void update_peer_distance(peer_info_t* peer_info, float dist)
+{
+	if (dist+1e-6 < MIN_DIST || dist >= MAX_DIST)
+		return;
+	
+	if (peer_info->calc_distance == MIN_DIST || peer_info->d_measures == 0)
+		peer_info->calc_distance = dist;
+	else
+		peer_info->calc_distance = (peer_info->calc_distance)*NEIGHBOUR_NUM/(NEIGHBOUR_NUM+1) + dist/(NEIGHBOUR_NUM+1);
+
+	peer_info->d_measures++;
+	chprintf((BaseSequentialStream*)&SD1, "A:%d\n", (int)(dist*10000.0));
+}
+
 void compute_distance(void)
 {
 	toggle_led(blue);
@@ -747,6 +761,7 @@ void compute_distance(void)
 	uint64_t tx_time = dw_get_tx_time();
 	uint64_t rx_time = 0;
 	memcpy(&rx_time, recv_info.dw_rx_time.RX_STAMP, sizeof(recv_info.dw_rx_time.RX_STAMP));
+
 	uint8_t lde_stat = 0;
 	memcpy(&lde_stat, recv_buf+sizeof(m_tx_time)+sizeof(m_rx_time), sizeof(lde_stat));
 	if (!rx_time || lde_stat)
@@ -763,25 +778,18 @@ void compute_distance(void)
 	int64_t rt_init = (rx_time) - (tx_time);
 	int64_t rt_resp = (m_tx_time) - (m_rx_time);
 
-	float clock_offset_r = dw_get_car_int() * ((998.4e6/2.0/1024.0/131072.0) * (-1.0e6/6489.6e6) / 1.0e6);
+	float clock_offset_r = dw_get_car_int() * CAR_INT_CTE;
 	rt_resp *= (1.0f - clock_offset_r);
 
 	double tof = (rt_init - rt_resp)/2.0f;
-	tof = tof * (1.0f/(float)(499.2e6*128.0));
+	tof *= (1.0f/(float)DW_TIME_U);
+
+	double distance = tof * C_ATM;
 
 	peer_info_t* peer_info = get_peer_info(recvd_header.src_addr);
 
-	if (tof > 0.0 && tof < 1e-5 && peer_info)
-	{
-		double distance = tof * 299702547;
-		distance *= 100;
-		if (peer_info->calc_distance > 0)
-			peer_info->calc_distance = (peer_info->calc_distance)*NEIGHBOUR_NUM/(NEIGHBOUR_NUM+1) + distance/(NEIGHBOUR_NUM+1);
-		else
-			peer_info->calc_distance = distance;
-
-		peer_info->d_measures++;
-	}
+	if (peer_info)
+		update_peer_distance(peer_info, (float)distance);
 }
 
 int8_t _get_address_index(uint16_t addr)
@@ -813,7 +821,7 @@ void set_distance(uint16_t addr1, uint16_t addr2, float distance)
   	if (index1 == -1 || index2 == -1)
 		return; // Do nothing if address is invalid
 
-	if (distance > 0.0)
+	if (distance > MIN_DIST)
 		euclidean_d_m.distances[index1][index2] = distance;
 }
 
@@ -919,6 +927,8 @@ void twr_handle(peer_connection_t* peer)
 					peer_info->recvd_distance = (peer_info->recvd_distance)*NEIGHBOUR_NUM/(NEIGHBOUR_NUM+1) + distance/(NEIGHBOUR_NUM+1);
 				else
 					peer_info->recvd_distance = distance;
+
+				chprintf((BaseSequentialStream*)&SD1, "B:%d\n", (int)(distance*10000.0));
 
 				twr_state = TWR_NO_TWR;
 				peer->seq_ack_n ^= 0x10; // Flips 4 bit (ack_num) 
@@ -1038,7 +1048,7 @@ void no_resp_action(void)
 {
 	peer_connection_t* lowest_d_peer = get_conn_peer();
 	peer_info_t* lowest_d_info;
-	uint8_t lowest_d_measures = 255;
+	uint32_t lowest_d_measures = 1<<(sizeof(uint32_t)-1);
 	
 	if (lowest_d_peer)
 	{
@@ -1118,6 +1128,8 @@ void process_message(void)
 			}
 			else
 			{
+				loc_state = LOC_COMM;
+				twr_state = TWR_NO_TWR;
 				if ((recvd_type&0xF0) == 0x10 /*|| some_peer_recv_ack_timeout*/)
 					conn_handle(peer);
 				else if ((recvd_type&0xF0) == 0x30 && peer_valid)
@@ -1459,7 +1471,7 @@ THD_FUNCTION(SYSTEM_STATUS, arg)
 		{
 			euclidean_d_m.addrs[i] = peers[i-1].peer_addr;
 			euclidean_d_m.distances[0][i] = peers_info[i-1].calc_distance;
-			euclidean_d_m.distances[i][0] = peers_info[i-1].recvd_distance;
+			//euclidean_d_m.distances[i][0] = peers_info[i-1].recvd_distance;
 		}
 
 		update_peer_pos();
@@ -1474,10 +1486,10 @@ THD_FUNCTION(SYSTEM_STATUS, arg)
 			// chprintf((BaseSequentialStream*)&SD1, "d: %d\n", (int)peers_info[i].distance);
 		}
 
-		chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[0][0], (int)peer_positions[0][1]);
-		chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[1][0], (int)peer_positions[1][1]);
-		chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[2][0], (int)peer_positions[2][1]);
-		chprintf((BaseSequentialStream*)&SD1, "\n");
+		// chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[0][0], (int)peer_positions[0][1]);
+		// chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[1][0], (int)peer_positions[1][1]);
+		// chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[2][0], (int)peer_positions[2][1]);
+		// chprintf((BaseSequentialStream*)&SD1, "\n");
 
 		// chprintf((BaseSequentialStream*)&SD1, "\n\t| ");
 

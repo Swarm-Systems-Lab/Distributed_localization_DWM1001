@@ -70,6 +70,8 @@
 #define CH_TIMEOUT	TIME_S2I(5)
 #define DW_ERR_THRESH	10
 #define PEER_CONN_TTL	16
+#define MIN_DIST		-999.0f
+#define MAX_DIST		999.0f
 
 extern thread_reference_t irq_evt;
 
@@ -77,8 +79,6 @@ extern SPIConfig spi_cfg;
 extern SerialConfig serial_cfg;
 
 extern thread_t* dw_thread;
-extern thread_t* peer_conn_thread;
-extern thread_t* peer_disc_thread;
 extern thread_t* comm_thread;
 
 typedef enum loc_state
@@ -192,7 +192,7 @@ typedef struct peer_loc
 	peer_connection_t* conn;
 	float calc_distance;
 	float recvd_distance;
-	uint8_t d_measures;
+	uint32_t d_measures;
 } peer_info_t;
 
 typedef struct euclidean_d_m
@@ -288,6 +288,7 @@ void process_message(void);
 
 int8_t respond_if_twr(void);
 
+void update_peer_distance(peer_info_t* peer_info, float dist);
 void compute_distance(void);
 
 void CPLOCK_handler(void);
