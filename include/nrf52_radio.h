@@ -14,6 +14,8 @@
  *
  * ported on: 25/10/2018, by andru
  *
+ * extended on: 20/03/2021, by HG de Marina
+ *
  */
 
 #ifndef NRF52_RADIO_H_
@@ -37,13 +39,12 @@
 #define NRF52_RX_FIFO_SIZE                  8                   /**< The size of the reception first in first out buffer. */
 
 #define NRF52_RADIO_USE_TIMER0              FALSE               /**< TIMER0 will be used by the module. */
-#define NRF52_RADIO_USE_TIMER1              TRUE                /**< TIMER1 will be used by the module. */
+#define NRF52_RADIO_USE_TIMER1              TRUE                /**< TIMER1 will be used by the module.*/
 #define NRF52_RADIO_USE_TIMER2              FALSE               /**< TIMER2 will be used by the module. */
 #define NRF52_RADIO_USE_TIMER3              FALSE               /**< TIMER3 will be used by the module. */
 #define NRF52_RADIO_USE_TIMER4              FALSE               /**< TIMER4 will be used by the module. */
 
 #define NRF52_RADIO_IRQ_PRIORITY            3                   /**< RADIO interrupt priority. */
-#define NRF52_RADIO_POSTTHD_PRIORITY        (NORMALPRIO+3)      /**< Postprocess TXRX thread priority. */
 #define NRF52_RADIO_INTTHD_PRIORITY         (NORMALPRIO+2)      /**< Interrupts handle thread priority. */
 #define NRF52_RADIO_EVTTHD_PRIORITY         (NORMALPRIO+1)      /**< Events handle thread priority */
 
@@ -64,29 +65,30 @@
 #define RADIO_ESB_PIPE_PREFIXES {0xF3, 0x3F, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6}
 #endif
 
+#ifndef RADIO_ESB_PRIMARY_TRANSMITTER                        /* By default, the device with ESB is always Primary Receiver */
+#define RADIO_ESB_MODE NRF52_MODE_PRX
+#else
+#define RADIO_ESB_MODE NRF52_MODE_PTX
+#endif
+
 #define RADIO_ESB_NUM_PIPES 8
 #define RADIO_ESB_ADDR_LENGTH 5
 #define RADIO_ESB_RX_PIPES 0xFF
-#define RADIO_ESB_RF_CHANNEL 1
+#define RADIO_ESB_RF_CHANNEL 56
 
 #define RADIO_ESB_RETRANSMIT_DELAY 1000
 #define RADIO_ESB_RETRANSMIT_COUNT 3
 
 #define RADIO_ESB_STATIC_PAYLOAD_LENGTH 0
 
-// Dummy network, by default ID 1. We reserve 0 for broadcast
-#ifndef RADIO_MY_ID
-#define RADIO_MY_ID 1
-#endif
-
 typedef enum {
-  NRF52_SUCCESS,                                        /* Call was successful.                  */
-  NRF52_INVALID_STATE,                                  /* Module is not initialized.            */
-  NRF52_ERROR_BUSY,                                     /* Module was not in idle state.         */
-  NRF52_ERROR_NULL,                                     /* Required parameter was NULL.          */
-  NRF52_ERROR_INVALID_PARAM,                            /* Required parameter is invalid         */
-  NRF52_ERROR_NOT_SUPPORTED,                            /* p_payload->noack was false while selective ack was not enabled. */
-  NRF52_ERROR_INVALID_LENGTH,                           /* Payload length was invalid (zero or larger than max allowed).   */
+    NRF52_SUCCESS,                                        /* Call was successful.                  */
+    NRF52_INVALID_STATE,                                  /* Module is not initialized.            */
+    NRF52_ERROR_BUSY,                                     /* Module was not in idle state.         */
+    NRF52_ERROR_NULL,                                     /* Required parameter was NULL.          */
+    NRF52_ERROR_INVALID_PARAM,                            /* Required parameter is invalid         */
+    NRF52_ERROR_NOT_SUPPORTED,                            /* p_payload->noack was false while selective ack was not enabled. */
+    NRF52_ERROR_INVALID_LENGTH,                           /* Payload length was invalid (zero or larger than max allowed).   */
 } nrf52_error_t;
 
 // Internal radio module state.
@@ -109,9 +111,9 @@ typedef enum {
 
 // Interrupt flags
 typedef enum {
-  NRF52_INT_TX_SUCCESS_MSK = 0x01,  /**< The flag used to indicate a success since last event. */
-  NRF52_INT_TX_FAILED_MSK  = 0x02,  /**< The flag used to indicate a failiure since last event. */
-  NRF52_INT_RX_DR_MSK      = 0x04,  /**< The flag used to indicate a received packet since last event. */
+    NRF52_INT_TX_SUCCESS_MSK = 0x01,  /**< The flag used to indicate a success since last event. */
+    NRF52_INT_TX_FAILED_MSK  = 0x02,  /**< The flag used to indicate a failiure since last event. */
+    NRF52_INT_RX_DR_MSK      = 0x04,  /**< The flag used to indicate a received packet since last event. */
 } nrf52_int_flags_t;
 
 /**Macro to create initializer for a TX data packet.
@@ -270,13 +272,8 @@ typedef struct {
   event_source_t eventsrc;
 } RFDriver;
 
-// Global variables. They are not thread-safe.
 extern RFDriver RFD1;
-extern nrf52_payload_t tx_payload;
-extern nrf52_payload_t rx_payload;
-extern nrf52_config_t radiocfg;
 
-// Radio services
 nrf52_error_t radio_init(nrf52_config_t const *config);
 nrf52_error_t radio_disable(void);
 nrf52_error_t radio_write_payload(nrf52_payload_t const * p_payload);

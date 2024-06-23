@@ -5,12 +5,13 @@
 
 # Compiler options here.
 ifeq ($(USE_OPT),)
-  USE_OPT = -Os -ggdb -fomit-frame-pointer -falign-functions=16 -std=c11
+  # Warning, if you want to debug the code, substitute -Os to -O0
+  USE_OPT = -O0 -ggdb -lm -fomit-frame-pointer -falign-functions=16 -std=c11 -fsingle-precision-constant
 endif
 
 # C specific options here (added to USE_OPT).
 ifeq ($(USE_COPT),)
-  USE_COPT =
+  USE_COPT = 
 endif
 
 # C++ specific options here (added to USE_OPT).
@@ -20,7 +21,7 @@ endif
 
 # Enable this if you want the linker to remove unused code and data
 ifeq ($(USE_LINK_GC),)
-  USE_LINK_GC = yes
+  USE_LINK_GC = no
 endif
 
 # Linker extra options here.
@@ -30,17 +31,17 @@ endif
 
 # Enable this if you want link time optimizations (LTO)
 ifeq ($(USE_LTO),)
-  USE_LTO = yes
+  USE_LTO = no
 endif
 
 # If enabled, this option allows to compile the application in THUMB mode.
 ifeq ($(USE_THUMB),)
-  USE_THUMB = yes
+  USE_THUMB = no
 endif
 
 # Enable this if you want to see the full log while compiling.
 ifeq ($(USE_VERBOSE_COMPILE),)
-  USE_VERBOSE_COMPILE = no
+  USE_VERBOSE_COMPILE = yes
 endif
 
 # If enabled, this option makes the build process faster by not compiling
@@ -60,13 +61,13 @@ endif
 # Stack size to be allocated to the Cortex-M process stack. This stack is
 # the stack used by the main() thread.
 ifeq ($(USE_PROCESS_STACKSIZE),)
-  USE_PROCESS_STACKSIZE = 0x400
+  USE_PROCESS_STACKSIZE = 0xA00
 endif
 
 # Stack size to the allocated to the Cortex-M main/exceptions stack. This
 # stack is used for processing interrupts and exceptions.
 ifeq ($(USE_EXCEPTIONS_STACKSIZE),)
-  USE_EXCEPTIONS_STACKSIZE = 0x400
+  USE_EXCEPTIONS_STACKSIZE = 0x800
 endif
 
 # Enables the use of FPU on Cortex-M4 (no, softfp, hard).
@@ -89,14 +90,16 @@ PROJECT = dis_loc_dwm1001
 # In case of using eclipse, it is necessary that this variable contains the path
 # to the path Distributed_localization_DWM1001 project. In case of executing make
 # manually try 'makefile PROJECT_DIRECTORY=./'
-PROJECT_DIRECTORY ?= /home/developer/ChibiOS-eclipse-workspace/Distributed_localization_DWM1001
+#PROJECT_DIRECTORY ?= /home/developer/ChibiOS-eclipse-workspace/Distributed_localization_DWM1001
 
 # Imported source files and paths
-CHIBIOS         := $(PROJECT_DIRECTORY)/ext/ChibiOS
-CHIBIOS_CONTRIB := $(PROJECT_DIRECTORY)/ext/ChibiOS-Contrib
-CONFDIR         := $(PROJECT_DIRECTORY)/cfg
-BUILDDIR        := $(PROJECT_DIRECTORY)/build
-DEPDIR          := $(PROJECT_DIRECTORY)/.dep
+CHIBIOS         := ./ext/ChibiOS
+CHIBIOS_CONTRIB := ./ext/ChibiOS-Contrib
+CONFDIR         := ./cfg
+BUILDDIR        := ./build
+DEPDIR          := ./.dep
+PSRCDIR        := ./src
+PINCDIR        := ./include
 
 # Licensing files.
 include $(CHIBIOS)/os/license/license.mk
@@ -105,17 +108,17 @@ include $(CHIBIOS_CONTRIB)/os/common/startup/ARMCMx/compilers/GCC/mk/startup_nrf
 # HAL-OSAL files (optional).
 include $(CHIBIOS_CONTRIB)/os/hal/hal.mk
 include $(CHIBIOS_CONTRIB)/os/hal/ports/NRF5/NRF52832/platform.mk
-include $(CHIBIOS_CONTRIB)/os/hal/boards/NRF52-DWM1001/board.mk
+include $(CHIBIOS_CONTRIB)/os/hal/boards/DWM1001-DEV/board.mk
 include $(CHIBIOS)/os/hal/osal/rt-nil/osal.mk
 include $(CHIBIOS)/os/hal/lib/streams/streams.mk
 # RTOS files (optional).
 include $(CHIBIOS)/os/rt/rt.mk
-include $(CHIBIOS)/os/common/ports/ARMCMx/compilers/GCC/mk/port_v7m.mk
+include $(CHIBIOS)/os/common/ports/ARMv7-M/compilers/GCC/mk/port.mk
 # Other files (optional).
-#include $(CHIBIOS)/test/lib/test.mk
-#include $(CHIBIOS)/test/rt/rt_test.mk
-#include $(CHIBIOS)/test/oslib/oslib_test.mk
-#include $(CHIBIOS)/os/various/shell/shell.mk
+include $(CHIBIOS)/os/test/test.mk
+include $(CHIBIOS)/test/rt/rt_test.mk
+include $(CHIBIOS)/test/oslib/oslib_test.mk
+include $(CHIBIOS)/os/various/shell/shell.mk
 
 # Define linker script file here
 LDSCRIPT= $(STARTUPLD_CONTRIB)/NRF52832.ld
@@ -124,11 +127,8 @@ LDSCRIPT= $(STARTUPLD_CONTRIB)/NRF52832.ld
 # setting.
 CSRC = $(ALLCSRC) \
        $(TESTSRC) \
-       $(PROJECT_DIRECTORY)/src/main.c \
-       $(PROJECT_DIRECTORY)/src/driver/led/led.c \
-       $(PROJECT_DIRECTORY)/src/driver/spi/spi.c \
-       $(PROJECT_DIRECTORY)/src/driver/button/button.c \
-       $(PROJECT_DIRECTORY)/src/driver/radio/nrf52_radio.c \
+       $(wildcard $(PSRCDIR)/*.c) \
+	   $(CHIBIOS)/os/various/syscalls.c \
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
@@ -158,11 +158,7 @@ TCPPSRC =
 ASMSRC = $(ALLASMSRC)
 ASMXSRC = $(ALLXASMSRC)
 
-INCDIR = $(CONFDIR) $(ALLINC) $(TESTINC) $(TESTHAL) \
-		$(PROJECT_DIRECTORY)/src/driver/led \
-		$(PROJECT_DIRECTORY)/src/driver/spi \
-		$(PROJECT_DIRECTORY)/src/driver/button \
-		$(PROJECT_DIRECTORY)/src/driver/radio \
+INCDIR = $(CONFDIR) $(ALLINC) $(TESTINC) $(TESTHAL) $(PINCDIR)
 
 #
 # Project, sources and paths
@@ -192,7 +188,7 @@ BIN  = $(CP) -O binary
 SREC = $(CP) -O srec
 
 # ARM-specific options here
-AOPT =
+AOPT = 
 
 # THUMB-specific options here
 TOPT = -mthumb -DTHUMB
@@ -212,7 +208,7 @@ CPPWARN = -Wall -Wextra -Wundef
 #
 
 # List all user C define here, like -D_DEBUG=1
-UDEFS = 
+UDEFS = -DRADIO_ESB_PRIMARY_TRANSMITTER -DCHPRINTF_USE_FLOAT=1
 
 # Define ASM defines here
 UADEFS =
@@ -225,6 +221,9 @@ ULIBDIR =
 
 # List all user libraries here
 ULIBS =
+
+# Terminal
+TERM = konsole
 
 #
 # End of user defines
@@ -240,10 +239,53 @@ OBIN = $(BUILDDIR)/$(PROJECT).bin
 include $(CHIBIOS_CONTRIB)/os/various/jlink.mk
 include $(CHIBIOS_CONTRIB)/os/various/gdb.mk
 
+.PHONY: openocd-flash openocd-debug-server openocd-debug
 
 pin-reset: jlink-pin-reset
 flash: all jlink-flash
+
+# Gets the serial numbers of all DWM1001 boards and flashes each board
+openocd-flash:
+	$(shell export SERIAL_NUMBERS=`lsusb -v | grep -C 20 'SEGGER J-Link' | grep "iSerial" | awk '{print $$NF}'` ; \
+	for serial_number in $$SERIAL_NUMBERS ; do \
+		sed -i "s/adapter serial .*/adapter serial $$serial_number/g" openocd/flash_dwm1001.cfg ; \
+		openocd -f openocd/flash_dwm1001.cfg ; \
+	done)
+
 debug: gdb-debug
+
+# Opens a GDB sessions for each board connected
+openocd-debug:
+	$(shell export DEVICE_NUMBER=`lsusb -v | grep -C 20 'SEGGER J-Link' | grep "iSerial" | wc -l` ; \
+	export OPENOCD_GDB_PORT=3333 ; \
+	for i in `seq 1 $$DEVICE_NUMBER` ; do \
+		sed -i "s/target extended-remote :.*/target extended-remote :$$((i+OPENOCD_GDB_PORT-1))/g" gdb/dwm1001.gdb ; \
+		sleep 1 ; \
+		$$TERM -e "arm-none-eabi-gdb -tui --command=./gdb/dwm1001.gdb" & \
+		sleep 1 ; \
+	done)
+
 erase-all: jlink-erase-all
 debug-server: jlink-debug-server
 
+# Opens a openocd GDB server for each board connected
+### SERVER IS RUN IN PARALLEL SO CTRL+C MAY NOT KILL THE PROCESS AND KEEP OPENOCD USED, pkill openocd can be used
+openocd-debug-server:
+	$(shell export SERIAL_NUMBERS=`lsusb -v | grep -C 20 'SEGGER J-Link' | grep "iSerial" | awk '{print $$NF}'` ; \
+	export COUNTER=0 ; \
+	export OPENOCD_GDB_PORT=3333 ; \
+	export OPENOCD_TELNET_PORT=4444 ; \
+	export OPENOCD_TCL_PORT=6666 ; \
+	for serial_number in $$SERIAL_NUMBERS ; do \
+		sed -i "s/adapter serial .*/adapter serial $$serial_number/g" openocd/dwm1001.cfg ; \
+		sed -i "s/gdb_port .*/gdb_port $$((COUNTER+OPENOCD_GDB_PORT))/g" openocd/dwm1001.cfg ; \
+		sed -i "s/telnet_port .*/telnet_port $$((COUNTER+OPENOCD_TELNET_PORT))/g" openocd/dwm1001.cfg ; \
+		sed -i "s/tcl_port .*/tcl_port $$((COUNTER+OPENOCD_TCL_PORT))/g" openocd/dwm1001.cfg ; \
+		if [[ $$COUNTER -eq 0 ]]; then \
+			openocd -f openocd/dwm1001.cfg & \
+		else \
+			$$TERM -e "openocd -f openocd/dwm1001.cfg" & \
+		fi ; \
+		sleep 1 ; \
+		COUNTER=$$((COUNTER+1)) ; \
+	done)

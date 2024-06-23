@@ -17,26 +17,17 @@
 #ifndef _MCUCONF_H_
 #define _MCUCONF_H_
 
-/*
- * Board setting
- */
-
-
 #define NRF5_SOFTDEVICE_THREAD_WA_SIZE 128
-
-#define SHELL_CMD_TEST_ENABLED FALSE
-#define SHELL_CMD_ECHO_ENABLED FALSE
-#define SHELL_CMD_INFO_ENABLED FALSE
-
 #define NRF5_SOFTDEVICE_LFCLK_SOURCE   NRF_CLOCK_LF_SRC_XTAL
 #define NRF5_SOFTDEVICE_LFCLK_ACCURACY NRF_CLOCK_LF_XTAL_ACCURACY_20_PPM
-
 
 /*
  * HAL driver system settings.
  */
+#define NRF_SERIES                 52
+
 #define NRF5_SERIAL_USE_UART0             TRUE
-#define NRF5_SERIAL_USE_HWFLOWCTRL        TRUE
+#define NRF5_SERIAL_USE_HWFLOWCTRL        FALSE
 #define NRF5_RNG_USE_RNG0                 TRUE
 #define NRF5_GPT_USE_TIMER0               TRUE
 
@@ -45,5 +36,9 @@
 
 #define WDG_USE_TIMEOUT_CALLBACK    TRUE
 
+/* SPI */
+#define NRF5_SPI_USE_SPI0          TRUE
+#define NRF5_SPI_USE_SPI1          FALSE
+#define SPI_SUPPORTS_CIRCULAR      FALSE
 
 #endif /* _MCUCONF_H_ */

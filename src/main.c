@@ -1,43 +1,32 @@
+#include <stdint.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "ch.h"
 #include "hal.h"
 
-#include "led.h"
-#include "nrf52_radio.h"
+#include "dist_loc.h"
 
 int main(void) {
-
     halInit();
     chSysInit();
 
-//  Leds off
     leds_off(ALL_LEDS);
-//  LED SUMMARY
-//  Blue for the heartbeep
-//  Green for PCK_RECEIVED between internal radios
 
-//  Internal radio nrf52 init
-    radio_init(&radiocfg);
-    radio_flush_tx();
-    radio_flush_rx();
-    radio_start_rx();
+	palEnablePadEvent(IOPORT1, DW_IRQ, PAL_EVENT_MODE_RISING_EDGE);
+	palSetPadCallback(IOPORT1, DW_IRQ, ISR_wrapper, NULL);
+	chThdSleepMilliseconds(100);
+	chThdCreateStatic(DW_IRQ_THREAD, sizeof(DW_IRQ_THREAD), NORMALPRIO+1, DW_IRQ_HANDLER, NULL);
 
-    chThdSleep(2);
+	chThdCreateStatic(SYSTEM_STATUS_THREAD, sizeof(SYSTEM_STATUS_THREAD), NORMALPRIO, SYSTEM_STATUS, NULL);
+	chThdSleepMilliseconds(100);
+	
+	chThdCreateStatic(DW_CONTROLLER_THREAD, sizeof(DW_CONTROLLER_THREAD), NORMALPRIO, DW_CONTROLLER, NULL);
+	chThdCreateStatic(COMMS_THREAD, sizeof(COMMS_THREAD), NORMALPRIO, COMMS, NULL);
 
-    while (true) {
-        toggle_led(blue);
-        chThdSleepMilliseconds(500);
-
-        // example of dummy transmission (it is configured so that there is ACK)
-        uint8_t neighborh_id = 0; // Destination between 0 and 7, we reserver 0 for broadcast
-        tx_payload.pipe = neighborh_id;
-        tx_payload.noack = 0;
-        tx_payload.data[0] = 0x03; // Packet ID
-        tx_payload.data[1] = 0x33; // Payload
-        tx_payload.length = 2;
-
-        radio_stop_rx();
-        // tx_payload and rx_payload are GLOBAL and they are not thread-safe now
-        radio_write_payload(&tx_payload);
-        radio_start_tx(); // Either fail or success TX (with or w/o ACK), the radio_start_rx is called afterward
-    }
+	while (true) {	
+		toggle_led(red1);
+		chThdSleepMilliseconds(500);
+	}
 }
