@@ -1884,8 +1884,6 @@ static const lde_conf_t LDE_CONF_DEF =
 	LDE_REPC_REF[RX_PCODE_DEF]			// lde_repc
 };
 
-extern uint64_t dw_conf_dirty_bits;
-
 typedef struct dw_rx_config
 {
 	rx_fwto_t dw_rx_fwto;			// 2
@@ -2077,25 +2075,75 @@ void dw_set_irq(sys_mask_t set_mask);
  */
 void dw_clear_irq(sys_mask_t clear_mask);
 
+/**
+ * @brief 
+ * 
+ */
 void dw_soft_reset(void);
 
+/**
+ * @brief 
+ * 
+ */
 void dw_soft_reset_rx(void);
 
+/**
+ * @brief 
+ * 
+ */
 // TODO add to docs chibios event callbacks are in syslock check mode
 void _dw_irq_handler(void);
 
+/**
+ * @brief 
+ * 
+ * @param tx_fctrl 
+ * @param tx_buf 
+ * @param dly_time 
+ * @param w4r_time 
+ */
 void dw_start_tx(tx_fctrl_t tx_fctrl, uint8_t * tx_buf, dx_time_t dly_time, ack_resp_t_t w4r_time);
 
+/**
+ * @brief 
+ * 
+ * @param dly_time 
+ */
 void dw_start_rx(dx_time_t dly_time);
 
+/**
+ * @brief 
+ * 
+ * @return sys_state_t 
+ */
 sys_state_t dw_transceiver_off(void);
 
+/**
+ * @brief 
+ * 
+ * @param address 
+ */
 void dw_command_read_OTP(uint16_t address);
 
+/**
+ * @brief 
+ * 
+ * @return uint64_t 
+ */
 uint64_t dw_get_tx_time(void);
 
+/**
+ * @brief 
+ * 
+ * @return uint64_t 
+ */
 uint64_t dw_get_rx_time(void);
 
+/**
+ * @brief 
+ * 
+ * @return int32_t 
+ */
 int32_t dw_get_car_int(void);
 
 void dw_get_full_config(dw_config_t* full_cfg);

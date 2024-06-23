@@ -23,19 +23,19 @@ uint8_t barrier_num;
 
 mutex_t dw_mutex;
 
+thread_reference_t irq_evt = NULL;
+
 thread_t* dw_thread;
 thread_t* comm_thread;
 
-thread_reference_t irq_evt = NULL;
-
-	// MHR.frame_control.frame_type = FT_DATA;
-	// MHR.frame_control.sec_en = 0b0;
-	// MHR.frame_control.frame_pending = 0b0;
-	// MHR.frame_control.ack_req = 0b0;
-	// MHR.frame_control.pan_id_compress = 0b1;
-	// MHR.frame_control.dest_addr_mode = SHORT_16;
-	// MHR.frame_control.frame_version = 0x1;
-	// MHR.frame_control.src_addr_mode = SHORT_16;
+// MHR.frame_control.frame_type = FT_DATA;
+// MHR.frame_control.sec_en = 0b0;
+// MHR.frame_control.frame_pending = 0b0;
+// MHR.frame_control.ack_req = 0b0;
+// MHR.frame_control.pan_id_compress = 0b1;
+// MHR.frame_control.dest_addr_mode = SHORT_16;
+// MHR.frame_control.frame_version = 0x1;
+// MHR.frame_control.src_addr_mode = SHORT_16;
 frame_control_t def_frame_ctrl = {.mask=0x9841};
 
 peer_connection_t peers[NEIGHBOUR_NUM];
@@ -74,8 +74,8 @@ uint8_t send_buf[128];
 dw_ctrl_req_t dw_ctrl_req = DW_CTRL_YIELD;
 
 loc_state_t loc_state = LOC_INIT;
-loc_action_t loc_action = LOC_NO_RESP;
 twr_state_t twr_state = TWR_NO_TWR;
+loc_action_t loc_action = LOC_NO_RESP;
 
 peer_connection_t* twr_peer = NULL;
 uint8_t twr_peer_seq = 0;
@@ -351,12 +351,12 @@ void dw_setup(void)
 	switch (panadr_own.short_addr)
 	{
 		case 5923:
-			tx_antd = 13659;
-			rx_ant_d = 18523;
+			tx_antd = 15918;
+			rx_ant_d = 15918;
 			break;
 		case 7090:
-			tx_antd = 14565;
-			rx_ant_d = 18537;
+			tx_antd = 15918;
+			rx_ant_d = 15918;
 			break;
 		case 1955:
 			tx_antd = 14535;
@@ -787,7 +787,7 @@ void compute_distance(void)
 	double distance = tof * C_ATM;
 
 	peer_info_t* peer_info = get_peer_info(recvd_header.src_addr);
-
+	
 	if (peer_info)
 		update_peer_distance(peer_info, (float)distance);
 }
@@ -845,7 +845,7 @@ void twr_handle(peer_connection_t* peer)
 
 	loc_action = LOC_RESP_NOW;
 
-	distance = -1.0;
+	distance = MIN_DIST;
 	switch (recvd_type)
 	{
 		case MT_D_REQ:
@@ -894,7 +894,6 @@ void twr_handle(peer_connection_t* peer)
 			{
 				twr_state = TWR_RESP_RECVD;
 				compute_distance();
-				//send_d_res(); // dly
 				peer_info_t* peer_info = get_peer_info(recvd_header.src_addr);
 				memcpy(send_buf, &(peer_info->calc_distance), sizeof(peer_info->calc_distance));
 
@@ -1447,7 +1446,6 @@ THD_FUNCTION(SYSTEM_STATUS, arg)
 
 	barrier_init(3);
 
-	//chVTObjectInit(&comm_watchdog);
 	init_d_m();
 
 	peer_positions[0][0] = 0;
@@ -1471,7 +1469,6 @@ THD_FUNCTION(SYSTEM_STATUS, arg)
 		{
 			euclidean_d_m.addrs[i] = peers[i-1].peer_addr;
 			euclidean_d_m.distances[0][i] = peers_info[i-1].calc_distance;
-			//euclidean_d_m.distances[i][0] = peers_info[i-1].recvd_distance;
 		}
 
 		update_peer_pos();
@@ -1481,15 +1478,20 @@ THD_FUNCTION(SYSTEM_STATUS, arg)
 			peers_info[i].d_measures = 0;
 			if (peers[i].ttl >= PEER_CONN_TTL)
 				disconnect_peer(peers+i);
-			// chprintf((BaseSequentialStream*)&SD1, "peer_addr: %d\n", peers[i].peer_addr);
-			// chprintf((BaseSequentialStream*)&SD1, "peer_seq_ack: %x\nttl: %d\n", peers[i].seq_ack_n, peers[i].ttl);
-			// chprintf((BaseSequentialStream*)&SD1, "d: %d\n", (int)peers_info[i].distance);
 		}
 
-		// chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[0][0], (int)peer_positions[0][1]);
-		// chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[1][0], (int)peer_positions[1][1]);
-		// chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[2][0], (int)peer_positions[2][1]);
-		// chprintf((BaseSequentialStream*)&SD1, "\n");
+		/*
+		 *	Print peer positions
+		 */
+
+		chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[0][0], (int)peer_positions[0][1]);
+		chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[1][0], (int)peer_positions[1][1]);
+		chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[2][0], (int)peer_positions[2][1]);
+		chprintf((BaseSequentialStream*)&SD1, "\n");
+
+		/*
+		 *	Print formatted EDM
+		 */
 
 		// chprintf((BaseSequentialStream*)&SD1, "\n\t| ");
 
@@ -1517,6 +1519,10 @@ THD_FUNCTION(SYSTEM_STATUS, arg)
 		// }
 
 		// chprintf((BaseSequentialStream*)&SD1, "\nXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n");
+		
+		/*
+		 *	Print calibration EDM 
+		 */
 
 		// chprintf((BaseSequentialStream*)&SD1, "X");
 		// for (uint8_t j = 0; j < NEIGHBOUR_NUM+1; j++)

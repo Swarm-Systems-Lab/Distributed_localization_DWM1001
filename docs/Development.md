@@ -11,20 +11,3 @@
 * **OpenOCD debugging Error: ChibiOS registry integrity check failed, double linked list violation**
   
   At connection with GDB session, maybe due to bad initialization or memory corruption. [ChibiOS Forum](https://forum.chibios.org/viewtopic.php?t=2422)
-
-
-
-
-
-
-PIN FOR IRQ LINE IS CORRECT CHANGING SYSCFG POLARITY WORKS SYSMASK AND SYSSTATUS SET CORRECTLY INCLUDING IRQS
-
-
-
-Interrupts seem to break after rxenab is set once
-
-BEWARE PRIORITIES, if a thread is created with higher priority than the creator thread it will be executed before its pointer is set
-
-nested interrupts not supported (maybe?) can't disable interrupts in ISR
-
-TODO boards supports NFC

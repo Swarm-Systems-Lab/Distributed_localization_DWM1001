@@ -73,14 +73,6 @@
 #define MIN_DIST		-999.0f
 #define MAX_DIST		999.0f
 
-extern thread_reference_t irq_evt;
-
-extern SPIConfig spi_cfg;
-extern SerialConfig serial_cfg;
-
-extern thread_t* dw_thread;
-extern thread_t* comm_thread;
-
 typedef enum loc_state
 {
 	LOC_STANDBY,
@@ -201,6 +193,64 @@ typedef struct euclidean_d_m
 	float distances[NEIGHBOUR_NUM+1][NEIGHBOUR_NUM+1];
 } euclidean_d_m_t;
 
+extern SPIConfig spi_cfg;
+extern SerialConfig serial_cfg;
+
+extern mutex_t dw_mutex;
+
+extern thread_reference_t irq_evt;
+
+extern thread_t* dw_thread;
+extern thread_t* comm_thread;
+
+extern panadr_t panadr_own;
+extern tx_antd_t tx_antd;
+extern uint16_t rx_ant_d;
+
+extern uint32_t recv_tmo_usec;
+
+extern send_msg_meta_t send_msg_meta;
+extern send_msg_meta_t send_msg_meta_def;
+
+extern MHR_16_t recvd_header;
+extern message_t recvd_type;
+
+extern uint8_t send_size;
+
+extern dw_rod_info_t recv_info;
+extern uint8_t recv_size;
+
+extern uint8_t recv_buf[128];
+extern uint8_t send_buf[128];
+
+extern frame_control_t def_frame_ctrl;
+
+extern peer_connection_t peers[NEIGHBOUR_NUM];
+extern peer_info_t peers_info[NEIGHBOUR_NUM];
+extern uint8_t current_peer_n;
+extern uint8_t current_peer_c_n;
+
+extern peer_connection_t* twr_peer;
+extern uint8_t twr_peer_seq;
+
+extern euclidean_d_m_t euclidean_d_m;
+extern float peer_positions[NEIGHBOUR_NUM+1][3];
+
+extern dw_ctrl_req_t dw_ctrl_req;
+
+extern loc_state_t loc_state;
+extern twr_state_t twr_state;
+extern loc_action_t loc_action;
+
+extern uint8_t messages_since_broad;
+extern uint8_t recv_tmo_cnt;
+extern uint8_t twr_fail_cnt;
+
+/**
+ * @brief 
+ * 
+ * @param arg 
+ */
 void ISR_wrapper(void * arg);
 
 void _dw_power_on(void);
@@ -221,9 +271,6 @@ extern THD_FUNCTION(DW_CONTROLLER, arg);
 static THD_WORKING_AREA(COMMS_THREAD, 4098);
 extern THD_FUNCTION(COMMS, arg);
 
-// static THD_WORKING_AREA(DIS_LOC_THREAD, THREAD_STACK_SIZE);
-// extern THD_FUNCTION(DIS_LOC, arg);
-
 static THD_WORKING_AREA(SYSTEM_STATUS_THREAD, 256);
 extern THD_FUNCTION(SYSTEM_STATUS, arg);
 
@@ -237,7 +284,6 @@ uint64_t get_hardware_id(void);
 void spi_hal_init(void);
 
 // TODO document must not be preempted
-// TODO solve magic number for size
 void load_lde(void);
 
 uint64_t load_ldotune(void);
@@ -254,20 +300,98 @@ void clean_send(void);
 int32_t get_message(void);
 void prepare_message(void);
 
+/**
+ * @brief 
+ * 
+ * @param addr 
+ * @return int8_t 
+ */
 int8_t _get_address_index(uint16_t addr);
+
+/**
+ * @brief Get the distance object
+ * 
+ * @param addr1 
+ * @param addr2 
+ * @return float 
+ */
 float get_distance(uint16_t addr1, uint16_t addr2);
+
+/**
+ * @brief Set the distance object
+ * 
+ * @param addr1 
+ * @param addr2 
+ * @param distance 
+ */
 void set_distance(uint16_t addr1, uint16_t addr2, float distance);
 
+/**
+ * @brief 
+ * 
+ */
 void init_peers(void);
+
+/**
+ * @brief Create a new peer object
+ * 
+ * @param addr 
+ * @return peer_connection_t* 
+ */
 peer_connection_t* create_new_peer(uint16_t addr);
+
+/**
+ * @brief Get the peer object
+ * 
+ * @param addr 
+ * @return peer_connection_t* 
+ */
 peer_connection_t* get_peer(uint16_t addr);
+
+/**
+ * @brief Get the peer info object
+ * 
+ * @param addr 
+ * @return peer_info_t* 
+ */
 peer_info_t* get_peer_info(uint16_t addr);
+
+/**
+ * @brief Get the unconn peer object
+ * 
+ * @return peer_connection_t* 
+ */
 peer_connection_t* get_unconn_peer(void);
+
+/**
+ * @brief Get the conn peer object
+ * 
+ * @return peer_connection_t* 
+ */
 peer_connection_t* get_conn_peer(void);
 
+/**
+ * @brief 
+ * 
+ * @param vtp 
+ * @param arg 
+ */
 void peer_tmo_cb(virtual_timer_t* vtp, void* arg);
+
+/**
+ * @brief 
+ * 
+ * @param peer 
+ */
 void connect_peer(peer_connection_t* peer);
+
+/**
+ * @brief 
+ * 
+ * @param peer 
+ */
 void disconnect_peer(peer_connection_t* peer);
+
 
 void send_syn(void);
 void send_broad(void);
@@ -278,17 +402,63 @@ void send_d_req_ack(peer_connection_t* peer);
 void send_conn_msg(peer_connection_t* peer, uint8_t size, message_t type);
 void send_w4r_msg(peer_connection_t* peer, uint8_t size, message_t type);
 
+/**
+ * @brief 
+ * 
+ */
 void process_req(void);
+
+/**
+ * @brief 
+ * 
+ */
 void handle_twr_fail(void);
+
+/**
+ * @brief 
+ * 
+ * @param peer 
+ */
 void twr_handle(peer_connection_t* peer);
+
+/**
+ * @brief 
+ * 
+ * @param peer 
+ */
 void conn_handle(peer_connection_t* peer);
 
+/**
+ * @brief 
+ * 
+ */
 void no_resp_action(void);
+
+/**
+ * @brief 
+ * 
+ */
 void process_message(void);
 
+/**
+ * @brief 
+ * 
+ * @return int8_t 
+ */
 int8_t respond_if_twr(void);
 
+/**
+ * @brief 
+ * 
+ * @param peer_info 
+ * @param dist 
+ */
 void update_peer_distance(peer_info_t* peer_info, float dist);
+
+/**
+ * @brief 
+ * 
+ */
 void compute_distance(void);
 
 void CPLOCK_handler(void);

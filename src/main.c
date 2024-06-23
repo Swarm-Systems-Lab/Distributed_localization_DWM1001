@@ -6,7 +6,6 @@
 #include "ch.h"
 #include "hal.h"
 
-#include "nrf52_radio.h"
 #include "dist_loc.h"
 
 int main(void) {

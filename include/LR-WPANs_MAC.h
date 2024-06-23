@@ -65,6 +65,17 @@ typedef struct MHR_16
 	uint16_t src_addr;
 } MHR_16_t;
 
+/**
+ * @brief 
+ * 
+ * @param frame_control 
+ * @param MHR 
+ * @param seq_num 
+ * @param pan_id 
+ * @param dest_addr 
+ * @param src_addr 
+ * @return size_t 
+ */
 size_t encode_MHR(frame_control_t frame_control, uint8_t* MHR, uint8_t seq_num, uint16_t pan_id, uint64_t dest_addr, uint64_t src_addr);
 
 MHR_16_t decode_MHR(uint8_t* MHR);
