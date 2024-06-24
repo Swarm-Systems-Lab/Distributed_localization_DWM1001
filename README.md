@@ -122,6 +122,11 @@ Prerequites are mostly inherited from ChibiOS and related to the architecture of
   For Linux, if the tar package is chosen, the path of the installation should be appended to system **PATH** variable.
 
 
+### Building
+
+1. Make sure all git submodules are up to date(```git submodule sync```) and downloaded (```git submodule update --recursive```).
+2. Run ```make all``` to build the binary.
+
 ### Flashing
 
 1. Plug the board through USB and make sure it is detected as a device through lsusb.

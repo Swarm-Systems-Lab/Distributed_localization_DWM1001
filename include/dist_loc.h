@@ -247,7 +247,7 @@ extern uint8_t recv_tmo_cnt;
 extern uint8_t twr_fail_cnt;
 
 /**
- * @brief 
+ * @brief wrapper function for the interrupt service routine
  * 
  * @param arg 
  */
@@ -301,7 +301,7 @@ int32_t get_message(void);
 void prepare_message(void);
 
 /**
- * @brief 
+ * @brief get index of a certain address in the EDM matrix
  * 
  * @param addr 
  * @return int8_t 
@@ -309,7 +309,7 @@ void prepare_message(void);
 int8_t _get_address_index(uint16_t addr);
 
 /**
- * @brief Get the distance object
+ * @brief Get a distance in the EDM
  * 
  * @param addr1 
  * @param addr2 
@@ -318,7 +318,7 @@ int8_t _get_address_index(uint16_t addr);
 float get_distance(uint16_t addr1, uint16_t addr2);
 
 /**
- * @brief Set the distance object
+ * @brief Set a distance in the EDM
  * 
  * @param addr1 
  * @param addr2 
@@ -327,13 +327,13 @@ float get_distance(uint16_t addr1, uint16_t addr2);
 void set_distance(uint16_t addr1, uint16_t addr2, float distance);
 
 /**
- * @brief 
+ * @brief initialize peer structures
  * 
  */
 void init_peers(void);
 
 /**
- * @brief Create a new peer object
+ * @brief Create a new peer
  * 
  * @param addr 
  * @return peer_connection_t* 
@@ -341,7 +341,7 @@ void init_peers(void);
 peer_connection_t* create_new_peer(uint16_t addr);
 
 /**
- * @brief Get the peer object
+ * @brief Get a peer
  * 
  * @param addr 
  * @return peer_connection_t* 
@@ -349,7 +349,7 @@ peer_connection_t* create_new_peer(uint16_t addr);
 peer_connection_t* get_peer(uint16_t addr);
 
 /**
- * @brief Get the peer info object
+ * @brief Get a peer's information
  * 
  * @param addr 
  * @return peer_info_t* 
@@ -357,21 +357,21 @@ peer_connection_t* get_peer(uint16_t addr);
 peer_info_t* get_peer_info(uint16_t addr);
 
 /**
- * @brief Get the unconn peer object
+ * @brief Get a peer which isn't currently connected
  * 
  * @return peer_connection_t* 
  */
 peer_connection_t* get_unconn_peer(void);
 
 /**
- * @brief Get the conn peer object
+ * @brief Get a peer which is currently connected
  * 
  * @return peer_connection_t* 
  */
 peer_connection_t* get_conn_peer(void);
 
 /**
- * @brief 
+ * @brief Callback to disconnect a peer after timeout
  * 
  * @param vtp 
  * @param arg 
@@ -379,14 +379,14 @@ peer_connection_t* get_conn_peer(void);
 void peer_tmo_cb(virtual_timer_t* vtp, void* arg);
 
 /**
- * @brief 
+ * @brief Connect a peer
  * 
  * @param peer 
  */
 void connect_peer(peer_connection_t* peer);
 
 /**
- * @brief 
+ * @brief Disconnect a peer
  * 
  * @param peer 
  */
@@ -403,52 +403,52 @@ void send_conn_msg(peer_connection_t* peer, uint8_t size, message_t type);
 void send_w4r_msg(peer_connection_t* peer, uint8_t size, message_t type);
 
 /**
- * @brief 
+ * @brief Process the EDM sent on the TWR request
  * 
  */
 void process_req(void);
 
 /**
- * @brief 
+ * @brief Handle failure in a TWR exchange
  * 
  */
 void handle_twr_fail(void);
 
 /**
- * @brief 
+ * @brief Handle a received TWR message 
  * 
  * @param peer 
  */
 void twr_handle(peer_connection_t* peer);
 
 /**
- * @brief 
+ * @brief Handle a received connection message, such as an ACK
  * 
  * @param peer 
  */
 void conn_handle(peer_connection_t* peer);
 
 /**
- * @brief 
+ * @brief Chooses what action to take if no response is required
  * 
  */
 void no_resp_action(void);
 
 /**
- * @brief 
+ * @brief Proccess a received message and decide how to handle it
  * 
  */
 void process_message(void);
 
 /**
- * @brief 
+ * @brief Responds autimatically to a correct TWR INIT message
  * 
  * @return int8_t 
  */
 int8_t respond_if_twr(void);
 
 /**
- * @brief 
+ * @brief Update the measured distance to a peer
  * 
  * @param peer_info 
  * @param dist 
@@ -456,7 +456,7 @@ int8_t respond_if_twr(void);
 void update_peer_distance(peer_info_t* peer_info, float dist);
 
 /**
- * @brief 
+ * @brief Calculate measured distance from timestamps
  * 
  */
 void compute_distance(void);

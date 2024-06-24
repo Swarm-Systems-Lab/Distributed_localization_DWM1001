@@ -1594,54 +1594,6 @@ typedef struct dw_pmsc_R
 	pmsc_ledc_t pmsc_ledc;
 } pmsc_R_t;
 
-/*
-	0	panadr 0-1 shortaddr
-	1	panadr 2-3 panid
-	2	syscfg 0
-	3	syscfg 1
-	4	syscfg 2
-	5	syscfg 3
-	6	tx_fctrl
-	7	rx_fwto
-	8	sys_mask 0
-	9	sys_mask 1
-	10	sys_mask 2
-	11	sys_mask 3
-	12	tx_antd
-	13	rx_sniff
-	14	tx_power
-	15	chan_ctrl
-	16	agc_ctrl1
-	17	agc_tune1
-	18	agc_tune2
-	19	agc_tune3
-	20	drx_tune0b
-	21	drx_tune1a
-	22	drx_tune1b
-	23	drx_tune2
-	24	drx_sfdtoc
-	25	drx_pretoc
-	26	drx_tune4h
-	27	rf_conf
-	28	rf_rxctrlh
-	29	rf_txctrl
-	30	ldotune
-	31	tc_sarc
-	32	tc_pg_ctrl
-	33 	tc_pgdelay
-	34	tc_pgtest
-	35	fs_pllcfg
-	36	fs_plltune
-	37	fs_xtalt
-	38	aon_wcfg
-	39	aon_cfg0
-	40	aon_cfg1
-	41	lde_cfg1
-	42	lde_cfg2
-	43	lde_rxantd
-	44	lde_repc
-*/
-
 // static const sys_cfg_t SYS_CFG_DEF =
 // {
 // 	.FFEN		= 0
@@ -2019,7 +1971,7 @@ int8_t validate_spi_transaction(reg_metadata_t info, size_t count, uint16_t offs
 int8_t validate_dw(reg_metadata_t info, size_t count, uint16_t offset);
 
 /**
- * @brief 
+ * @brief build the header for a spi transaction
  * 
  * @param is_read_op 
  * @param id 
@@ -2029,7 +1981,7 @@ int8_t validate_dw(reg_metadata_t info, size_t count, uint16_t offset);
 spi_header_t _build_header(uint8_t is_read_op, uint8_t id, uint16_t offset);
 
 /**
- * @brief 
+ * @brief perform a read or a write spi operation
  * 
  * @param is_read_op 
  * @param reg_id 
@@ -2040,7 +1992,7 @@ spi_header_t _build_header(uint8_t is_read_op, uint8_t id, uint16_t offset);
 void _dw_spi_transaction(uint8_t is_read_op,  uint8_t reg_id, uint8_t* buf, size_t count, uint16_t offset);
 
 /**
- * @brief 
+ * @brief read from a device register
  * 
  * @param info 
  * @param buf 
@@ -2051,7 +2003,7 @@ void _dw_spi_transaction(uint8_t is_read_op,  uint8_t reg_id, uint8_t* buf, size
 int8_t dw_read(reg_metadata_t info, uint8_t* buf, size_t count, uint16_t offset);
 
 /**
- * @brief 
+ * @brief write into a device register
  * 
  * @param info 
  * @param buf 
@@ -2062,27 +2014,27 @@ int8_t dw_read(reg_metadata_t info, uint8_t* buf, size_t count, uint16_t offset)
 int8_t dw_write(reg_metadata_t info, uint8_t* buf, size_t count, uint16_t offset);
 
 /**
- * @brief 
+ * @brief enable interrrupts given
  * 
  * @param set_mask 
  */
 void dw_set_irq(sys_mask_t set_mask);
 
 /**
- * @brief 
+ * @brief disable interrupts given
  * 
  * @param clear_mask 
  */
 void dw_clear_irq(sys_mask_t clear_mask);
 
 /**
- * @brief 
+ * @brief command the device to perform a soft reset
  * 
  */
 void dw_soft_reset(void);
 
 /**
- * @brief 
+ * @brief command the device to perform a soft reset of the receiver
  * 
  */
 void dw_soft_reset_rx(void);
@@ -2095,7 +2047,7 @@ void dw_soft_reset_rx(void);
 void _dw_irq_handler(void);
 
 /**
- * @brief 
+ * @brief send command to start message transmission
  * 
  * @param tx_fctrl 
  * @param tx_buf 
@@ -2105,44 +2057,44 @@ void _dw_irq_handler(void);
 void dw_start_tx(tx_fctrl_t tx_fctrl, uint8_t * tx_buf, dx_time_t dly_time, ack_resp_t_t w4r_time);
 
 /**
- * @brief 
+ * @brief send command to start message reception
  * 
  * @param dly_time 
  */
 void dw_start_rx(dx_time_t dly_time);
 
 /**
- * @brief 
+ * @brief turn off the transceiver
  * 
  * @return sys_state_t 
  */
 sys_state_t dw_transceiver_off(void);
 
 /**
- * @brief 
+ * @brief send the command to read an address from the OTP memory
  * 
  * @param address 
  */
 void dw_command_read_OTP(uint16_t address);
 
 /**
- * @brief 
+ * @brief get the ajusted transmission timestamp
  * 
  * @return uint64_t 
  */
 uint64_t dw_get_tx_time(void);
 
 /**
- * @brief 
+ * @brief get the ajusted reception timestamp
  * 
  * @return uint64_t 
  */
 uint64_t dw_get_rx_time(void);
 
 /**
- * @brief 
+ * @brief Calculates the clock offset with the data provided by the carrier recovery integrator register
  * 
- * @return int32_t 
+ * @return int32_t a floating point value relating to clock offset
  */
 int32_t dw_get_car_int(void);
 
