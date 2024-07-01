@@ -49,20 +49,26 @@ def update(frame):
 
     ax.clear()
     x, y = zip(*frame)
-    ax.scatter(x, y)
-    ax.scatter(4.2, 3.6)
-    ax.scatter(2.1, 3.6)
-    ax.scatter(0, 3.6)
+    scatter = ax.scatter(x, y)
+
+    # Draw vector arrows from the origin to each point
+    for (xi, yi) in frame:
+        ax.arrow(0, 0, xi, yi, head_width=0.2, head_length=0.2, length_includes_head=True, fc='black', ec='black')
+
+    # Predefined points
     ax.scatter(4.2, 0)
-    ax.scatter(0, 0)
+    ax.text(4.2, 0, "B", fontsize=10)
+    ax.scatter(4.2, 3.6)
+    ax.text(4.2, 3.6, "C1", fontsize=10)
+    ax.scatter(2.1, 3.6)
+    ax.text(2.1, 3.6, "C2", fontsize=10)
+    ax.scatter(0, 3.6)
+    ax.text(0, 3.6, "C0", fontsize=10)
 
     # Draw accuracy err for each point
-    circles = []
     radius = 3.16
-    for i in range(len(x) - 1):
-        i += 1
-        circle = plt.Circle((x[i], y[i]), radius, linestyle='--', fill=False)
-        circles.append(circle)
+    for xi, yi in frame[1:]:
+        circle = plt.Circle((xi, yi), radius, linestyle='--', fill=False)
         ax.add_patch(circle)
 
     ax.grid()
