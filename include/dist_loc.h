@@ -23,6 +23,7 @@
 #include "hal.h"
 #include "led.h"
 #include "chprintf.h"
+#include "chscanf.h"
 
 #include "dw1000_hal.h"
 #include "LR-WPANs_MAC.h"

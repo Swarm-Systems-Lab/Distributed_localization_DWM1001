@@ -1480,14 +1480,29 @@ THD_FUNCTION(SYSTEM_STATUS, arg)
 				disconnect_peer(peers+i);
 		}
 
+		int scanf_test;
+		float scanf_float;
+		char scanf_string[20];
+		chprintf((BaseSequentialStream*)&SD1, "\nInput an integer: ");
+		chscanf((BaseBufferedStream*)&SD1, "%d", &scanf_test);
+		chprintf((BaseSequentialStream*)&SD1, "Read: %d\n", scanf_test);
+
+		chprintf((BaseSequentialStream*)&SD1, "\nInput a float: ");
+		chscanf((BaseBufferedStream*)&SD1, "%f", &scanf_float);
+		chprintf((BaseSequentialStream*)&SD1, "Read: %f\n", scanf_float);
+
+		chprintf((BaseSequentialStream*)&SD1, "\nInput a string: ");
+		chscanf((BaseBufferedStream*)&SD1, " %20s", scanf_string);
+		chprintf((BaseSequentialStream*)&SD1, "Read: %s\n", scanf_string);
+
 		/*
 		 *	Print peer positions
 		 */
 
-		chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[0][0], (int)peer_positions[0][1]);
-		chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[1][0], (int)peer_positions[1][1]);
-		chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[2][0], (int)peer_positions[2][1]);
-		chprintf((BaseSequentialStream*)&SD1, "\n");
+		// chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[0][0], (int)peer_positions[0][1]);
+		// chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[1][0], (int)peer_positions[1][1]);
+		// chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[2][0], (int)peer_positions[2][1]);
+		// chprintf((BaseSequentialStream*)&SD1, "\n");
 
 		/*
 		 *	Print formatted EDM
