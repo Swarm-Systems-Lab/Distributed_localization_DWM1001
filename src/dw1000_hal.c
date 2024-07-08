@@ -307,7 +307,9 @@ void _dw_irq_handler(void)
 		if (pos)
 		{
 			//  TODO add warning cannot change irq_vector while interrupts are enabled
+			_dw_spi_hal_set._dw_spi_unlock();
 			irq_vector.vector[pos-1]();
+			_dw_spi_hal_set._dw_spi_lock();
 
 			// TODO disable mask each interrupt or manually
 			// sys_mask_t irq_mask;
@@ -411,7 +413,10 @@ uint64_t dw_get_tx_time(void)
 
 	dw_read(DW_REG_INFO.TX_TIME, time.reg, DW_REG_INFO.TX_TIME.size, 0);
 
-	memcpy(&timestamp, time.TX_STAMP, sizeof(time.TX_STAMP));
+	if (time.TX_STAMP)
+		memcpy(&timestamp, time.TX_STAMP, sizeof(time.TX_STAMP));
+	else
+		memcpy(&timestamp, time.TX_RAWST, sizeof(time.TX_RAWST));
 
 	return timestamp;
 }
@@ -424,9 +429,23 @@ uint64_t dw_get_rx_time(void)
 
 	dw_read(DW_REG_INFO.RX_TIME, time.reg, DW_REG_INFO.RX_TIME.size, 0);
 
-	memcpy(&timestamp, time.RX_STAMP, sizeof(time.RX_STAMP));
+	if (time.RX_STAMP)
+		memcpy(&timestamp, time.RX_STAMP, sizeof(time.RX_STAMP));
+	else
+		memcpy(&timestamp, time.RX_RAWST, sizeof(time.RX_RAWST));
 
 	return timestamp;
+}
+
+uint16_t dw_get_recv_size(void)
+{
+	rx_finfo_t rx_finfo;
+	uint16_t size = 0;
+
+	dw_read(DW_REG_INFO.RX_FINFO, rx_finfo.reg, DW_REG_INFO.RX_FINFO.size, 0);
+	size = (uint16_t)rx_finfo.RXFLEN + (uint16_t)(rx_finfo.RXFLE<<7) - 2; // 2 for CRC
+
+	return size;
 }
 
 int32_t dw_get_car_int(void)

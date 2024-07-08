@@ -2091,6 +2091,8 @@ uint64_t dw_get_tx_time(void);
  */
 uint64_t dw_get_rx_time(void);
 
+uint16_t dw_get_recv_size(void);
+
 /**
  * @brief Calculates the clock offset with the data provided by the carrier recovery integrator register
  * 
