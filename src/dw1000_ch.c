@@ -323,6 +323,16 @@ void read_frame(void)
 	dw_read(DW_REG_INFO.RX_BUFFER, dw1000_resp.recv_buf, dw1000_resp.recvd_size, 0);
 }
 
+uint16_t dw_get_addr(void)
+{
+	return panadr_own.short_addr;
+}
+
+uint16_t dw_get_panid(void)
+{
+	return panadr_own.pan_id;
+}
+
 void CPLOCK_handler(void)
 {
 	return;
@@ -359,6 +369,7 @@ void TXPHS_handler(void)
 void TXFRS_handler(void)
 {
 	dw1000_resp.tx_time = dw_get_tx_time();
+	toggle_led(blue);
 	chEvtSignal(dw_thread, MTXFRS_E);
 }
 
@@ -402,6 +413,7 @@ void RXDFR_handler(void)
 void RXFCG_handler(void)
 {
 	read_frame();
+	toggle_led(green);
 	chEvtSignal(dw_thread, MRXFCG_E);
 }
 
@@ -562,13 +574,13 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	tx_ctrl.TXPL = PL_128;
 
 	dw_ctrl_req_t current_state;
-	dw_ctrl_req_t dw_ctrl_req;
+	dw_ctrl_req_t dw_ctrl_req = DW_CTRL_YIELD;
 	dw_ctrl_req_t last_state = DW_RESET;
 	uint8_t err_cnt = 0;
 	uint8_t rst_cnt = 0;
 	int8_t twr_ret;
 
-	dw1000_cmd_t* dw1000_cmd;
+	dw1000_cmd_t* dw1000_cmd = NULL;
 
 	chMBObjectInit(&dw_controller, &dw_controller_msg, 1);
 	chMBObjectInit(&dw_controller_resp, &dw_controller_resp_msg, 1);
@@ -581,7 +593,9 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 
 	while (true)
 	{
-		tx_ctrl.TFLEN = dw1000_cmd->size+2; // TODO magic
+		if (dw1000_cmd != NULL)
+			tx_ctrl.TFLEN = dw1000_cmd->size+2; // TODO magic
+
 		w4r.mask = 0;
 		memset(dx_time.reg, 0, sizeof(dx_time.reg));
 
@@ -591,7 +605,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 		{
 			case DW_RECV:
 				dw_start_rx(dx_time);
-				evt = chEvtWaitOneTimeout(MRXFCG_E | MRXERR_E, TIME_US2I(dw1000_cmd->tmo));
+				evt = chEvtWaitOneTimeout(MRXFCG_E | MRXERR_E, dw1000_cmd->tmo);
 				if (evt == MRXFCG_E)
 				{
 					dw_ctrl_req = DW_CTRL_YIELD;
@@ -628,7 +642,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 					dw_ctrl_req = DW_TRX_ERR;
 				else
 				{
-					evt = chEvtWaitOneTimeout(MRXFCG_E | MRXERR_E, TIME_US2I(dw1000_cmd->tmo));
+					evt = chEvtWaitOneTimeout(MRXFCG_E | MRXERR_E, dw1000_cmd->tmo);
 					if (evt == MRXFCG_E)
 					{
 						dw1000_resp.state = DW_SEND_W4R_OK;

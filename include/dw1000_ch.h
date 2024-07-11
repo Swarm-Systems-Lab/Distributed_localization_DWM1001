@@ -99,7 +99,7 @@ typedef struct dw1000_cmd
 	dw_ctrl_req_t dw_ctrl_req;
 	uint32_t dly;
 	int32_t wait;
-	uint32_t tmo;
+	sysinterval_t tmo;
 	size_t size;
 	uint8_t send_buf[MSG_BUFFER_SIZE];
 } dw1000_cmd_t;
@@ -175,6 +175,9 @@ void set_irq_vector(void);
 void dw_setup(void);
 
 void read_frame(void);
+
+uint16_t dw_get_addr(void);
+uint16_t dw_get_panid(void);
 
 void CPLOCK_handler(void);
 void ESYNCR_handler(void);
