@@ -20,7 +20,7 @@
 #define SS_DEVICE_NUMBER		3
 #define SS_CONSENSUS_FREQUENCY	10
 #define SS_COMM_PERIOD_SLICE	0.5
-#define SS_K_GAIN				100
+#define SS_K_GAIN				1
 #define SS_COMM_SLOT_N			4
 
 typedef enum ss_packet_types
@@ -42,7 +42,7 @@ typedef struct ss_pos
 
 typedef struct _comm_slot_data
 {
-	uint8_t* current_slot_p;
+	int8_t* current_slot_p;
 	binary_semaphore_t* slot_free_p;
 } _comm_slot_data_t;
 
@@ -60,7 +60,7 @@ extern dw_addr_t identifier_map[SS_DEVICE_NUMBER];
 
 extern float consensus_value[SS_DEVICE_NUMBER];
 
-extern uint8_t current_slot;
+extern int8_t current_slot;
 extern uint8_t current_comm;
 
 extern dw_addr_t self_addr;
@@ -69,8 +69,8 @@ extern size_t self_id;
 static const uint8_t COMM_GRAPH[SS_DEVICE_NUMBER][SS_DEVICE_NUMBER] =
 {
 	{0,1,0},
-	{1,0,1},
-	{0,1,0}
+	{2,0,3},
+	{0,4,0}
 };
 
 extern THD_FUNCTION(SS, arg);

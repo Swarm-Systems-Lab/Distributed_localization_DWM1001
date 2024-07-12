@@ -59,7 +59,7 @@ size_t dw_recv_tmo(dw_addr_t* addr, uint8_t* recv_data, size_t size, sysinterval
 	chMBPostTimeout(&dw_controller, (msg_t)&dw_cmd, TIME_INFINITE);
 	chMBFetchTimeout(&dw_controller_resp, (msg_t*)&res, TIME_INFINITE);
 
-	if (res->recvd_size >= sizeof(MHR_16_t))
+	if (res->recvd_size >= sizeof(header))
 	{
 		header = decode_MHR(res->recv_buf);
 
