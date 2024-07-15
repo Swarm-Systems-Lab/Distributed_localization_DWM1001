@@ -39,6 +39,8 @@ binary_semaphore_t slot_free;
 
 uint16_t consensus_iter_n = 0;
 
+uint8_t fail_cnt = 0;
+
 void comm_slot_cb(virtual_timer_t* vtp, void* arg)
 {
 	current_slot++;
@@ -167,16 +169,19 @@ void run_consensus(void)
 {
 	dw_addr_t recvd_addr = 0;
 
+	if (consensus_iter_n == SS_ITER_N-1)
+		chprintf((BaseSequentialStream*)&SD1, "Id: %d Consensus value: %f\n\n", self_id, consensus_value[self_id]);
+	
 	for (size_t i = 0; i < SS_DEVICE_NUMBER; i++)
 	{
 		chBSemWait(&slot_free);
 
 		if (identifier_map[i] == self_addr)
 		{
-			chThdSleepMicroseconds(5);
+			chThdSleepMicroseconds(10);
 			dw_send_tmo(0xFFFF, (uint8_t*)(&(consensus_value[i])), sizeof(consensus_value[i]), TIME_US2I(CONSENSUS_PERIOD_US/SS_DEVICE_NUMBER-SS_RTOS_DELAY_US));
 			
-			chprintf((BaseSequentialStream*)&SD1, "Iter: %d %d sent: %f\n\n", consensus_iter_n, self_id, consensus_value[i]);
+			//chprintf((BaseSequentialStream*)&SD1, "Iter: %d %d sent: %f\n\n", consensus_iter_n, self_id, consensus_value[i]);
 		}
 		else
 		{
@@ -185,10 +190,26 @@ void run_consensus(void)
 			if (recvd == sizeof(recv_value) && recvd_addr == identifier_map[i] && COMM_GRAPH[i][self_id] > 0)
 			{
 				consensus_value[i] = recv_value;
-				chprintf((BaseSequentialStream*)&SD1, "Iter: %d %d received: %f\n\n", consensus_iter_n, self_id, recv_value);
+				//chprintf((BaseSequentialStream*)&SD1, "Iter: %d %d received: %f\n\n", consensus_iter_n, self_id, recv_value);
 			}
 			else
 			{
+				if (recvd == 0)
+				{
+					fail_cnt++;
+					chprintf((BaseSequentialStream*)&SD1, "Iter: %d timeout\n\n", consensus_iter_n);
+				}
+				else if (recvd_addr != identifier_map[i])
+				{
+					fail_cnt++;
+					chprintf((BaseSequentialStream*)&SD1, "Iter: %d %d received from %d\n\n", consensus_iter_n, self_id, identifier_map[i]);
+				}
+				else if (COMM_GRAPH[i][self_id] <= 0)
+				{
+					fail_cnt++;
+					chprintf((BaseSequentialStream*)&SD1, "Iter: %d %d received from %d\n\n", consensus_iter_n, self_id, identifier_map[i]);
+				}
+
 				consensus_value[i] = consensus_value[self_id];
 			}
 		}
