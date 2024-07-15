@@ -31,7 +31,6 @@ float init_consensus[SS_DEVICE_NUMBER] = {1.0, 3.0, 0.0};
 float consensus_value[SS_DEVICE_NUMBER];
 
 int8_t current_slot = -1;
-uint8_t current_comm = 1;
 
 dw_addr_t self_addr;
 size_t self_id;
@@ -40,41 +39,33 @@ binary_semaphore_t slot_free;
 
 uint16_t consensus_iter_n = 0;
 
-static const _comm_slot_data_t _comm_slot_data = 
-{
-	.current_slot_p = &current_slot,
-	.slot_free_p = &slot_free
-};
-
 void comm_slot_cb(virtual_timer_t* vtp, void* arg)
 {
-	 _comm_slot_data_t* slot_data = ((_comm_slot_data_t*)arg);
+	current_slot++;
+	if (current_slot >= SS_DEVICE_NUMBER)
+	{
+		current_slot = 0;
+		update_consensus(consensus_value);
+	}
 
-	(*(slot_data->current_slot_p))++;
-	if ((*(slot_data->current_slot_p)) >= SS_COMM_SLOT_N)
-		(*(slot_data->current_slot_p)) = 0;
+	if (consensus_iter_n >= SS_ITER_N)
+	{
+		consensus_iter_n = 0;
+		reload_consensus();
+	}
 
 	chSysLockFromISR();
-	chBSemSignalI(slot_data->slot_free_p);
+	chBSemSignalI(&slot_free);
 	chSysUnlockFromISR();
-
-	// chSysLockFromISR();
-	// chVTSetI(&comm_slot_timer, TIME_US2I((10000000)/(SS_CONSENSUS_FREQUENCY*COMM_SLOT_N)), comm_slot_cb, NULL);
-	// chSysUnlockFromISR();
 }
 
 void consensus_cb(virtual_timer_t* vtp, void* arg)
 {
 	update_consensus((float*)arg);
-
-	// chSysLockFromISR();
-	// chVTSetI(&consensus_timer, TIME_MS2I((1000/SS_CONSENSUS_FREQUENCY)), comm_slot_cb, NULL);
-	// chSysUnlockFromISR();
 }
 
 void init_timers(void)
 {
-	chVTObjectInit(&consensus_timer);
 	chVTObjectInit(&comm_slot_timer);
 }
 
@@ -136,6 +127,7 @@ void recv_serial(void)
 void update_consensus(float* values)
 {
 	float consensus_sum = 0;
+	consensus_iter_n++;
 
 	for (size_t i = 0; i < SS_DEVICE_NUMBER; i++)
 		consensus_sum += values[self_id]-values[i];
@@ -175,50 +167,38 @@ void run_consensus(void)
 {
 	dw_addr_t recvd_addr = 0;
 
-	current_comm = 1;
-
 	for (size_t i = 0; i < SS_DEVICE_NUMBER; i++)
 	{
-		for (size_t j = 0; j < SS_DEVICE_NUMBER; j++)
+		chBSemWait(&slot_free);
+
+		if (identifier_map[i] == self_addr)
 		{
-			if (COMM_GRAPH[i][j] == current_comm)
+			chThdSleepMicroseconds(5);
+			dw_send_tmo(0xFFFF, (uint8_t*)(&(consensus_value[i])), sizeof(consensus_value[i]), TIME_US2I(CONSENSUS_PERIOD_US/SS_DEVICE_NUMBER-SS_RTOS_DELAY_US));
+			
+			chprintf((BaseSequentialStream*)&SD1, "Iter: %d %d sent: %f\n\n", consensus_iter_n, self_id, consensus_value[i]);
+		}
+		else
+		{
+			float recv_value = -99999.9;
+			size_t recvd = dw_recv_tmo(&recvd_addr, (uint8_t*)(&recv_value), sizeof(recv_value), TIME_US2I(CONSENSUS_PERIOD_US/SS_DEVICE_NUMBER-SS_RTOS_DELAY_US));
+			if (recvd == sizeof(recv_value) && recvd_addr == identifier_map[i] && COMM_GRAPH[i][self_id] > 0)
 			{
-				if (current_comm == current_slot+1)
-				{
-					chBSemWait(&slot_free);
-					if (current_slot == 0)
-						current_comm = 1;
-
-					chprintf((BaseSequentialStream*)&SD1, "at slot %d comm %d i:%d j:%d\n", current_slot, current_comm, i, j);
-
-					if (self_addr == identifier_map[j])
-					{
-						float recv_value = -99999.9;
-						size_t recvd = dw_recv_tmo(&recvd_addr, (uint8_t*)(&recv_value), sizeof(recv_value), TIME_US2I((100000000/2)/(SS_CONSENSUS_FREQUENCY*SS_COMM_SLOT_N)));
-						if (recvd == sizeof(recv_value) && recvd_addr == identifier_map[i])
-							consensus_value[i] = recv_value;
-						else
-							consensus_value[i] = consensus_value[j];
-						chprintf((BaseSequentialStream*)&SD1, "%d received: %f\n\n", self_addr, recv_value);
-					}
-					else if (self_addr == identifier_map[i])
-					{
-						chThdSleepMilliseconds(5);
-						dw_send_tmo(identifier_map[j], (uint8_t*)(&(consensus_value[i])), sizeof(consensus_value[i]), TIME_US2I((100000000/4)/(SS_CONSENSUS_FREQUENCY*SS_COMM_SLOT_N)));
-						chprintf((BaseSequentialStream*)&SD1, "%d sent: %f\n\n", self_addr, consensus_value[i]);
-					}
-					current_comm++;
-				}
+				consensus_value[i] = recv_value;
+				chprintf((BaseSequentialStream*)&SD1, "Iter: %d %d received: %f\n\n", consensus_iter_n, self_id, recv_value);
 			}
 			else
 			{
-				if (self_addr == identifier_map[j])
-					consensus_value[i] = consensus_value[self_id];
-				else if (self_addr == identifier_map[i])
-					consensus_value[j] = consensus_value[self_id];
+				consensus_value[i] = consensus_value[self_id];
 			}
 		}
 	}
+}
+
+void reload_consensus(void)
+{
+	for (size_t i = 0; i < SS_DEVICE_NUMBER; i++)
+		consensus_value[i] = init_consensus[self_id];
 }
 
 THD_FUNCTION(SS, arg)
@@ -235,8 +215,7 @@ THD_FUNCTION(SS, arg)
 			self_id = i;
 	}
 
-	for (size_t i = 0; i < SS_DEVICE_NUMBER; i++)
-		consensus_value[i] = init_consensus[self_id];
+	reload_consensus();
 
 	chBSemObjectInit(&slot_free, 1);
 
@@ -246,13 +225,10 @@ THD_FUNCTION(SS, arg)
 
 	ss_sync();
 
-	chVTSetContinuous(&comm_slot_timer, TIME_US2I((100000000)/(SS_CONSENSUS_FREQUENCY*SS_COMM_SLOT_N)), comm_slot_cb, &_comm_slot_data);
-	chVTSetContinuous(&consensus_timer, TIME_US2I((100000000/SS_CONSENSUS_FREQUENCY)), consensus_cb, consensus_value);
+	chVTSetContinuous(&comm_slot_timer, TIME_US2I(CONSENSUS_PERIOD_US/SS_DEVICE_NUMBER), comm_slot_cb, NULL);
 
 	while(true)
 	{
 		run_consensus();
-		send_debug();
-		chThdSleepMilliseconds(5);
 	}
 }

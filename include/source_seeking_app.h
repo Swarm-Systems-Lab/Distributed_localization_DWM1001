@@ -18,10 +18,12 @@
 #include "uwb_comm.h"
 
 #define SS_DEVICE_NUMBER		3
-#define SS_CONSENSUS_FREQUENCY	10
+#define SS_CONSENSUS_FREQUENCY	5
 #define SS_COMM_PERIOD_SLICE	0.5
-#define SS_K_GAIN				1
-#define SS_COMM_SLOT_N			4
+#define SS_K_GAIN				0.5
+#define CONSENSUS_PERIOD_US		(1000000/SS_CONSENSUS_FREQUENCY)
+#define SS_RTOS_DELAY_US		100
+#define SS_ITER_N				100
 
 typedef enum ss_packet_types
 {
@@ -40,15 +42,7 @@ typedef struct ss_pos
 	float y;
 } ss_pos_t;
 
-typedef struct _comm_slot_data
-{
-	int8_t* current_slot_p;
-	binary_semaphore_t* slot_free_p;
-} _comm_slot_data_t;
-
 extern virtual_timer_t comm_slot_timer;
-
-extern virtual_timer_t consensus_timer;
 
 extern binary_semaphore_t slot_free;
 
@@ -61,7 +55,6 @@ extern dw_addr_t identifier_map[SS_DEVICE_NUMBER];
 extern float consensus_value[SS_DEVICE_NUMBER];
 
 extern int8_t current_slot;
-extern uint8_t current_comm;
 
 extern dw_addr_t self_addr;
 extern size_t self_id;
@@ -71,15 +64,13 @@ extern uint16_t consensus_iter_n;
 static const uint8_t COMM_GRAPH[SS_DEVICE_NUMBER][SS_DEVICE_NUMBER] =
 {
 	{0,1,0},
-	{2,0,3},
-	{0,4,0}
+	{1,0,1},
+	{0,1,0}
 };
 
 extern THD_FUNCTION(SS, arg);
 
 void comm_slot_cb(virtual_timer_t* vtp, void* arg);
-
-void consensus_cb(virtual_timer_t* vtp, void* arg);
 
 void init_timers(void);
 
@@ -98,3 +89,5 @@ void update_consensus(float* values);
 void run_consensus(void);
 
 void ss_sync(void);
+
+void reload_consensus(void);
