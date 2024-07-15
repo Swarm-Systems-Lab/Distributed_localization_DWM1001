@@ -66,6 +66,8 @@ extern uint8_t current_comm;
 extern dw_addr_t self_addr;
 extern size_t self_id;
 
+extern uint16_t consensus_iter_n;
+
 static const uint8_t COMM_GRAPH[SS_DEVICE_NUMBER][SS_DEVICE_NUMBER] =
 {
 	{0,1,0},

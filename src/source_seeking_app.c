@@ -38,6 +38,8 @@ size_t self_id;
 
 binary_semaphore_t slot_free;
 
+uint16_t consensus_iter_n = 0;
+
 static const _comm_slot_data_t _comm_slot_data = 
 {
 	.current_slot_p = &current_slot,
@@ -91,6 +93,16 @@ void send_asc_2d(void)
 	uart1_send_buff[0].p_length = sizeof(ss_ned_pos);
 
 	memcpy(uart1_send_buff[0].p_data, &ss_ned_pos, uart1_send_buff[0].p_length);
+	chMBPostTimeout(&uart1_send_queue, (msg_t)&(uart1_send_buff[0]), TIME_US2I(50));
+}
+
+void send_debug(void)
+{
+	uart1_send_buff[0].p_class = SS_P_DEBUG;
+	uart1_send_buff[0].p_length = sizeof(consensus_iter_n) + sizeof(consensus_value[self_id]);
+
+	memcpy(uart1_send_buff[0].p_data, &consensus_iter_n, sizeof(consensus_iter_n));
+	memcpy(uart1_send_buff[0].p_data+sizeof(consensus_iter_n), consensus_value+self_id, sizeof(consensus_value[self_id]));
 	chMBPostTimeout(&uart1_send_queue, (msg_t)&(uart1_send_buff[0]), TIME_US2I(50));
 }
 
@@ -169,34 +181,42 @@ void run_consensus(void)
 	{
 		for (size_t j = 0; j < SS_DEVICE_NUMBER; j++)
 		{
-			if (COMM_GRAPH[i][j] == current_comm && current_comm == current_slot+1)
+			if (COMM_GRAPH[i][j] == current_comm)
 			{
-				chBSemWait(&slot_free);
-				if (current_slot == 0)
-					current_comm = 1;
-
-				chprintf((BaseSequentialStream*)&SD1, "at slot %d comm %d i:%d j:%d\n", current_slot, current_comm, i, j);
-
-				if (self_addr == identifier_map[j])
+				if (current_comm == current_slot+1)
 				{
-					float recv_value = -99999.9;
-					size_t recvd = dw_recv_tmo(&recvd_addr, (uint8_t*)(&recv_value), sizeof(recv_value), TIME_US2I((100000000/2)/(SS_CONSENSUS_FREQUENCY*SS_COMM_SLOT_N)));
-					if (recvd == sizeof(recv_value) && recvd_addr == identifier_map[i])
-						consensus_value[i] = recv_value;
-					else
-						consensus_value[i] = consensus_value[j];
-					chprintf((BaseSequentialStream*)&SD1, "%d received: %f\n\n", self_addr, recv_value);
+					chBSemWait(&slot_free);
+					if (current_slot == 0)
+						current_comm = 1;
+
+					chprintf((BaseSequentialStream*)&SD1, "at slot %d comm %d i:%d j:%d\n", current_slot, current_comm, i, j);
+
+					if (self_addr == identifier_map[j])
+					{
+						float recv_value = -99999.9;
+						size_t recvd = dw_recv_tmo(&recvd_addr, (uint8_t*)(&recv_value), sizeof(recv_value), TIME_US2I((100000000/2)/(SS_CONSENSUS_FREQUENCY*SS_COMM_SLOT_N)));
+						if (recvd == sizeof(recv_value) && recvd_addr == identifier_map[i])
+							consensus_value[i] = recv_value;
+						else
+							consensus_value[i] = consensus_value[j];
+						chprintf((BaseSequentialStream*)&SD1, "%d received: %f\n\n", self_addr, recv_value);
+					}
+					else if (self_addr == identifier_map[i])
+					{
+						chThdSleepMilliseconds(5);
+						dw_send_tmo(identifier_map[j], (uint8_t*)(&(consensus_value[i])), sizeof(consensus_value[i]), TIME_US2I((100000000/4)/(SS_CONSENSUS_FREQUENCY*SS_COMM_SLOT_N)));
+						chprintf((BaseSequentialStream*)&SD1, "%d sent: %f\n\n", self_addr, consensus_value[i]);
+					}
+					current_comm++;
 				}
-				else if (self_addr == identifier_map[i])
-				{
-					chThdSleepMilliseconds(5);
-					dw_send_tmo(identifier_map[j], (uint8_t*)(&(consensus_value[i])), sizeof(consensus_value[i]), TIME_US2I((100000000/4)/(SS_CONSENSUS_FREQUENCY*SS_COMM_SLOT_N)));
-					chprintf((BaseSequentialStream*)&SD1, "%d sent: %f\n\n", self_addr, consensus_value[i]);
-				}
-				current_comm++;
 			}
 			else
-				consensus_value[j] = consensus_value[i]; // TODO
+			{
+				if (self_addr == identifier_map[j])
+					consensus_value[i] = consensus_value[self_id];
+				else if (self_addr == identifier_map[i])
+					consensus_value[j] = consensus_value[self_id];
+			}
 		}
 	}
 }
@@ -232,5 +252,7 @@ THD_FUNCTION(SS, arg)
 	while(true)
 	{
 		run_consensus();
+		send_debug();
+		chThdSleepMilliseconds(5);
 	}
 }
