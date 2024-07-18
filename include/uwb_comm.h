@@ -15,12 +15,18 @@
  */
 
 #include "dw1000_ch.h"
-#include "LR-WPANs_MAC.h"
 
 #define DEF_TMO_MS			TIME_MS2I(50)
 
 // TODO ifdef needed to support 64 bit addrs
 typedef uint16_t dw_addr_t;
+
+typedef struct dw_recv_info
+{
+	dw_rsp_st_t state;
+	size_t recvd_size;
+	uint64_t rx_time;
+} dw_recv_info_t;
 
 // MHR.frame_control.frame_type = FT_DATA;
 // MHR.frame_control.sec_en = 0b0;
@@ -33,4 +39,7 @@ typedef uint16_t dw_addr_t;
 static const frame_control_t def_frame_ctrl = {.mask=0x9841};
 
 int64_t dw_send_tmo(dw_addr_t addr, uint8_t* send_data, size_t size, sysinterval_t tmo);
-size_t dw_recv_tmo(dw_addr_t* addr, uint8_t* recv_data, size_t size, sysinterval_t tmo);
+int64_t dw_send_dly_tmo(dw_addr_t addr, uint8_t* send_data, size_t size, uint32_t dly, sysinterval_t tmo);
+dw_recv_info_t dw_send_w4r_tmo(dw_addr_t addr, uint8_t* send_data, size_t size, uint32_t wait, dw_addr_t* recv_addr, uint8_t* recv_data, size_t recv_size, sysinterval_t tmo);
+dw_recv_info_t dw_sstwr(dw_addr_t addr, uint8_t* send_data, size_t size, uint8_t* recv_data, size_t recv_size);
+dw_recv_info_t dw_recv_tmo(dw_addr_t* addr, uint8_t* recv_data, size_t size, sysinterval_t tmo);

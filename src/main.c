@@ -6,8 +6,9 @@
 #include "ch.h"
 #include "hal.h"
 
+//#include "source_seeking_app.h"
+#include "test_app.h"
 
-#include "source_seeking_app.h"
 
 static THD_WORKING_AREA(APP_THREAD, 512);
 
@@ -26,9 +27,8 @@ int main(void) {
 	chThdSleepMilliseconds(100);
 	
 	chThdCreateStatic(DW_CONTROLLER_THREAD, sizeof(DW_CONTROLLER_THREAD), NORMALPRIO, DW_CONTROLLER, NULL);
-	//chThdCreateStatic(COMMS_THREAD, sizeof(COMMS_THREAD), NORMALPRIO, COMMS, NULL);
 	chThdCreateStatic(UART_CONTROLLER_THREAD, sizeof(UART_CONTROLLER_THREAD), NORMALPRIO, UART_CONTROLLER, NULL);
-	chThdCreateStatic(APP_THREAD, sizeof(APP_THREAD), NORMALPRIO, SS, NULL);
+	chThdCreateStatic(APP_THREAD, sizeof(APP_THREAD), NORMALPRIO, TEST_APP, NULL);
 
 	while (true) {	
 		toggle_led(red1);

@@ -42,6 +42,8 @@ panadr_t panadr_own;
 tx_antd_t tx_antd;
 uint16_t rx_ant_d;
 
+rx_finfo_t rx_finfo;
+
 uint32_t recv_tmo_usec;
 
 dw1000_resp_t dw1000_resp = 
@@ -274,7 +276,7 @@ void dw_setup(void)
 	irq_mask.MRXPHE = 0b1;
 	irq_mask.MRXFCE = 0b1;
 	irq_mask.MRXRFSL = 0b1;
-	//irq_mask.MLDEERR = 0b1;
+	irq_mask.MLDEERR = 0b1;
 	irq_mask.MAFFREJ = 0b1;	
 
 	dw_set_irq(irq_mask);
@@ -308,8 +310,8 @@ void dw_setup(void)
 			rx_ant_d = 15918;
 			break;
 		case 1955:
-			tx_antd = 14535;
-			rx_ant_d = 18500;
+			tx_antd = 0;
+			rx_ant_d = 0;
 			break;
 	}
 	dw_write(DW_REG_INFO.LDE_CTRL, (uint8_t*)(&rx_ant_d), DW_SUBREG_INFO.LDE_RXANTD.size, DW_SUBREG_INFO.LDE_RXANTD.offset);
@@ -318,7 +320,9 @@ void dw_setup(void)
 
 void read_frame(void)
 {
-	dw1000_resp.recvd_size = dw_get_recv_size();
+	dw_read(DW_REG_INFO.RX_FINFO, rx_finfo.reg, DW_REG_INFO.RX_FINFO.size, 0);
+
+	dw1000_resp.recvd_size = dw_get_recv_size(rx_finfo);
 	dw1000_resp.rx_time = dw_get_rx_time();
 	dw_read(DW_REG_INFO.RX_BUFFER, dw1000_resp.recv_buf, dw1000_resp.recvd_size, 0);
 }
@@ -502,61 +506,114 @@ void AFFREJ_handler(void)
 	return;
 }
 
-// int8_t respond_if_twr(void)
-// {
-// 	recvd_type = recv_buf[sizeof(recvd_header)];
-// 	if (recvd_type != MT_D_INIT || twr_state != TWR_REQ_RECVD)
-// 		return 0;
+void calculate_distance(void)
+{
+	twr_header_t twr_header;
+	uint64_t tx_time = dw_get_tx_time();
+	uint64_t rx_time = dw1000_resp.rx_time;
+	int64_t rt_init, rt_resp;
 
-// 	dx_time_t dx_time;
-// 	ack_resp_t_t w4r;
-// 	tx_fctrl_t tx_ctrl;
-// 	eventmask_t evt = 0;
-// 	memset(tx_ctrl.reg, 0, sizeof(tx_ctrl.reg));
-// 	memset(send_buf, 0, sizeof(send_buf));
-// 	tx_ctrl.TXBR = BR_6_8MBPS;
-// 	tx_ctrl.TXPRF = PRF_16MHZ;
-// 	tx_ctrl.TXPL = PL_128;
-// 	w4r.mask = 0;
-// 	memset(dx_time.reg, 0, sizeof(dx_time.reg));
+	// Get time from response
+	memcpy(&twr_header, dw1000_resp.recv_buf+sizeof(MHR_16_t), sizeof(twr_header));
 
-// 	uint8_t lde_stat = 0xd;
+	rt_init = (rx_time) - (tx_time);
+	rt_resp = (twr_header.tx_time) - (twr_header.rx_time);
 
-// 	recvd_header = decode_MHR(recv_buf);
+	float clock_offset_r = dw_get_car_int() * CAR_INT_CTE;
+	rt_resp *= (1.0f - clock_offset_r);
 
-// 	uint64_t rx_time = 0;
-// 	memcpy(&rx_time, recv_info.dw_rx_time.RX_STAMP, sizeof(recv_info.dw_rx_time.RX_STAMP));
-// 	if (!rx_time)
-// 	{
-// 		memcpy(&rx_time, recv_info.dw_rx_time.RX_RAWST, sizeof(recv_info.dw_rx_time.RX_RAWST));
-// 		rx_time -= rx_ant_d;
-// 		memcpy(send_buf+sizeof(rx_time)+sizeof(rx_time), &lde_stat, sizeof(lde_stat));
-// 	}
-// 	uint64_t delay_tx = (uint64_t)rx_time + (uint64_t)(65536*4000);
-// 	uint64_t tx_time = (uint64_t)delay_tx +(uint64_t)tx_antd;
+	double tof = (rt_init - rt_resp)/2.0f;
+	tof *= (1.0f/(float)DW_TIME_U);
 
-// 	memcpy(send_buf, &tx_time, sizeof(tx_time));
-// 	memcpy(send_buf+sizeof(tx_time), &rx_time, sizeof(rx_time));
+	float distance = (float)tof * C_ATM;
 
-// 	send_msg_meta.size = sizeof(tx_time)+sizeof(rx_time)+sizeof(lde_stat);
-// 	send_msg_meta.seq_ack_num = 0;
-// 	send_msg_meta.type = MT_D_RESP;
-// 	send_msg_meta.addr = recvd_header.src_addr;
+	if (distance > -0.1 && distance < 300)
+	{
+		memcpy(dw1000_resp.recv_buf+sizeof(MHR_16_t), &distance, sizeof(distance));
+		dw1000_resp.recvd_size = sizeof(MHR_16_t) + sizeof(distance);
+	}
+}
 
-// 	prepare_message();
-// 	tx_ctrl.TFLEN = send_size+2; // TODO magic
+uint64_t build_twr_resp(uint8_t* buffer, MHR_16_t header)
+{
+	twr_header_t twr_header;
+	uint64_t delay_tx = dw1000_resp.rx_time + (uint64_t)(65536*2800);
+	uint64_t tx_time = (uint64_t)delay_tx +(uint64_t)tx_antd;
 
-// 	dx_time.time32 = (uint32_t)(delay_tx >> 8);
-// 	dw_start_tx(tx_ctrl, send_buf, dx_time, w4r);
-// 	evt = chEvtWaitOneTimeout(MTXFRS_E, TX_TIMEOUT);
-// 	if (evt != MTXFRS_E)
-// 	{
-// 		twr_state = TWR_FAIL;
-// 		return -1;
-// 	}
-// 	return 1;
-		
-// }
+	header.dest_addr = header.src_addr;
+	header.src_addr = dw_get_addr();
+
+	twr_header.m_type = MT_TWR_RESP;
+	twr_header.tx_time = tx_time;
+	twr_header.rx_time = dw1000_resp.rx_time;
+
+	memcpy(buffer, &header, sizeof(header));
+	memcpy(buffer + sizeof(header), &twr_header, sizeof(twr_header));
+
+	return delay_tx;
+}
+
+twr_state_t respond_twr(twr_state_t twr_state)
+{
+	twr_header_t twr_header;
+	MHR_16_t header;
+	uint64_t delay_tx;
+	uint8_t resp_message_size = sizeof(MHR_16_t) + sizeof(twr_header) + 1;
+	uint8_t resp_message[resp_message_size];
+	dx_time_t dx_time;
+	ack_resp_t_t w4r;
+	tx_fctrl_t tx_ctrl;
+	eventmask_t evt = 0;
+
+	if (twr_state == TWR_SEND_INIT)
+		return TWR_RESP_RECVD;
+
+	header = decode_MHR(dw1000_resp.recv_buf);
+	memcpy(&twr_header, dw1000_resp.recv_buf+sizeof(MHR_16_t), sizeof(twr_header));
+
+	if (twr_header.m_type != MT_TWR_INIT)
+		return TWR_FAIL;
+	
+	memset(tx_ctrl.reg, 0, sizeof(tx_ctrl.reg));
+	memset(dx_time.reg, 0, sizeof(dx_time.reg));
+
+	tx_ctrl.TXBR = BR_6_8MBPS;
+	tx_ctrl.TXPRF = PRF_16MHZ;
+	tx_ctrl.TXPL = PL_128;
+	tx_ctrl.TFLEN = resp_message_size+2; // TODO magic
+	tx_ctrl.TR = 0b1;
+	w4r.mask = 0;
+
+	delay_tx = build_twr_resp(resp_message, header);
+
+	dx_time.time32 = (uint32_t)(delay_tx >> 8);
+	dw_start_tx(tx_ctrl, resp_message, dx_time, w4r);
+	evt = chEvtWaitOneTimeout(MTXFRS_E, TX_TIMEOUT);
+	if (evt != MTXFRS_E)
+		return TWR_FAIL;
+	return TWR_SEND_RESP;
+}
+
+dw_ctrl_req_t handle_sstwr(twr_state_t state)
+{
+	switch (state)
+	{
+		case TWR_NO_TWR:
+			break;
+		case TWR_SEND_INIT:
+			return DW_SEND_W4R;
+			break;
+		case TWR_SEND_RESP:
+			return DW_CTRL_YIELD;
+			break;
+		case TWR_RESP_RECVD:
+			calculate_distance();
+			return DW_CTRL_YIELD;
+			break;
+		case TWR_FAIL:
+			break;
+	}
+}
 
 THD_FUNCTION(DW_CONTROLLER, arg)
 {
@@ -578,7 +635,8 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	dw_ctrl_req_t last_state = DW_RESET;
 	uint8_t err_cnt = 0;
 	uint8_t rst_cnt = 0;
-	int8_t twr_ret;
+
+	twr_state_t twr_state = TWR_NO_TWR;
 
 	dw1000_cmd_t* dw1000_cmd = NULL;
 
@@ -589,7 +647,9 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 
 	set_irq_vector();
 
-	//barrier();
+
+	// TODO This sleep makes LDE work, may not enough time to start lde on setup
+	chThdSleepMilliseconds(100);
 
 	while (true)
 	{
@@ -610,6 +670,11 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				{
 					dw_ctrl_req = DW_CTRL_YIELD;
 					dw1000_resp.state = DW_RECV_OK;
+					if (rx_finfo.RNG)
+					{
+						twr_state = respond_twr(twr_state);
+						handle_sstwr(twr_state);
+					}
 				}
 				else if (evt == 0)
 				{
@@ -646,9 +711,11 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 					if (evt == MRXFCG_E)
 					{
 						dw1000_resp.state = DW_SEND_W4R_OK;
-						// twr_ret = respond_if_twr();
-						// if (twr_ret < 0)
-						// 	dw_ctrl_req = DW_TRX_ERR;
+						if (rx_finfo.RNG)
+						{
+							twr_state = respond_twr(twr_state);
+							handle_sstwr(twr_state);
+						}
 						dw_ctrl_req = DW_CTRL_YIELD;
 					}
 					else if (evt == 0)
@@ -689,12 +756,11 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				{
 					dw_ctrl_req = dw1000_cmd->dw_ctrl_req;
 
+					tx_ctrl.TR = 0b0;
 					dw_soft_reset_rx();
 					chThdSleepMilliseconds(1);
 					dw_transceiver_off();
 					chThdSleepMilliseconds(3);
-					// chThdSleepMilliseconds(TRX_RST_TM);
-					// state = dw_transceiver_off();
 				}
 				break;
 			case DW_RECV_TMO:
@@ -702,6 +768,17 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				dw1000_resp.rx_time = 0;
 				dw1000_resp.tx_time = 0;
 				memset(dw1000_resp.recv_buf, 0, sizeof(dw1000_resp.recv_buf));
+				dw_ctrl_req = DW_CTRL_YIELD;
+				break;
+			case DW_SSTWR:
+				twr_state = TWR_SEND_INIT;
+				tx_ctrl.TR = 0b1;
+				dw_ctrl_req = handle_sstwr(twr_state);
+				break;
+			case DW_DSTWR:
+				dw_ctrl_req = DW_CTRL_YIELD;
+				break;
+			case DW_3DSTWR:
 				dw_ctrl_req = DW_CTRL_YIELD;
 				break;
 			case DW_RESET:

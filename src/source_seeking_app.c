@@ -20,6 +20,8 @@ serial_packet_t uart1_send_buff[UART1_Q_LENGTH];
 
 dw_addr_t identifier_map[SS_DEVICE_NUMBER] = {1955, 3213, 18};
 
+dw_addr_t field_source = 5923;
+
 ss_pos_t ss_ned_pos;
 
 virtual_timer_t comm_slot_timer;
@@ -44,16 +46,12 @@ uint8_t fail_cnt = 0;
 void comm_slot_cb(virtual_timer_t* vtp, void* arg)
 {
 	current_slot++;
+
 	if (current_slot >= SS_DEVICE_NUMBER)
 	{
 		current_slot = 0;
-		update_consensus(consensus_value);
-	}
-
-	if (consensus_iter_n >= SS_ITER_N)
-	{
-		consensus_iter_n = 0;
-		reload_consensus();
+		if(consensus_iter_n > 0)
+			update_consensus(consensus_value);
 	}
 
 	chSysLockFromISR();
@@ -131,10 +129,18 @@ void update_consensus(float* values)
 	float consensus_sum = 0;
 	consensus_iter_n++;
 
-	for (size_t i = 0; i < SS_DEVICE_NUMBER; i++)
-		consensus_sum += values[self_id]-values[i];
-	
-	values[self_id] += -SS_K_GAIN*consensus_sum/SS_DEVICE_NUMBER;
+	if (consensus_iter_n >= SS_ITER_N)
+	{
+		consensus_iter_n = 0;
+		reload_consensus();
+	}
+	else
+	{
+		for (size_t i = 0; i < SS_DEVICE_NUMBER; i++)
+			consensus_sum += values[self_id]-values[i];
+		
+		values[self_id] += -SS_K_GAIN*consensus_sum/SS_DEVICE_NUMBER;
+	}
 }
 
 void get_id_from_ap(uint8_t* data, size_t size)
@@ -168,6 +174,7 @@ void ss_sync(void)
 void run_consensus(void)
 {
 	dw_addr_t recvd_addr = 0;
+	dw_recv_info_t dw_recv_info;
 
 	if (consensus_iter_n == SS_ITER_N-1)
 		chprintf((BaseSequentialStream*)&SD1, "Id: %d Consensus value: %f\n\n", self_id, consensus_value[self_id]);
@@ -176,41 +183,47 @@ void run_consensus(void)
 	{
 		chBSemWait(&slot_free);
 
-		if (identifier_map[i] == self_addr)
-		{
-			chThdSleepMicroseconds(10);
-			dw_send_tmo(0xFFFF, (uint8_t*)(&(consensus_value[i])), sizeof(consensus_value[i]), TIME_US2I(CONSENSUS_PERIOD_US/SS_DEVICE_NUMBER-SS_RTOS_DELAY_US));
-			
-			//chprintf((BaseSequentialStream*)&SD1, "Iter: %d %d sent: %f\n\n", consensus_iter_n, self_id, consensus_value[i]);
-		}
+		if (consensus_iter_n == 0 && identifier_map[i] == self_addr)
+			dw_recv_info = dw_sstwr(field_source, NULL, 0, (uint8_t*)(&(consensus_value[i])), sizeof(consensus_value[i]));
 		else
 		{
-			float recv_value = -99999.9;
-			size_t recvd = dw_recv_tmo(&recvd_addr, (uint8_t*)(&recv_value), sizeof(recv_value), TIME_US2I(CONSENSUS_PERIOD_US/SS_DEVICE_NUMBER-SS_RTOS_DELAY_US));
-			if (recvd == sizeof(recv_value) && recvd_addr == identifier_map[i] && COMM_GRAPH[i][self_id] > 0)
+			if (identifier_map[i] == self_addr)
 			{
-				consensus_value[i] = recv_value;
-				//chprintf((BaseSequentialStream*)&SD1, "Iter: %d %d received: %f\n\n", consensus_iter_n, self_id, recv_value);
+				chThdSleepMilliseconds(1);
+				dw_send_tmo(0xFFFF, (uint8_t*)(&(consensus_value[i])), sizeof(consensus_value[i]), TIME_US2I(CONSENSUS_PERIOD_US/SS_DEVICE_NUMBER-SS_RTOS_DELAY_US));
+				
+				//chprintf((BaseSequentialStream*)&SD1, "Iter: %d %d sent: %f\n\n", consensus_iter_n, self_id, consensus_value[i]);
 			}
 			else
 			{
-				if (recvd == 0)
+				float recv_value = -99999.9;
+				dw_recv_info = dw_recv_tmo(&recvd_addr, (uint8_t*)(&recv_value), sizeof(recv_value), TIME_US2I(CONSENSUS_PERIOD_US/SS_DEVICE_NUMBER-SS_RTOS_DELAY_US));
+				size_t recvd = dw_recv_info.recvd_size;
+				if (recvd == sizeof(recv_value) && recvd_addr == identifier_map[i] && COMM_GRAPH[i][self_id] > 0)
 				{
-					fail_cnt++;
-					chprintf((BaseSequentialStream*)&SD1, "Iter: %d timeout\n\n", consensus_iter_n);
+					consensus_value[i] = recv_value;
+					//chprintf((BaseSequentialStream*)&SD1, "Iter: %d %d received: %f\n\n", consensus_iter_n, self_id, recv_value);
 				}
-				else if (recvd_addr != identifier_map[i])
+				else
 				{
-					fail_cnt++;
-					chprintf((BaseSequentialStream*)&SD1, "Iter: %d %d received from %d\n\n", consensus_iter_n, self_id, identifier_map[i]);
-				}
-				else if (COMM_GRAPH[i][self_id] <= 0)
-				{
-					fail_cnt++;
-					chprintf((BaseSequentialStream*)&SD1, "Iter: %d %d received from %d\n\n", consensus_iter_n, self_id, identifier_map[i]);
-				}
+					// if (recvd == 0)
+					// {
+					// 	fail_cnt++;
+					// 	chprintf((BaseSequentialStream*)&SD1, "Iter: %d timeout\n\n", consensus_iter_n);
+					// }
+					// else if (recvd_addr != identifier_map[i])
+					// {
+					// 	fail_cnt++;
+					// 	chprintf((BaseSequentialStream*)&SD1, "Iter: %d %d received from %d\n\n", consensus_iter_n, self_id, identifier_map[i]);
+					// }
+					// else if (COMM_GRAPH[i][self_id] <= 0)
+					// {
+					// 	fail_cnt++;
+					// 	chprintf((BaseSequentialStream*)&SD1, "Iter: %d %d received from %d\n\n", consensus_iter_n, self_id, identifier_map[i]);
+					// }
 
-				consensus_value[i] = consensus_value[self_id];
+					consensus_value[i] = consensus_value[self_id];
+				}
 			}
 		}
 	}
@@ -229,6 +242,12 @@ THD_FUNCTION(SS, arg)
 	chThdSleepMilliseconds(50);
 
 	self_addr = dw_get_addr();
+	
+	if (self_addr == field_source)
+	{
+		while (true)
+			dw_recv_tmo(NULL, NULL, 0, TIME_US2I(CONSENSUS_PERIOD_US));
+	}
 
 	for (size_t i = 0; i < SS_DEVICE_NUMBER; i++)
 	{

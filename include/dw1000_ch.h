@@ -23,6 +23,7 @@
 #include "led.h"
 
 #include "dw1000_hal.h"
+#include "LR-WPANs_MAC.h"
 
 #define MCPLOCK_E	(EVENT_MASK(1))
 #define MESYNCR_E	(EVENT_MASK(2))
@@ -57,9 +58,10 @@
 
 #define MRXERR_E	(MRXPHE_E | MRXFCE_E | MRXRFSL_E | MRXSFDTO_E | MAFFREJ_E | MLDEERR_E)
 
-#define TX_TIMEOUT	TIME_MS2I(10)
-#define CH_TIMEOUT	TIME_S2I(5)
+#define TX_TIMEOUT		TIME_MS2I(10)
+#define CH_TIMEOUT		TIME_S2I(5)
 #define DW_ERR_THRESH	10
+#define SSTWR_TMO		TIME_MS2I(10)
 
 #define MSG_BUFFER_SIZE	128 
 
@@ -71,6 +73,9 @@ typedef enum dw_ctrl_req
 	DW_SEND_DLY,
 	DW_TRX_ERR,
 	DW_RESET,
+	DW_SSTWR,
+	DW_DSTWR,
+	DW_3DSTWR,
 	DW_RECV_TMO,
 	DW_CTRL_YIELD
 } dw_ctrl_req_t;
@@ -93,6 +98,28 @@ typedef enum dw_rsp_st
 	DW_SYS_ERR,
 	DW_BAD_CONF
 } dw_rsp_st_t;
+
+typedef enum twr_state
+{
+	TWR_SEND_INIT,	// send init and wait for resp
+	TWR_SEND_RESP, 	// resp sent automatically
+	TWR_RESP_RECVD,		// send res and wait res_ack
+	TWR_NO_TWR,			
+	TWR_FAIL
+} twr_state_t;
+
+typedef enum message_types_twr
+{
+	MT_TWR_INIT		= 0x01,
+	MT_TWR_RESP		= 0x02
+} twr_message_t;
+
+typedef struct dw_twr_header
+{
+	twr_message_t m_type;
+	uint64_t tx_time;
+	uint64_t rx_time;
+} twr_header_t;
 
 typedef struct dw1000_cmd
 {
@@ -127,6 +154,8 @@ extern SPIConfig spi_cfg;
 extern panadr_t panadr_own;
 extern tx_antd_t tx_antd;
 extern uint16_t rx_ant_d;
+
+extern rx_finfo_t rx_finfo;
 
 extern uint32_t recv_tmo_usec;
 
