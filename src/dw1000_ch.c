@@ -148,6 +148,21 @@ void set_slow_spi_freq(void)
 	spi1_unlock();	
 }
 
+void dw_soft_reset_rx(void)
+{
+	pmsc_ctrl0_t pmsc_ctrl_sr;
+	_dw_spi_hal_set._dw_spi_lock();
+	_dw_spi_transaction(1, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, DW_SUBREG_INFO.PMSC_CTRL0.size, DW_SUBREG_INFO.PMSC_CTRL0.offset);
+	// Todo check reserved bits as 1 maybe not write whole register
+	pmsc_ctrl_sr.mask |= 0x00300200;
+	pmsc_ctrl_sr.SOFTRESET &= 0b1110; // Clear bit 28
+	_dw_spi_transaction(0, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, DW_SUBREG_INFO.PMSC_CTRL0.size, DW_SUBREG_INFO.PMSC_CTRL0.offset);
+	pmsc_ctrl_sr.SOFTRESET |= 0b0001; // Set bit 28
+	chThdSleepMilliseconds(1);
+	_dw_spi_transaction(0, DW_REG_INFO.PMSC.id, pmsc_ctrl_sr.reg, DW_SUBREG_INFO.PMSC_CTRL0.size, DW_SUBREG_INFO.PMSC_CTRL0.offset);
+	_dw_spi_hal_set._dw_spi_unlock();
+}
+
 uint64_t get_hardware_id(void)
 {
 	uint64_t id = 0;
@@ -299,21 +314,21 @@ void dw_setup(void)
 	tx_antd = 0;
 	rx_ant_d = 0;
 
-	switch (panadr_own.short_addr)
-	{
-		case 5923:
-			tx_antd = 15918;
-			rx_ant_d = 15918;
-			break;
-		case 7090:
-			tx_antd = 15918;
-			rx_ant_d = 15918;
-			break;
-		case 1955:
-			tx_antd = 0;
-			rx_ant_d = 0;
-			break;
-	}
+	// switch (panadr_own.short_addr)
+	// {
+	// 	case 5923:
+	// 		tx_antd = 15918;
+	// 		rx_ant_d = 15918;
+	// 		break;
+	// 	case 7090:
+	// 		tx_antd = 15918;
+	// 		rx_ant_d = 15918;
+	// 		break;
+	// 	case 1955:
+	// 		tx_antd = 0;
+	// 		rx_ant_d = 0;
+	// 		break;
+	// }
 	dw_write(DW_REG_INFO.LDE_CTRL, (uint8_t*)(&rx_ant_d), DW_SUBREG_INFO.LDE_RXANTD.size, DW_SUBREG_INFO.LDE_RXANTD.offset);
 	dw_write(DW_REG_INFO.TX_ANTD, (uint8_t*)(&tx_antd), DW_REG_INFO.TX_ANTD.size, 0);
 }
@@ -506,7 +521,7 @@ void AFFREJ_handler(void)
 	return;
 }
 
-void calculate_distance(void)
+dw_ctrl_req_t calculate_distance(void)
 {
 	twr_header_t twr_header;
 	uint64_t tx_time = dw_get_tx_time();
@@ -531,7 +546,10 @@ void calculate_distance(void)
 	{
 		memcpy(dw1000_resp.recv_buf+sizeof(MHR_16_t), &distance, sizeof(distance));
 		dw1000_resp.recvd_size = sizeof(MHR_16_t) + sizeof(distance);
+		return DW_CTRL_YIELD;
 	}
+
+	return DW_RESET;
 }
 
 uint64_t build_twr_resp(uint8_t* buffer, MHR_16_t header)
@@ -607,10 +625,10 @@ dw_ctrl_req_t handle_sstwr(twr_state_t state)
 			return DW_CTRL_YIELD;
 			break;
 		case TWR_RESP_RECVD:
-			calculate_distance();
-			return DW_CTRL_YIELD;
+			return calculate_distance();
 			break;
 		case TWR_FAIL:
+			return DW_RESET;
 			break;
 	}
 }
@@ -673,7 +691,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 					if (rx_finfo.RNG)
 					{
 						twr_state = respond_twr(twr_state);
-						handle_sstwr(twr_state);
+						dw_ctrl_req = handle_sstwr(twr_state);
 					}
 				}
 				else if (evt == 0)
@@ -711,12 +729,12 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 					if (evt == MRXFCG_E)
 					{
 						dw1000_resp.state = DW_SEND_W4R_OK;
+						dw_ctrl_req = DW_CTRL_YIELD;
 						if (rx_finfo.RNG)
 						{
 							twr_state = respond_twr(twr_state);
-							handle_sstwr(twr_state);
+							dw_ctrl_req = handle_sstwr(twr_state);
 						}
-						dw_ctrl_req = DW_CTRL_YIELD;
 					}
 					else if (evt == 0)
 					{
@@ -745,22 +763,20 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				chThdSleepMilliseconds(1);
 				dw_transceiver_off();
 				err_cnt++;
-				chThdSleepMilliseconds(3);
 				dw_ctrl_req = last_state;
 				break;
 			case DW_CTRL_YIELD:
 				if (last_state != DW_RESET)
 					chMBPostAheadTimeout(&dw_controller_resp, (msg_t)&dw1000_resp, TIME_INFINITE);
+					
+				dw_soft_reset_rx();
+				dw_transceiver_off();
 
 				if (chMBFetchTimeout(&dw_controller, (msg_t*)&dw1000_cmd, TIME_INFINITE) == MSG_OK)
 				{
 					dw_ctrl_req = dw1000_cmd->dw_ctrl_req;
 
 					tx_ctrl.TR = 0b0;
-					dw_soft_reset_rx();
-					chThdSleepMilliseconds(1);
-					dw_transceiver_off();
-					chThdSleepMilliseconds(3);
 				}
 				break;
 			case DW_RECV_TMO:
@@ -783,6 +799,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				break;
 			case DW_RESET:
 				dw_setup();
+				chThdSleepMilliseconds(100);
 				rst_cnt++;
 				dw_ctrl_req = DW_CTRL_YIELD;
 				dw1000_resp.state = DW_SYS_ERR;

@@ -50,18 +50,12 @@ void comm_slot_cb(virtual_timer_t* vtp, void* arg)
 	if (current_slot >= SS_DEVICE_NUMBER)
 	{
 		current_slot = 0;
-		if(consensus_iter_n > 0)
-			update_consensus(consensus_value);
+		update_consensus(consensus_value);
 	}
 
 	chSysLockFromISR();
 	chBSemSignalI(&slot_free);
 	chSysUnlockFromISR();
-}
-
-void consensus_cb(virtual_timer_t* vtp, void* arg)
-{
-	update_consensus((float*)arg);
 }
 
 void init_timers(void)
@@ -175,21 +169,21 @@ void run_consensus(void)
 {
 	dw_addr_t recvd_addr = 0;
 	dw_recv_info_t dw_recv_info;
-
-	if (consensus_iter_n == SS_ITER_N-1)
-		chprintf((BaseSequentialStream*)&SD1, "Id: %d Consensus value: %f\n\n", self_id, consensus_value[self_id]);
 	
 	for (size_t i = 0; i < SS_DEVICE_NUMBER; i++)
 	{
 		chBSemWait(&slot_free);
 
 		if (consensus_iter_n == 0 && identifier_map[i] == self_addr)
+		{
 			dw_recv_info = dw_sstwr(field_source, NULL, 0, (uint8_t*)(&(consensus_value[i])), sizeof(consensus_value[i]));
+			chprintf((BaseSequentialStream*)&SD1, "SSTWR: %d field value read: %f\n\n", self_id, consensus_value[i]);
+		}
 		else
 		{
 			if (identifier_map[i] == self_addr)
 			{
-				chThdSleepMilliseconds(1);
+				chThdSleepMilliseconds(10);
 				dw_send_tmo(0xFFFF, (uint8_t*)(&(consensus_value[i])), sizeof(consensus_value[i]), TIME_US2I(CONSENSUS_PERIOD_US/SS_DEVICE_NUMBER-SS_RTOS_DELAY_US));
 				
 				//chprintf((BaseSequentialStream*)&SD1, "Iter: %d %d sent: %f\n\n", consensus_iter_n, self_id, consensus_value[i]);
@@ -239,14 +233,14 @@ THD_FUNCTION(SS, arg)
 {
 	(void) arg;
 
-	chThdSleepMilliseconds(50);
+	chThdSleepMilliseconds(500);
 
 	self_addr = dw_get_addr();
 	
 	if (self_addr == field_source)
 	{
 		while (true)
-			dw_recv_tmo(NULL, NULL, 0, TIME_US2I(CONSENSUS_PERIOD_US));
+			dw_recv_tmo(NULL, NULL, 0, TIME_MS2I(1000));
 	}
 
 	for (size_t i = 0; i < SS_DEVICE_NUMBER; i++)
@@ -270,5 +264,7 @@ THD_FUNCTION(SS, arg)
 	while(true)
 	{
 		run_consensus();
+		if (consensus_iter_n == SS_ITER_N-1)
+			chprintf((BaseSequentialStream*)&SD1, "Id: %d Consensus value: %f\n\n", self_id, consensus_value[self_id]);
 	}
 }

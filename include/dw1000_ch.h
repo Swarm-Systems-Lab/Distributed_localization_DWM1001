@@ -208,6 +208,13 @@ void read_frame(void);
 uint16_t dw_get_addr(void);
 uint16_t dw_get_panid(void);
 
+/**
+ * @brief command the device to perform a soft reset of the receiver
+ * 
+ */
+void dw_soft_reset_rx(void);
+
+
 void CPLOCK_handler(void);
 void ESYNCR_handler(void);
 void AAT_handler(void);

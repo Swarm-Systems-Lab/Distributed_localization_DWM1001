@@ -2037,7 +2037,7 @@ void dw_soft_reset(void);
  * @brief command the device to perform a soft reset of the receiver
  * 
  */
-void dw_soft_reset_rx(void);
+//void dw_soft_reset_rx(void);
 
 /**
  * @brief 

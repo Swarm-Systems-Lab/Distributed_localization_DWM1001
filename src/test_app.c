@@ -31,6 +31,7 @@ THD_FUNCTION(TEST_APP, arg)
 	dw_recv_info_t dw_recv_info;
 
 	float distance = 0.0;
+	uint32_t cnt = 0;
 
 	while(true)
 	{
@@ -39,7 +40,7 @@ THD_FUNCTION(TEST_APP, arg)
 			dw_recv_tmo(NULL, NULL, 0, TIME_MS2I(1000));
 		else if (self_addr == tag)
 			dw_recv_info = dw_sstwr(source, NULL, 0, (uint8_t*)(&distance), sizeof(distance));
-		chThdSleepMilliseconds(50);
+		chThdSleepMilliseconds(10);
 		chprintf((BaseSequentialStream*)&SD1, "%fm\n", distance);
 	}
 }
