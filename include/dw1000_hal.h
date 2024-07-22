@@ -1818,7 +1818,7 @@ static const lde_cfg2_t LDE_CFG2_16_NLOS_REF = 0x0003;
 static const lde_cfg1_t LDE_CFG1_DEF = {.mask=0x6C};
 static const lde_cfg1_t LDE_CFG1_REF = {.mask=0x6D};
 
-// Values only applicable for 850 kbps and 6.8Mbps data rates, index is RX_PCODE config
+// Values only applicable for 850 kbps and 6.8Mbps data rates, index is RX_PCODE config, for 110kbps the values should be divided by 8 (unsigned values)
 static const lde_repc_t LDE_REPC_REF[24] =
 {
 	0x5998, 0x5998, 0x51EA, 0x428E, 0x451E, 0x2E14, 0x8000, 0x51EA, 0x28F4, 0x3332, 0x3AE0, 0x3D70,
@@ -2109,3 +2109,5 @@ void dw_get_rx_config(rx_config_t* rx_config);
 void dw_get_tc_pg_config(tc_pg_conf_t* tc_pg_conf);
 
 void default_config(void);
+
+void long_range_config(void);

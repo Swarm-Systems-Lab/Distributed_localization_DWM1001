@@ -21,45 +21,10 @@
 // uint8_t barrier_cnt = 0;
 // uint8_t barrier_num;
 
-// mutex_t dw_mutex;
-
-// thread_reference_t irq_evt = NULL;
-
-// thread_t* dw_thread;
-// thread_t* comm_thread;
-
-// // MHR.frame_control.frame_type = FT_DATA;
-// // MHR.frame_control.sec_en = 0b0;
-// // MHR.frame_control.frame_pending = 0b0;
-// // MHR.frame_control.ack_req = 0b0;
-// // MHR.frame_control.pan_id_compress = 0b1;
-// // MHR.frame_control.dest_addr_mode = SHORT_16;
-// // MHR.frame_control.frame_version = 0x1;
-// // MHR.frame_control.src_addr_mode = SHORT_16;
-// frame_control_t def_frame_ctrl = {.mask=0x9841};
-
 // peer_connection_t peers[NEIGHBOUR_NUM];
 // peer_info_t peers_info[NEIGHBOUR_NUM];
 // uint8_t current_peer_n = 0;
 // uint8_t current_peer_c_n = 0;
-
-// send_msg_meta_t send_msg_meta;
-// send_msg_meta_t send_msg_meta_def = 
-// {
-// 	.wtime = -1,
-// 	.dlytime = 0,
-// 	.size = 0,
-// 	.seq_ack_num = 0,
-// 	.type = 0,
-// 	.addr = 0
-// };
-
-// MHR_16_t recvd_header;
-// message_t recvd_type;
-
-// loc_state_t loc_state = LOC_INIT;
-// twr_state_t twr_state = TWR_NO_TWR;
-// loc_action_t loc_action = LOC_NO_RESP;
 
 // peer_connection_t* twr_peer = NULL;
 // uint8_t twr_peer_seq = 0;
@@ -70,30 +35,30 @@
 // euclidean_d_m_t euclidean_d_m;
 // float peer_positions[NEIGHBOUR_NUM+1][3];
 
-// void barrier(void)
-// {
-// 	uint8_t release = 1;
-// 	chMtxLock(&barrier_mutex);
-// 	barrier_cnt++;
-// 	if (barrier_cnt == barrier_num)
-// 	{
-// 		for (uint8_t i = 0; i < barrier_num; i++)
-// 			chSemSignal(&barrier_sem);
-// 		barrier_cnt = 0;
-// 		release = 0;
-// 	}	
-// 	chMtxUnlock(&barrier_mutex);
-// 	if (release)
-// 		chSemWait(&barrier_sem);
-// }
+// // void barrier(void)
+// // {
+// // 	uint8_t release = 1;
+// // 	chMtxLock(&barrier_mutex);
+// // 	barrier_cnt++;
+// // 	if (barrier_cnt == barrier_num)
+// // 	{
+// // 		for (uint8_t i = 0; i < barrier_num; i++)
+// // 			chSemSignal(&barrier_sem);
+// // 		barrier_cnt = 0;
+// // 		release = 0;
+// // 	}	
+// // 	chMtxUnlock(&barrier_mutex);
+// // 	if (release)
+// // 		chSemWait(&barrier_sem);
+// // }
 
-// void barrier_init(uint8_t n)
-// {
-// 	barrier_num = n;
-// 	chMtxObjectInit(&barrier_mutex);
-// 	chSemObjectInit(&barrier_sem, 0);
-// 	barrier_cnt = 0;
-// }
+// // void barrier_init(uint8_t n)
+// // {
+// // 	barrier_num = n;
+// // 	chMtxObjectInit(&barrier_mutex);
+// // 	chSemObjectInit(&barrier_sem, 0);
+// // 	barrier_cnt = 0;
+// // }
 
 // // Function to initialize the matrix
 // void init_d_m(void) 
@@ -738,7 +703,7 @@
 // 	}
 // }
 
-// void no_resp_action(void)
+// loc_action_t no_resp_action(void)
 // {
 // 	peer_connection_t* lowest_d_peer = get_conn_peer();
 // 	peer_info_t* lowest_d_info;
@@ -758,37 +723,178 @@
 // 	{
 // 		if (broad_send)
 // 		{
-// 			recv_tmo_usec = (rand()&0xF000)+40000;
-// 			send_broad();
+// 			return LOC_SEND_BROAD;
 // 			messages_since_broad = 0;
 // 			recv_tmo_cnt = 0;
 // 		}
 // 		else if (possible_conn_n)
-// 			send_syn();
+// 			return LOC_SEND_SYN;
 // 		// else if (shortest_timeout < CONN_MSG_TMO_MAX)
 // 		// 	send_maintain();
 // 		else if (lowest_d_measures < MIN_D_MEASURES)
-// 			send_d_req();
-// 		else
-// 		{
-// 			recv_tmo_usec = (rand()&0xF000)+40000;
-// 			send_msg_meta = send_msg_meta_def;
-// 		}
+// 			return LOC_SEND_TWR;
 // 	}
+
+// 	return LOC_NO_SEND;
 // }
 
-// void process_message(void)
+// // void process_message(void)
+// // {
+// // 	uint8_t is_timeout = 0;
+// // 	uint8_t peer_valid = 0;
+// // 	peer_connection_t* peer = NULL;
+
+// // 	loc_action = LOC_NO_RESP;
+
+// // 	if ((recvd_type == MT_D_REQ || recvd_type == MT_D_REQ_ACK))
+// // 	{
+// // 		process_req();
+// // 		if (*((uint16_t*)recv_buf) != panadr_own.short_addr)
+// // 		{
+// // 			recv_tmo_usec = (rand()&0xF000)+40000;
+// // 			loc_action = LOC_STOP;
+// // 			send_msg_meta = send_msg_meta_def;
+// // 		}
+// // 	}
+// // 	if(loc_action != LOC_STOP)
+// // 	{
+// // 		if (recvd_type == 0)
+// // 		{
+// // 			recv_tmo_cnt++;
+// // 			if (loc_state == LOC_TWR)
+// // 				handle_twr_fail();
+// // 		}
+// // 		else
+// // 		{
+// // 			peer = get_peer(recvd_header.src_addr);
+// // 			if (peer != NULL && peer->ttl < PEER_CONN_TTL)
+// // 			{
+// // 				peer_valid = 1;
+// // 				chVTReset(&(peer->tmo_timer));
+// // 				chVTSet(&(peer->tmo_timer), TIME_S2I(5), peer_tmo_cb, peer);
+// // 			}
+				
+// // 			if ((recvd_type&0xF0) == 0x20)
+// // 			{
+// // 				if (peer_valid)
+// // 					loc_action = LOC_SSTWR;
+// // 			}
+// // 			else
+// // 			{
+// // 				loc_state = LOC_COMM;
+// // 				twr_state = TWR_NO_TWR;
+// // 				if ((recvd_type&0xF0) == 0x10 /*|| some_peer_recv_ack_timeout*/)
+// // 					conn_handle(peer);
+// // 				else if ((recvd_type&0xF0) == 0x30 && peer_valid)
+// // 					conn_handle(peer);
+// // 				// else
+// // 				// 	invalid_message_handle
+// // 			}
+// // 		}
+// // 	}
+
+// // 	// if (loc_action == LOC_ACT_ERR)
+// // 	// 	reset // how? what?
+
+// // 	//new_state();
+// // 	clean_recvd();
+
+// // 	if (loc_action == LOC_NO_RESP || recv_tmo_cnt > 5)
+// // 		no_resp_action();
+// // 	// else
+// // 	// {
+// // 	// 	if (loc_action != LOC_RESP_NOW)
+// // 	// 		resp_action();
+// // 	// }
+// // }
+
+// // THD_FUNCTION(COMMS, arg)
+// // {
+// // 	(void)arg;
+
+// // 	comm_thread = chThdGetSelfX();
+// // 	comm_state_t comm_state = COMM_RECV;
+// // 	eventmask_t evt = 0;
+// // 	recv_tmo_usec = (rand()&0xF000)+40000;
+
+// // 	init_peers();
+
+// // 	barrier();
+
+// // 	chMtxLock(&dw_mutex);
+// // 	chEvtWaitOne(DW_COMM_OK_E);
+// // 	chMtxUnlock(&dw_mutex);
+
+// // 	while (true)
+// // 	{
+// // 		switch (comm_state)
+// // 		{
+// // 			case COMM_RECV:
+// // 				chMtxLock(&dw_mutex);
+// // 				dw_ctrl_req = DW_RECV;
+// // 				if (send_msg_meta.wtime >= 0 && send_msg_meta.type != 0)
+// // 				{
+// // 					dw_ctrl_req = DW_SEND_W4R;
+// // 					prepare_message();
+// // 				}
+// // 				chMtxUnlock(&dw_mutex);
+// // 				chEvtSignal(dw_thread, DW_COMM_OK_E);
+// // 				evt = chEvtWaitOneTimeout(DW_COMM_OK_E, CH_TIMEOUT);
+// // 				if (evt == DW_COMM_OK_E)
+// // 				{
+// // 					get_message();
+// // 					comm_state = COMM_IDLE;
+// // 				}
+// // 				else
+// // 					comm_state = COMM_ERR;
+// // 				break;
+// // 			case COMM_SEND:
+// // 				chMtxLock(&dw_mutex);
+// // 				dw_ctrl_req = DW_SEND;
+// // 				if (send_msg_meta.dlytime > 0)
+// // 					dw_ctrl_req = DW_SEND_DLY;
+// // 				chMtxUnlock(&dw_mutex);
+// // 				prepare_message();
+// // 				chEvtSignal(dw_thread, DW_COMM_OK_E);
+// // 				evt = chEvtWaitOneTimeout(DW_COMM_OK_E, CH_TIMEOUT);
+// // 				if (evt == DW_COMM_OK_E)
+// // 					comm_state = COMM_RECV;
+// // 				else
+// // 					comm_state = COMM_ERR;
+// // 				break;
+// // 			case COMM_ERR:
+// // 				// Thread not responding reset thread?
+// // 				comm_state = COMM_IDLE;
+// // 				break;
+// // 			case COMM_IDLE:
+// // 				recv_tmo_usec = 50000;
+// // 				process_message();
+// // 				comm_state = COMM_RECV;
+// // 				if (send_msg_meta.type != 0 && send_msg_meta.wtime < 0)
+// // 					comm_state = COMM_SEND;
+// // 				break;
+// // 			default:
+// // 				break;
+// // 		}
+// // 	}
+// // }
+
+// loc_action_t dist_loc_decide(dw_addr_t addr, dw_recv_info_t recv_info, uint8_t* recvd)
 // {
+// 	loc_action_t loc_action;
+
+// 	message_t recvd_msg_type = recvd[0];
+
 // 	uint8_t is_timeout = 0;
 // 	uint8_t peer_valid = 0;
 // 	peer_connection_t* peer = NULL;
 
 // 	loc_action = LOC_NO_RESP;
 
-// 	if ((recvd_type == MT_D_REQ || recvd_type == MT_D_REQ_ACK))
+// 	if ((recvd_msg_type == MT_D_REQ || recvd_msg_type == MT_D_REQ_ACK))
 // 	{
 // 		process_req();
-// 		if (*((uint16_t*)recv_buf) != panadr_own.short_addr)
+// 		if (*((uint16_t*)recvd) != panadr_own.short_addr)
 // 		{
 // 			recv_tmo_usec = (rand()&0xF000)+40000;
 // 			loc_action = LOC_STOP;
@@ -797,15 +903,15 @@
 // 	}
 // 	if(loc_action != LOC_STOP)
 // 	{
-// 		if (recvd_type == 0)
+// 		if (recvd_msg_type == 0)
 // 		{
 // 			recv_tmo_cnt++;
-// 			if (loc_state == LOC_TWR)
-// 				handle_twr_fail();
+// 			// if (loc_state == LOC_TWR)
+// 			// 	handle_twr_fail();
 // 		}
 // 		else
 // 		{
-// 			peer = get_peer(recvd_header.src_addr);
+// 			peer = get_peer(addr);
 // 			if (peer != NULL && peer->ttl < PEER_CONN_TTL)
 // 			{
 // 				peer_valid = 1;
@@ -813,10 +919,10 @@
 // 				chVTSet(&(peer->tmo_timer), TIME_S2I(5), peer_tmo_cb, peer);
 // 			}
 				
-// 			if ((recvd_type&0xF0) == 0x20)
+// 			if ((recvd_msg_type&0xF0) == 0x20)
 // 			{
 // 				if (peer_valid)
-// 					twr_handle(peer);
+// 					loc_action = twr_handle(peer);
 // 				else
 // 					handle_twr_fail();
 // 			}
@@ -824,9 +930,9 @@
 // 			{
 // 				loc_state = LOC_COMM;
 // 				twr_state = TWR_NO_TWR;
-// 				if ((recvd_type&0xF0) == 0x10 /*|| some_peer_recv_ack_timeout*/)
+// 				if ((recvd_msg_type&0xF0) == 0x10 /*|| some_peer_recv_ack_timeout*/)
 // 					conn_handle(peer);
-// 				else if ((recvd_type&0xF0) == 0x30 && peer_valid)
+// 				else if ((recvd_msg_type&0xF0) == 0x30 && peer_valid)
 // 					conn_handle(peer);
 // 				// else
 // 				// 	invalid_message_handle
@@ -838,142 +944,87 @@
 // 	// 	reset // how? what?
 
 // 	//new_state();
-// 	clean_recvd();
 
 // 	if (loc_action == LOC_NO_RESP || recv_tmo_cnt > 5)
-// 		no_resp_action();
-// 	// else
-// 	// {
-// 	// 	if (loc_action != LOC_RESP_NOW)
-// 	// 		resp_action();
-// 	// }
+// 		loc_action = no_resp_action();
+
+// 	return loc_action;
 // }
 
-// THD_FUNCTION(COMMS, arg)
+// loc_state_t dist_loc_act(dw_addr_t* send_addr, size_t* send_size, uint8_t* send_buf, loc_action_t loc_action, loc_state_t loc_state)
+// {
+// 	switch (loc_action)
+// 	{
+
+// 	}
+// }
+
+// THD_FUNCTION(DIST_LOC, arg)
 // {
 // 	(void)arg;
 
-// 	comm_thread = chThdGetSelfX();
-// 	comm_state_t comm_state = COMM_RECV;
-// 	eventmask_t evt = 0;
-// 	recv_tmo_usec = (rand()&0xF000)+40000;
+// 	init();
 
-// 	init_peers();
+// 	uint8_t recvd_message[MAX_MSG_SIZE];
+// 	uint8_t send_buf[MAX_MSG_SIZE];
 
-// 	barrier();
-
-// 	chMtxLock(&dw_mutex);
-// 	chEvtWaitOne(DW_COMM_OK_E);
-// 	chMtxUnlock(&dw_mutex);
+// 	loc_state_t loc_state = LOC_INIT;
+// 	dw_recv_info_t recv_info;
+// 	dw_addr_t recvd_addr;
+// 	dw_addr_t send_addr;
+// 	size_t send_size;
+// 	uint8_t w4r = 0;
+// 	loc_action_t loc_action = LOC_NO_RESP;
+// 	sysinterval_t tmo = TIME_US2I(40000);
 
 // 	while (true)
 // 	{
-// 		switch (comm_state)
+// 		// Sense
+// 		if (!w4r)
+// 			recv_info = dw_recv_tmo(&recvd_addr, recvd_message, MAX_MSG_SIZE, tmo);
+
+// 		recv_info.recvd_size = 0;
+// 		recv_info.rx_time = 0;
+// 		recv_info.state = DW_NO_RESP;
+
+// 		// Decide(Think)
+// 		loc_action = dist_loc_decide(recvd_addr, recv_info, recvd_message);
+
+// 		// Act
+// 		loc_state = dist_loc_act(&send_addr, &send_size, send_buf, loc_action, loc_state);
+
+// 		switch (loc_state)
 // 		{
-// 			case COMM_RECV:
-// 				chMtxLock(&dw_mutex);
-// 				dw_ctrl_req = DW_RECV;
-// 				if (send_msg_meta.wtime >= 0 && send_msg_meta.type != 0)
-// 				{
-// 					dw_ctrl_req = DW_SEND_W4R;
-// 					prepare_message();
-// 				}
-// 				chMtxUnlock(&dw_mutex);
-// 				chEvtSignal(dw_thread, DW_COMM_OK_E);
-// 				evt = chEvtWaitOneTimeout(DW_COMM_OK_E, CH_TIMEOUT);
-// 				if (evt == DW_COMM_OK_E)
-// 				{
-// 					get_message();
-// 					comm_state = COMM_IDLE;
-// 				}
-// 				else
-// 					comm_state = COMM_ERR;
+// 			case LOC_COMM:
+// 				tmo = TIME_US2I(40000);
 // 				break;
-// 			case COMM_SEND:
-// 				chMtxLock(&dw_mutex);
-// 				dw_ctrl_req = DW_SEND;
-// 				if (send_msg_meta.dlytime > 0)
-// 					dw_ctrl_req = DW_SEND_DLY;
-// 				chMtxUnlock(&dw_mutex);
-// 				prepare_message();
-// 				chEvtSignal(dw_thread, DW_COMM_OK_E);
-// 				evt = chEvtWaitOneTimeout(DW_COMM_OK_E, CH_TIMEOUT);
-// 				if (evt == DW_COMM_OK_E)
-// 					comm_state = COMM_RECV;
-// 				else
-// 					comm_state = COMM_ERR;
-// 				break;
-// 			case COMM_ERR:
-// 				// Thread not responding reset thread?
-// 				comm_state = COMM_IDLE;
-// 				break;
-// 			case COMM_IDLE:
-// 				recv_tmo_usec = 50000;
-// 				process_message();
-// 				comm_state = COMM_RECV;
-// 				if (send_msg_meta.type != 0 && send_msg_meta.wtime < 0)
-// 					comm_state = COMM_SEND;
+// 			case LOC_INIT:
+// 				tmo = TIME_US2I((rand()&0xF000)+40000);
 // 				break;
 // 			default:
 // 				break;
 // 		}
-// 	}
-// }
-
-// int8_t respond_if_twr(void)
-// {
-// 	recvd_type = recv_buf[sizeof(recvd_header)];
-// 	if (recvd_type != MT_D_INIT || twr_state != TWR_REQ_RECVD)
-// 		return 0;
-
-// 	dx_time_t dx_time;
-// 	ack_resp_t_t w4r;
-// 	tx_fctrl_t tx_ctrl;
-// 	eventmask_t evt = 0;
-// 	memset(tx_ctrl.reg, 0, sizeof(tx_ctrl.reg));
-// 	memset(send_buf, 0, sizeof(send_buf));
-// 	tx_ctrl.TXBR = BR_6_8MBPS;
-// 	tx_ctrl.TXPRF = PRF_16MHZ;
-// 	tx_ctrl.TXPL = PL_128;
-// 	w4r.mask = 0;
-// 	memset(dx_time.reg, 0, sizeof(dx_time.reg));
-
-// 	uint8_t lde_stat = 0xd;
-
-// 	recvd_header = decode_MHR(recv_buf);
-
-// 	uint64_t rx_time = 0;
-// 	memcpy(&rx_time, recv_info.dw_rx_time.RX_STAMP, sizeof(recv_info.dw_rx_time.RX_STAMP));
-// 	if (!rx_time)
-// 	{
-// 		memcpy(&rx_time, recv_info.dw_rx_time.RX_RAWST, sizeof(recv_info.dw_rx_time.RX_RAWST));
-// 		rx_time -= rx_ant_d;
-// 		memcpy(send_buf+sizeof(rx_time)+sizeof(rx_time), &lde_stat, sizeof(lde_stat));
-// 	}
-// 	uint64_t delay_tx = (uint64_t)rx_time + (uint64_t)(65536*4000);
-// 	uint64_t tx_time = (uint64_t)delay_tx +(uint64_t)tx_antd;
-
-// 	memcpy(send_buf, &tx_time, sizeof(tx_time));
-// 	memcpy(send_buf+sizeof(tx_time), &rx_time, sizeof(rx_time));
-
-// 	send_msg_meta.size = sizeof(tx_time)+sizeof(rx_time)+sizeof(lde_stat);
-// 	send_msg_meta.seq_ack_num = 0;
-// 	send_msg_meta.type = MT_D_RESP;
-// 	send_msg_meta.addr = recvd_header.src_addr;
-
-// 	prepare_message();
-// 	tx_ctrl.TFLEN = send_size+2; // TODO magic
-
-// 	dx_time.time32 = (uint32_t)(delay_tx >> 8);
-// 	dw_start_tx(tx_ctrl, send_buf, dx_time, w4r);
-// 	evt = chEvtWaitOneTimeout(MTXFRS_E, TX_TIMEOUT);
-// 	if (evt != MTXFRS_E)
-// 	{
-// 		twr_state = TWR_FAIL;
-// 		return -1;
-// 	}
-// 	return 1;
 		
+// 		// Commit action
+// 		w4r = 0;
+// 		switch (loc_action)
+// 		{
+// 			case LOC_SEND:
+// 				dw_send_tmo(send_addr, send_buf, send_size, tmo);
+// 				break;
+// 			case LOC_SEND_W4R:
+// 				w4r = 1;
+// 				recv_info = dw_send_w4r_tmo(send_addr, send_buf, send_size, 0, &recvd_addr, recvd_message, MAX_MSG_SIZE, tmo);
+// 				break;
+// 			case LOC_SSTWR:
+// 				recv_info = dw_sstwr(send_addr, send_buf, 0, recvd_message, MAX_MSG_SIZE);
+// 				break;
+// 			// case config:
+// 			// 	break;
+// 			default:
+// 				break;
+// 		}
+// 	}
 // }
 
 // void update_peer_pos(void)
@@ -992,121 +1043,121 @@
 // 	}
 // }
 
-// // THD_FUNCTION(SYSTEM_STATUS, arg)
-// // {
-// // 	(void)arg;
+// THD_FUNCTION(SYSTEM_STATUS, arg)
+// {
+// 	(void)arg;
 
-// // 	barrier_init(3);
+// 	barrier_init(3);
 
-// // 	init_d_m();
+// 	init_d_m();
 
-// // 	peer_positions[0][0] = 0;
-// // 	peer_positions[0][1] = 0;
-// // 	peer_positions[0][2] = 0;
-// // 	peer_positions[1][0] = 0;
-// // 	peer_positions[1][1] = 0;
-// // 	peer_positions[1][2] = 0;
-// // 	peer_positions[2][0] = 0;
-// // 	peer_positions[2][1] = 0;
-// // 	peer_positions[2][2] = 0;
+// 	peer_positions[0][0] = 0;
+// 	peer_positions[0][1] = 0;
+// 	peer_positions[0][2] = 0;
+// 	peer_positions[1][0] = 0;
+// 	peer_positions[1][1] = 0;
+// 	peer_positions[1][2] = 0;
+// 	peer_positions[2][0] = 0;
+// 	peer_positions[2][1] = 0;
+// 	peer_positions[2][2] = 0;
 
-// // 	sdStart(&SD1, &serial_cfg);
+// 	sdStart(&SD1, &serial_cfg);
 
-// // 	barrier();
-// // 	euclidean_d_m.addrs[0] = panadr_own.short_addr;
+// 	barrier();
+// 	euclidean_d_m.addrs[0] = panadr_own.short_addr;
 
-// // 	while (true)
-// // 	{
-// // 		for (uint8_t i = 1; i < NEIGHBOUR_NUM+1; i++)
-// // 		{
-// // 			euclidean_d_m.addrs[i] = peers[i-1].peer_addr;
-// // 			euclidean_d_m.distances[0][i] = peers_info[i-1].calc_distance;
-// // 		}
+// 	while (true)
+// 	{
+// 		for (uint8_t i = 1; i < NEIGHBOUR_NUM+1; i++)
+// 		{
+// 			euclidean_d_m.addrs[i] = peers[i-1].peer_addr;
+// 			euclidean_d_m.distances[0][i] = peers_info[i-1].calc_distance;
+// 		}
 
-// // 		update_peer_pos();
+// 		update_peer_pos();
 
-// // 		for (uint8_t i = 0; i < NEIGHBOUR_NUM; i++)
-// // 		{
-// // 			peers_info[i].d_measures = 0;
-// // 			if (peers[i].ttl >= PEER_CONN_TTL)
-// // 				disconnect_peer(peers+i);
-// // 		}
+// 		for (uint8_t i = 0; i < NEIGHBOUR_NUM; i++)
+// 		{
+// 			peers_info[i].d_measures = 0;
+// 			if (peers[i].ttl >= PEER_CONN_TTL)
+// 				disconnect_peer(peers+i);
+// 		}
 
-// // 		int scanf_test;
-// // 		float scanf_float;
-// // 		char scanf_string[20];
-// // 		chprintf((BaseSequentialStream*)&SD1, "\nInput an integer: ");
-// // 		chscanf((BaseBufferedStream*)&SD1, "%d", &scanf_test);
-// // 		chprintf((BaseSequentialStream*)&SD1, "Read: %d\n", scanf_test);
+// 		int scanf_test;
+// 		float scanf_float;
+// 		char scanf_string[20];
+// 		chprintf((BaseSequentialStream*)&SD1, "\nInput an integer: ");
+// 		chscanf((BaseBufferedStream*)&SD1, "%d", &scanf_test);
+// 		chprintf((BaseSequentialStream*)&SD1, "Read: %d\n", scanf_test);
 
-// // 		chprintf((BaseSequentialStream*)&SD1, "\nInput a float: ");
-// // 		chscanf((BaseBufferedStream*)&SD1, "%f", &scanf_float);
-// // 		chprintf((BaseSequentialStream*)&SD1, "Read: %f\n", scanf_float);
+// 		chprintf((BaseSequentialStream*)&SD1, "\nInput a float: ");
+// 		chscanf((BaseBufferedStream*)&SD1, "%f", &scanf_float);
+// 		chprintf((BaseSequentialStream*)&SD1, "Read: %f\n", scanf_float);
 
-// // 		chprintf((BaseSequentialStream*)&SD1, "\nInput a string: ");
-// // 		chscanf((BaseBufferedStream*)&SD1, " %20s", scanf_string);
-// // 		chprintf((BaseSequentialStream*)&SD1, "Read: %s\n", scanf_string);
+// 		chprintf((BaseSequentialStream*)&SD1, "\nInput a string: ");
+// 		chscanf((BaseBufferedStream*)&SD1, " %20s", scanf_string);
+// 		chprintf((BaseSequentialStream*)&SD1, "Read: %s\n", scanf_string);
 
-// // 		/*
-// // 		 *	Print peer positions
-// // 		 */
+// 		/*
+// 		 *	Print peer positions
+// 		 */
 
-// // 		// chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[0][0], (int)peer_positions[0][1]);
-// // 		// chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[1][0], (int)peer_positions[1][1]);
-// // 		// chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[2][0], (int)peer_positions[2][1]);
-// // 		// chprintf((BaseSequentialStream*)&SD1, "\n");
+// 		// chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[0][0], (int)peer_positions[0][1]);
+// 		// chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[1][0], (int)peer_positions[1][1]);
+// 		// chprintf((BaseSequentialStream*)&SD1, "%d,%d\n", (int)peer_positions[2][0], (int)peer_positions[2][1]);
+// 		// chprintf((BaseSequentialStream*)&SD1, "\n");
 
-// // 		/*
-// // 		 *	Print formatted EDM
-// // 		 */
+// 		/*
+// 		 *	Print formatted EDM
+// 		 */
 
-// // 		// chprintf((BaseSequentialStream*)&SD1, "\n\t| ");
+// 		// chprintf((BaseSequentialStream*)&SD1, "\n\t| ");
 
-// // 		// for (uint8_t j = 0; j < NEIGHBOUR_NUM+1; j++)
-// // 		// {
-// // 		// 	chprintf((BaseSequentialStream*)&SD1, "%d\t", (int)euclidean_d_m.addrs[j]);
-// // 		// 	chprintf((BaseSequentialStream*)&SD1, "| ");
-// // 		// }
-// // 		// chprintf((BaseSequentialStream*)&SD1, "\n");
-// // 		// chprintf((BaseSequentialStream*)&SD1, "-------------------------------------\n");
+// 		// for (uint8_t j = 0; j < NEIGHBOUR_NUM+1; j++)
+// 		// {
+// 		// 	chprintf((BaseSequentialStream*)&SD1, "%d\t", (int)euclidean_d_m.addrs[j]);
+// 		// 	chprintf((BaseSequentialStream*)&SD1, "| ");
+// 		// }
+// 		// chprintf((BaseSequentialStream*)&SD1, "\n");
+// 		// chprintf((BaseSequentialStream*)&SD1, "-------------------------------------\n");
 
-// // 		// for (uint8_t i = 0; i < NEIGHBOUR_NUM+1; i++)
-// // 		// {
-// // 		// 	chprintf((BaseSequentialStream*)&SD1, "%d\t", (int)euclidean_d_m.addrs[i]);
-// // 		// 	chprintf((BaseSequentialStream*)&SD1, "| ");
+// 		// for (uint8_t i = 0; i < NEIGHBOUR_NUM+1; i++)
+// 		// {
+// 		// 	chprintf((BaseSequentialStream*)&SD1, "%d\t", (int)euclidean_d_m.addrs[i]);
+// 		// 	chprintf((BaseSequentialStream*)&SD1, "| ");
 
-// // 		// 	for (uint8_t j = 0; j < NEIGHBOUR_NUM+1; j++)
-// // 		// 	{
-// // 		// 		chprintf((BaseSequentialStream*)&SD1, "%d\t", (int)euclidean_d_m.distances[i][j]);
-// // 		// 		chprintf((BaseSequentialStream*)&SD1, "| ");
-// // 		// 	}
+// 		// 	for (uint8_t j = 0; j < NEIGHBOUR_NUM+1; j++)
+// 		// 	{
+// 		// 		chprintf((BaseSequentialStream*)&SD1, "%d\t", (int)euclidean_d_m.distances[i][j]);
+// 		// 		chprintf((BaseSequentialStream*)&SD1, "| ");
+// 		// 	}
 
-// // 		// 	chprintf((BaseSequentialStream*)&SD1, "\n");
-// // 		// 	chprintf((BaseSequentialStream*)&SD1, "-------------------------------------\n");
-// // 		// }
+// 		// 	chprintf((BaseSequentialStream*)&SD1, "\n");
+// 		// 	chprintf((BaseSequentialStream*)&SD1, "-------------------------------------\n");
+// 		// }
 
-// // 		// chprintf((BaseSequentialStream*)&SD1, "\nXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n");
+// 		// chprintf((BaseSequentialStream*)&SD1, "\nXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n");
 		
-// // 		/*
-// // 		 *	Print calibration EDM 
-// // 		 */
+// 		/*
+// 		 *	Print calibration EDM 
+// 		 */
 
-// // 		// chprintf((BaseSequentialStream*)&SD1, "X");
-// // 		// for (uint8_t j = 0; j < NEIGHBOUR_NUM+1; j++)
-// // 		// 	chprintf((BaseSequentialStream*)&SD1, "%d,", (int)euclidean_d_m.addrs[j]);
+// 		// chprintf((BaseSequentialStream*)&SD1, "X");
+// 		// for (uint8_t j = 0; j < NEIGHBOUR_NUM+1; j++)
+// 		// 	chprintf((BaseSequentialStream*)&SD1, "%d,", (int)euclidean_d_m.addrs[j]);
 
-// // 		// chprintf((BaseSequentialStream*)&SD1, "\n");
+// 		// chprintf((BaseSequentialStream*)&SD1, "\n");
 
-// // 		// for (uint8_t i = 0; i < NEIGHBOUR_NUM+1; i++)
-// // 		// {
-// // 		// 	for (uint8_t j = 0; j < NEIGHBOUR_NUM+1; j++)
-// // 		// 		chprintf((BaseSequentialStream*)&SD1, "%d,", (int)(euclidean_d_m.distances[i][j]*1000.0));
+// 		// for (uint8_t i = 0; i < NEIGHBOUR_NUM+1; i++)
+// 		// {
+// 		// 	for (uint8_t j = 0; j < NEIGHBOUR_NUM+1; j++)
+// 		// 		chprintf((BaseSequentialStream*)&SD1, "%d,", (int)(euclidean_d_m.distances[i][j]*1000.0));
 
-// // 		// 	chprintf((BaseSequentialStream*)&SD1, "\n");
-// // 		// }
+// 		// 	chprintf((BaseSequentialStream*)&SD1, "\n");
+// 		// }
 
-// // 		// chprintf((BaseSequentialStream*)&SD1, "\n");
+// 		// chprintf((BaseSequentialStream*)&SD1, "\n");
 
-// // 		chThdSleepMilliseconds(1000);
-// // 	}
-// // }
+// 		chThdSleepMilliseconds(1000);
+// 	}
+// }

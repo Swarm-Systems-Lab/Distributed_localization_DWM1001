@@ -44,6 +44,10 @@ uint16_t rx_ant_d;
 
 rx_finfo_t rx_finfo;
 
+tx_fctrl_t tx_fctrl;
+
+size_t send_dly_mult = 10000;
+
 uint32_t recv_tmo_usec;
 
 dw1000_resp_t dw1000_resp = 
@@ -278,7 +282,20 @@ void dw_setup(void)
 {
 	dw_reset();
 	spi_hal_init();
-	default_config();
+	memset(tx_fctrl.reg, 0, sizeof(tx_fctrl.reg));
+
+	// default_config();
+	// tx_fctrl.TXBR = BR_6_8MBPS;
+	// tx_fctrl.TXPRF = PRF_16MHZ;
+	// tx_fctrl.TXPL = PL_128;
+	//send_dly_mult = 3000;
+
+	long_range_config();
+	tx_fctrl.TXBR = BR_110KBPS;
+	tx_fctrl.TXPRF = PRF_16MHZ;
+	tx_fctrl.TXPL = PL_2048;
+	send_dly_mult = 7000;
+
 	load_lde();
 
 	sys_mask_t irq_mask;
@@ -555,7 +572,7 @@ dw_ctrl_req_t calculate_distance(void)
 uint64_t build_twr_resp(uint8_t* buffer, MHR_16_t header)
 {
 	twr_header_t twr_header;
-	uint64_t delay_tx = dw1000_resp.rx_time + (uint64_t)(65536*2800);
+	uint64_t delay_tx = dw1000_resp.rx_time + (uint64_t)(65536*send_dly_mult);
 	uint64_t tx_time = (uint64_t)delay_tx +(uint64_t)tx_antd;
 
 	header.dest_addr = header.src_addr;
@@ -580,7 +597,6 @@ twr_state_t respond_twr(twr_state_t twr_state)
 	uint8_t resp_message[resp_message_size];
 	dx_time_t dx_time;
 	ack_resp_t_t w4r;
-	tx_fctrl_t tx_ctrl;
 	eventmask_t evt = 0;
 
 	if (twr_state == TWR_SEND_INIT)
@@ -592,20 +608,16 @@ twr_state_t respond_twr(twr_state_t twr_state)
 	if (twr_header.m_type != MT_TWR_INIT)
 		return TWR_FAIL;
 	
-	memset(tx_ctrl.reg, 0, sizeof(tx_ctrl.reg));
 	memset(dx_time.reg, 0, sizeof(dx_time.reg));
 
-	tx_ctrl.TXBR = BR_6_8MBPS;
-	tx_ctrl.TXPRF = PRF_16MHZ;
-	tx_ctrl.TXPL = PL_128;
-	tx_ctrl.TFLEN = resp_message_size+2; // TODO magic
-	tx_ctrl.TR = 0b1;
+	tx_fctrl.TFLEN = resp_message_size+2; // TODO magic
+	tx_fctrl.TR = 0b1;
 	w4r.mask = 0;
 
 	delay_tx = build_twr_resp(resp_message, header);
 
 	dx_time.time32 = (uint32_t)(delay_tx >> 8);
-	dw_start_tx(tx_ctrl, resp_message, dx_time, w4r);
+	dw_start_tx(tx_fctrl, resp_message, dx_time, w4r);
 	evt = chEvtWaitOneTimeout(MTXFRS_E, TX_TIMEOUT);
 	if (evt != MTXFRS_E)
 		return TWR_FAIL;
@@ -640,14 +652,8 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 	dw_setup();
 
 	dx_time_t dx_time;
-	tx_fctrl_t tx_ctrl;
 	ack_resp_t_t w4r;
 	eventmask_t evt = 0;
-	memset(tx_ctrl.reg, 0, sizeof(tx_ctrl.reg));
-	tx_ctrl.TXBR = BR_6_8MBPS;
-	tx_ctrl.TXPRF = PRF_16MHZ;
-	tx_ctrl.TXPL = PL_128;
-
 	dw_ctrl_req_t current_state;
 	dw_ctrl_req_t dw_ctrl_req = DW_CTRL_YIELD;
 	dw_ctrl_req_t last_state = DW_RESET;
@@ -667,12 +673,12 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 
 
 	// TODO This sleep makes LDE work, may not enough time to start lde on setup
-	chThdSleepMilliseconds(100);
+	chThdSleepMilliseconds(50);
 
 	while (true)
 	{
 		if (dw1000_cmd != NULL)
-			tx_ctrl.TFLEN = dw1000_cmd->size+2; // TODO magic
+			tx_fctrl.TFLEN = dw1000_cmd->size+2; // TODO magic
 
 		w4r.mask = 0;
 		memset(dx_time.reg, 0, sizeof(dx_time.reg));
@@ -706,7 +712,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				}
 				break;
 			case DW_SEND:
-				dw_start_tx(tx_ctrl, dw1000_cmd->send_buf, dx_time, w4r);
+				dw_start_tx(tx_fctrl, dw1000_cmd->send_buf, dx_time, w4r);
 				evt = chEvtWaitOneTimeout(MTXFRS_E, TX_TIMEOUT);
 				if (evt == MTXFRS_E)
 				{
@@ -719,7 +725,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 			case DW_SEND_W4R:
 				w4r.W4R_TIM = dw1000_cmd->wait;
 				w4r.ACK_TIM = 1;
-				dw_start_tx(tx_ctrl, dw1000_cmd->send_buf, dx_time, w4r);
+				dw_start_tx(tx_fctrl, dw1000_cmd->send_buf, dx_time, w4r);
 				evt = chEvtWaitOneTimeout(MTXFRS_E, TX_TIMEOUT);
 				if (evt != MTXFRS_E)
 					dw_ctrl_req = DW_TRX_ERR;
@@ -748,7 +754,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				break;
 			case DW_SEND_DLY:
 				dx_time.time32 = dw1000_cmd->dly;
-				dw_start_tx(tx_ctrl, dw1000_cmd->send_buf, dx_time, w4r);
+				dw_start_tx(tx_fctrl, dw1000_cmd->send_buf, dx_time, w4r);
 				evt = chEvtWaitOneTimeout(MTXFRS_E, TX_TIMEOUT);
 				if (evt == MTXFRS_E)
 				{
@@ -776,7 +782,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				{
 					dw_ctrl_req = dw1000_cmd->dw_ctrl_req;
 
-					tx_ctrl.TR = 0b0;
+					tx_fctrl.TR = 0b0;
 				}
 				break;
 			case DW_RECV_TMO:
@@ -788,7 +794,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				break;
 			case DW_SSTWR:
 				twr_state = TWR_SEND_INIT;
-				tx_ctrl.TR = 0b1;
+				tx_fctrl.TR = 0b1;
 				dw_ctrl_req = handle_sstwr(twr_state);
 				break;
 			case DW_DSTWR:
@@ -799,7 +805,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				break;
 			case DW_RESET:
 				dw_setup();
-				chThdSleepMilliseconds(100);
+				chThdSleepMilliseconds(50);
 				rst_cnt++;
 				dw_ctrl_req = DW_CTRL_YIELD;
 				dw1000_resp.state = DW_SYS_ERR;

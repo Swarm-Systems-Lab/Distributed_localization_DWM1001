@@ -25,8 +25,8 @@ THD_FUNCTION(TEST_APP, arg)
 
 	dw_addr_t self_addr = dw_get_addr();
 
-	dw_addr_t source = 18;
-	dw_addr_t tag = 1955;
+	dw_addr_t source = 1955;
+	dw_addr_t tag = 3213;
 
 	dw_recv_info_t dw_recv_info;
 
@@ -40,7 +40,7 @@ THD_FUNCTION(TEST_APP, arg)
 			dw_recv_tmo(NULL, NULL, 0, TIME_MS2I(1000));
 		else if (self_addr == tag)
 			dw_recv_info = dw_sstwr(source, NULL, 0, (uint8_t*)(&distance), sizeof(distance));
-		chThdSleepMilliseconds(10);
+		chThdSleepMilliseconds(60);
 		chprintf((BaseSequentialStream*)&SD1, "%fm\n", distance);
 	}
 }

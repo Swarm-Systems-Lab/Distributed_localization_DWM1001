@@ -61,7 +61,7 @@
 #define TX_TIMEOUT		TIME_MS2I(10)
 #define CH_TIMEOUT		TIME_S2I(5)
 #define DW_ERR_THRESH	10
-#define SSTWR_TMO		TIME_MS2I(10)
+#define SSTWR_TMO		TIME_MS2I(20)
 
 #define MSG_BUFFER_SIZE	128 
 
@@ -156,6 +156,11 @@ extern tx_antd_t tx_antd;
 extern uint16_t rx_ant_d;
 
 extern rx_finfo_t rx_finfo;
+
+extern tx_fctrl_t tx_fctrl;
+
+// TODO check effect on measurements, accuracy etc
+extern size_t send_dly_mult;
 
 extern uint32_t recv_tmo_usec;
 

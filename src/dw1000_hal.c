@@ -522,3 +522,71 @@ void default_config(void)
 	_dw_spi_transaction(0, DW_SUBREG_INFO.FS_PLLTUNE.parent.id, &fs_plltune, DW_SUBREG_INFO.FS_PLLTUNE.size, DW_SUBREG_INFO.FS_PLLTUNE.offset);
 	_dw_spi_hal_set._dw_spi_unlock();
 }
+
+void long_range_config(void)
+{
+	tx_power_t tx_power = TX_POWER_REF[0][0][0];
+
+	chan_ctrl_t chan_ctrl;
+	chan_ctrl.RX_CHAN = 1;
+	chan_ctrl.TX_CHAN = 1;
+	chan_ctrl.TX_PCODE = 1;
+	chan_ctrl.RX_PCODE = 1;
+	chan_ctrl.RXPRF = 0b01;
+
+	agc_tune1_t agc_tune1 = AGC_TUNE1_16_REF;
+	agc_tune2_t agc_tune2 = AGC_TUNE2_REF;
+
+	drx_tune0b_t drx_tune0b = DRX_TUNE0B_REF[0][0];
+	drx_tune1b_t drx_tune1b = DRX_TUNE1B_1024_REF;
+	drx_tune2_t drx_tune2 = DRX_TUNE2_REF[0][3]; // 64 pac	
+	drx_tune4h_t drx_tune4h = DRX_TUNE4H_128_REF;
+
+	rf_rxctrlh_t rf_rxctrlh = RF_RXCTRL_1_5_REF;
+	rf_txctrl_t rf_txctrl = RF_TXCTRL_1_REF;
+
+	tc_pgdelay_t tc_pgdelay = TC_PGDELAY_1_REF;
+
+	fs_pllcfg_t fs_pllcfg = FS_PLLCFG_1_REF;
+	fs_plltune_t fs_plltune = FS_PLLTUNE_1_REF;
+
+	lde_cfg1_t lde_cfg1 = LDE_CFG1_REF;
+	lde_cfg2_t lde_cfg2 = LDE_CFG2_16_REF;
+	lde_repc_t lde_repc = LDE_REPC_REF[0] >> 3; // 110kbps shift by 3
+
+	sys_cfg_t sys_cfg;
+	dw_read(DW_REG_INFO.SYS_CFG, sys_cfg.reg, DW_REG_INFO.SYS_CFG.size, 0);
+	sys_cfg.FFEN = 0b1;
+	sys_cfg.FFAD = 0b1;
+	sys_cfg.RXM110K = 0b1;
+	//TODO can reeanble after err condition and not work
+	//sys_cfg.RXAUTR = 0b1;
+	dw_write(DW_REG_INFO.SYS_CFG, sys_cfg.reg, DW_REG_INFO.SYS_CFG.size, 0);
+
+ 	_dw_spi_hal_set._dw_spi_lock(); 
+	_dw_spi_transaction(0, DW_REG_INFO.TX_POWER.id, tx_power.reg, DW_REG_INFO.TX_POWER.size, 0);
+
+	_dw_spi_transaction(0, DW_REG_INFO.CHAN_CTRL.id, chan_ctrl.reg, DW_REG_INFO.CHAN_CTRL.size, 0);
+
+	_dw_spi_transaction(0, DW_SUBREG_INFO.AGC_TUNE1.parent.id, (uint8_t*)(&agc_tune1), DW_SUBREG_INFO.AGC_TUNE1.size, DW_SUBREG_INFO.AGC_TUNE1.offset);
+	_dw_spi_transaction(0, DW_SUBREG_INFO.AGC_TUNE2.parent.id, (uint8_t*)(&agc_tune2), DW_SUBREG_INFO.AGC_TUNE2.size, DW_SUBREG_INFO.AGC_TUNE2.offset);
+
+	_dw_spi_transaction(0, DW_SUBREG_INFO.DRX_TUNE0b.parent.id, (uint8_t*)(&drx_tune0b), DW_SUBREG_INFO.DRX_TUNE0b.size, DW_SUBREG_INFO.DRX_TUNE0b.offset);
+	_dw_spi_transaction(0, DW_SUBREG_INFO.DRX_TUNE1b.parent.id, (uint8_t*)(&drx_tune1b), DW_SUBREG_INFO.DRX_TUNE1b.size, DW_SUBREG_INFO.DRX_TUNE1b.offset);
+	_dw_spi_transaction(0, DW_SUBREG_INFO.DRX_TUNE2.parent.id, (uint8_t*)(&drx_tune2), DW_SUBREG_INFO.DRX_TUNE2.size, DW_SUBREG_INFO.DRX_TUNE2.offset);
+	_dw_spi_transaction(0, DW_SUBREG_INFO.DRX_TUNE4H.parent.id, (uint8_t*)(&drx_tune4h), DW_SUBREG_INFO.DRX_TUNE4H.size, DW_SUBREG_INFO.DRX_TUNE4H.offset);
+
+	_dw_spi_transaction(0, DW_SUBREG_INFO.RF_RXCTRLH.parent.id, (uint8_t*)(&rf_rxctrlh), DW_SUBREG_INFO.RF_RXCTRLH.size, DW_SUBREG_INFO.RF_RXCTRLH.offset);
+	_dw_spi_transaction(0, DW_SUBREG_INFO.RF_TXCTRL.parent.id, rf_txctrl.reg, DW_SUBREG_INFO.RF_TXCTRL.size, DW_SUBREG_INFO.RF_TXCTRL.offset);
+
+	_dw_spi_transaction(0, DW_SUBREG_INFO.TC_PGDELAY.parent.id, (uint8_t*)(&tc_pgdelay), DW_SUBREG_INFO.TC_PGDELAY.size, DW_SUBREG_INFO.TC_PGDELAY.offset);
+
+	_dw_spi_transaction(0, DW_SUBREG_INFO.FS_PLLCFG.parent.id, (uint8_t*)(&fs_pllcfg), DW_SUBREG_INFO.FS_PLLCFG.size, DW_SUBREG_INFO.FS_PLLCFG.offset);
+	_dw_spi_transaction(0, DW_SUBREG_INFO.FS_PLLTUNE.parent.id, (uint8_t*)(&fs_plltune), DW_SUBREG_INFO.FS_PLLTUNE.size, DW_SUBREG_INFO.FS_PLLTUNE.offset);
+
+	_dw_spi_transaction(0, DW_SUBREG_INFO.LDE_CFG1.parent.id, lde_cfg1.reg, DW_SUBREG_INFO.LDE_CFG1.size, DW_SUBREG_INFO.LDE_CFG1.offset);
+	_dw_spi_transaction(0, DW_SUBREG_INFO.LDE_CFG2.parent.id, (uint8_t*)(&lde_cfg2), DW_SUBREG_INFO.LDE_CFG2.size, DW_SUBREG_INFO.LDE_CFG2.offset);
+	_dw_spi_transaction(0, DW_SUBREG_INFO.LDE_REPC.parent.id, (uint8_t*)(&lde_repc), DW_SUBREG_INFO.LDE_REPC.size, DW_SUBREG_INFO.LDE_REPC.offset);
+
+	_dw_spi_hal_set._dw_spi_unlock();
+}

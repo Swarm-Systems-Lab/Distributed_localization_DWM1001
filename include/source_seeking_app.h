@@ -23,7 +23,7 @@
 #define SS_K_GAIN				0.5
 #define CONSENSUS_PERIOD_US		(1000000/SS_CONSENSUS_FREQUENCY)
 #define SS_RTOS_DELAY_US		100
-#define SS_ITER_N				40
+#define SS_ITER_N				5
 
 typedef enum ss_packet_types
 {

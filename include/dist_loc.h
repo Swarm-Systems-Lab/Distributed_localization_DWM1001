@@ -25,7 +25,7 @@
 // #include "chprintf.h"
 // #include "chscanf.h"
 
-// #include "dw1000_ch.h"
+// #include "uwb_comm.h"
 // #include "LR-WPANs_MAC.h"
 
 // #define THREAD_STACK_SIZE	2048
@@ -38,6 +38,8 @@
 // #define MIN_DIST		-999.0f
 // #define MAX_DIST		999.0f
 
+// #define MAX_MSG_SIZE	110
+
 // typedef enum loc_state
 // {
 // 	LOC_STANDBY,
@@ -47,16 +49,16 @@
 // 	LOC_ERR
 // } loc_state_t;
 
-// typedef enum twr_state
-// {
-// 	TWR_REQ_SENT,		// start TWR
-// 	TWR_REQ_RECVD,		// start TWR send ack and wait for init
-// 	TWR_REQ_ACK_RECVD,	// send init and wait for resp
-// 	TWR_INIT_RECVD, 	// resp sent automatically
-// 	TWR_RESP_RECVD,		// send res and wait res_ack
-// 	TWR_NO_TWR,			
-// 	TWR_FAIL
-// } twr_state_t;
+// // typedef enum twr_state
+// // {
+// // 	TWR_REQ_SENT,		// start TWR
+// // 	TWR_REQ_RECVD,		// start TWR send ack and wait for init
+// // 	TWR_REQ_ACK_RECVD,	// send init and wait for resp
+// // 	TWR_INIT_RECVD, 	// resp sent automatically
+// // 	TWR_RESP_RECVD,		// send res and wait res_ack
+// // 	TWR_NO_TWR,			
+// // 	TWR_FAIL
+// // } twr_state_t;
 
 // typedef enum comm_state
 // {
@@ -99,15 +101,35 @@
 // 	MT_OTHER		= 0xFE
 // } message_t;
 
+// typedef enum loc_action2
+// {
+// 	LOC_SEND,
+// 	LOC_SEND_W4R,
+// 	LOC_SSTWR,
+// 	LOC_CONFIG,
+// 	LOC_NO_RESP,
+// 	LOC_ERR,
+// 	LOC_STOP
+// } loc_action2_t;
+
 // typedef enum loc_action
 // {
-// 	LOC_RESP,
-// 	LOC_RESP_BTMO,
-// 	LOC_RESP_NOW,
-// 	LOC_NO_RESP,
-// 	LOC_ACT_ERR,
-// 	LOC_STOP
+// 	LOC_SEND_BROAD,
+// 	LOC_SEND_ACK,
+// 	LOC_SEND_SYN,
+// 	LOC_SEND_SYN_ACK,
+// 	LOC_SEND_COMM,
+// 	LOC_SEND_TWR,
+// 	LOC_NO_SEND
 // } loc_action_t;
+
+// typedef struct loc_action3
+// {
+// 	loc_action_t loc_action;
+// 	dw_addr_t addr;
+// 	uint8_t* data;
+// 	size_t size;
+// } loc_action3_t;
 
 // typedef struct send_msg_meta
 // {
@@ -176,6 +198,8 @@
 
 // static THD_WORKING_AREA(COMMS_THREAD, 4098);
 // extern THD_FUNCTION(COMMS, arg);
+
+// extern THD_FUNCTION(DIST_LOC, arg);
 
 // static THD_WORKING_AREA(SYSTEM_STATUS_THREAD, 256);
 // extern THD_FUNCTION(SYSTEM_STATUS, arg);
