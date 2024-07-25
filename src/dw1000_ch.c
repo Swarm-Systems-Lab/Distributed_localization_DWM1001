@@ -341,7 +341,7 @@ void dw_setup(void)
 	// 		tx_antd = 15918;
 	// 		rx_ant_d = 15918;
 	// 		break;
-	// 	case 1955:
+	// 	case 2177:
 	// 		tx_antd = 0;
 	// 		rx_ant_d = 0;
 	// 		break;
@@ -805,7 +805,7 @@ THD_FUNCTION(DW_CONTROLLER, arg)
 				break;
 			case DW_RESET:
 				dw_setup();
-				chThdSleepMilliseconds(50);
+				chThdSleepMilliseconds(100);
 				rst_cnt++;
 				dw_ctrl_req = DW_CTRL_YIELD;
 				dw1000_resp.state = DW_SYS_ERR;

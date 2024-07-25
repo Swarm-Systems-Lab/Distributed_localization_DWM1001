@@ -43,3 +43,4 @@ int64_t dw_send_dly_tmo(dw_addr_t addr, uint8_t* send_data, size_t size, uint32_
 dw_recv_info_t dw_send_w4r_tmo(dw_addr_t addr, uint8_t* send_data, size_t size, uint32_t wait, dw_addr_t* recv_addr, uint8_t* recv_data, size_t recv_size, sysinterval_t tmo);
 dw_recv_info_t dw_sstwr(dw_addr_t addr, uint8_t* send_data, size_t size, uint8_t* recv_data, size_t recv_size);
 dw_recv_info_t dw_recv_tmo(dw_addr_t* addr, uint8_t* recv_data, size_t size, sysinterval_t tmo);
+void dw_reset_sys(void);

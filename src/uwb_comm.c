@@ -204,3 +204,18 @@ dw_recv_info_t dw_recv_tmo(dw_addr_t* addr, uint8_t* recv_data, size_t size, sys
 
 	return dw_recv_info;
 }
+
+void dw_reset_sys(void)
+{
+	dw1000_resp_t* res;
+	dw1000_cmd_t dw_cmd;
+
+	dw_cmd.size = 0;
+	dw_cmd.dw_ctrl_req = DW_RESET;
+	dw_cmd.dly = 0; 
+	dw_cmd.wait = -1;
+	dw_cmd.tmo = 0;
+
+	chMBPostTimeout(&dw_controller, (msg_t)&dw_cmd, TIME_INFINITE);
+	chMBFetchTimeout(&dw_controller_resp, (msg_t*)&res, TIME_INFINITE);
+}
