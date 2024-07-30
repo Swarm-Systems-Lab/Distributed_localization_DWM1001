@@ -31,7 +31,6 @@ msg_t uart1_recv_msgs[UART1_Q_LENGTH];
 
 serial_packet_t uart1_recv_buff[UART1_Q_LENGTH];
 
-
 void serial_init(void)
 {
 	memset(uart1_send_msgs, 0, sizeof(uart1_send_msgs));
@@ -41,41 +40,74 @@ void serial_init(void)
 	sdStart(&SD1, &serial_cfg);
 }
 
-void check_serial(void)
-{
-	serial_packet_t* uart_pend;
-	char read[2] = {0,0};
-	sdReadTimeout(&SD1, read, 2,  TIME_MS2I(50));
-
-	if (strcmp(read, "DW"))
-	{
-		while (chMBFetchTimeout(&uart1_send_queue, (msg_t*)&uart_pend, TIME_US2I(50)) == MSG_OK)
-		{
-			chprintf((BaseSequentialStream*)&SD1, "DW");
-      		sdWrite(&SD1, (const uint8_t*)uart_pend, uart_pend->p_length+2);
-		}
-	} 
-	else
-	{
-		size_t char_n_read = sdReadTimeout(&SD1, (const uint8_t*)uart1_recv_buff, 2,  TIME_US2I(50));
-		if (char_n_read == 2)
-		{
-			sdReadTimeout(&SD1, (const uint8_t*)(uart1_recv_buff->p_data), uart1_recv_buff->p_length,  TIME_US2I(50));
-			chMBPostTimeout(&uart1_recv_queue, (msg_t)uart1_recv_buff, TIME_US2I(50));
-		}
-	}
-}
-
-THD_FUNCTION(UART_CONTROLLER, arg)
+THD_FUNCTION(UART_RECEIVER, arg)
 {
 	(void)arg;
 
 	serial_init();
 	chThdSleepMilliseconds(5);
+	
+	uint8_t current_byte = 0;
+	size_t data_cnt = 0;
+	sd_read_state_t state = SD_SYNC0;
 
 	while(true)
 	{
-		check_serial();
-		chThdSleepMilliseconds(5);
+		current_byte = sdGet(&SD1);
+
+		switch (state)
+		{
+			case SD_SYNC0:
+				data_cnt = 0;
+				if (current_byte == 'D')
+					state = SD_SYNC1;
+				break;
+			case SD_SYNC1:
+				if (current_byte == 'W')
+					state = SD_CLASS;
+				else
+					state = SD_SYNC0;
+				break;
+			case SD_CLASS:
+				uart1_recv_buff[0].p_class = current_byte;
+				state = SD_LENGTH;
+				break;
+			case SD_LENGTH:
+				uart1_recv_buff[0].p_length = current_byte;
+				state = SD_DATA;
+				break;
+			case SD_DATA:
+				if (data_cnt < uart1_recv_buff[0].p_length)
+				{
+					uart1_recv_buff[0].p_data[data_cnt] = current_byte;
+					data_cnt++;
+				}
+				else
+				{
+					chMBPostTimeout(&uart1_recv_queue, (msg_t)uart1_recv_buff, TIME_US2I(50));
+					state = SD_SYNC0;
+				}
+				break;
+		}
+		
+	}
+}
+
+THD_FUNCTION(UART_SENDER, arg)
+{
+	(void)arg;
+
+	chThdSleepMilliseconds(15);
+
+	serial_packet_t* uart_pend;
+	const char sync_message[2] = {'D', 'W'};
+
+	while(true)
+	{
+		if (chMBFetchTimeout(&uart1_send_queue, (msg_t*)&uart_pend, TIME_MS2I(100)) == MSG_OK)
+		{
+			sdWrite(&SD1, (const uint8_t*)sync_message, sizeof(sync_message));
+			sdWrite(&SD1, (const uint8_t*)uart_pend, uart_pend->p_length+2);
+		}
 	}
 }

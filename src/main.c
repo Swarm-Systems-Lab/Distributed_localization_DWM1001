@@ -39,8 +39,9 @@ int main(void) {
 	chThdSleepMilliseconds(100);
 	
 	chThdCreateStatic(DW_CONTROLLER_THREAD, sizeof(DW_CONTROLLER_THREAD), NORMALPRIO, DW_CONTROLLER, NULL);
-	chThdCreateStatic(UART_CONTROLLER_THREAD, sizeof(UART_CONTROLLER_THREAD), NORMALPRIO, UART_CONTROLLER, NULL);
-	thread_t* app_thread_p = chThdCreateStatic(APP_THREAD, sizeof(APP_THREAD), NORMALPRIO, DISTANCE_FIELD, NULL);
+	chThdCreateStatic(UART_CONTROLLER_THREAD, sizeof(UART_CONTROLLER_THREAD), NORMALPRIO, UART_RECEIVER, NULL);
+	chThdCreateStatic(UART_CONTROLLER_THREAD, sizeof(UART_CONTROLLER_THREAD), NORMALPRIO, UART_SENDER, NULL);
+	thread_t* app_thread_p = chThdCreateStatic(APP_THREAD, sizeof(APP_THREAD), NORMALPRIO, SS, NULL);
 
 	while (true) {	
 		toggle_led(red1);

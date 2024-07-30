@@ -28,6 +28,15 @@
 #define UART1_Q_LENGTH	1
 #define UART_BUFF_SIZE	64
 
+typedef enum sd_read_state
+{
+	SD_SYNC0,
+	SD_SYNC1,
+	SD_CLASS,
+	SD_LENGTH,
+	SD_DATA
+} sd_read_state_t;
+
 typedef struct serial_packet
 {
 	uint8_t p_class;
@@ -46,8 +55,9 @@ extern serial_packet_t uart1_recv_buff[UART1_Q_LENGTH];
 extern SerialConfig serial_cfg;
 
 static THD_WORKING_AREA(UART_CONTROLLER_THREAD, 512);
-extern THD_FUNCTION(UART_CONTROLLER, arg);
+extern THD_FUNCTION(UART_RECEIVER, arg);
+
+static THD_WORKING_AREA(UART_CONTROLLER_THREAD, 512);
+extern THD_FUNCTION(UART_SENDER, arg);
 
 void serial_init(void);
-
-void check_serial(void);

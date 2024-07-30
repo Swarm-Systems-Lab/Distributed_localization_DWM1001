@@ -18,9 +18,9 @@
 
 serial_packet_t uart1_send_buff[UART1_Q_LENGTH];
 
-dw_addr_t identifier_map[SS_DEVICE_NUMBER] = {2177, 7090, 5923};
+dw_addr_t identifier_map[SS_DEVICE_NUMBER] = {0, 0, 0};
 
-dw_addr_t field_source = 1955;
+dw_addr_t field_source = 7090;
 
 virtual_timer_t comm_slot_timer;
 
@@ -132,11 +132,11 @@ void recv_serial(void)
 	switch(recvd_packet->p_class)
 	{
 		case SS_P_IDENTITIES:
-			//get_id_from_ap(recvd_packet->p_data, recvd_packet->p_length);
+			get_id_from_ap(recvd_packet->p_data, recvd_packet->p_length);
 			chThdSleepMilliseconds(20);
 			send_confirmation();
 			// chThdSleepMilliseconds(1);
-			send_confirmation();
+			// send_confirmation();
 			break;
 		case SS_P_CONFIRMATION:
 			break;
@@ -213,13 +213,13 @@ void ss_sync(void)
 	uint8_t recv_message[1] = {0};
 	switch(self_addr)
 	{
-		case 7090:
+		case 1955:
 			chThdSleepMilliseconds(150);
 			dw_send_tmo(0xFFFF, &sync_message1, sizeof(sync_message1), DEF_TMO_MS);
 			break;
 
 		default:
-			while (recv_addr != 7090 || recv_message[0] != sync_message1)
+			while (recv_addr != 1955 || recv_message[0] != sync_message1)
 				dw_recv_tmo(&recv_addr, recv_message, sizeof(sync_message1), DEF_TMO_MS);
 			break;
 	}
@@ -398,7 +398,7 @@ void run_consensus_centroid(void)
 				{
 					if (COMM_GRAPH[i][self_id] > 0)
 					{
-						chprintf((BaseSequentialStream*)&SD1, "Iter: %d ID: %d failed receive\n\n", consensus_iter_n, self_id);
+						//chprintf((BaseSequentialStream*)&SD1, "Iter: %d ID: %d failed receive\n\n", consensus_iter_n, self_id);
 						fail_cnt++;
 						fail_state = 1;
 					}
@@ -564,10 +564,10 @@ THD_FUNCTION(SS, arg)
 
 	self_addr = dw_get_addr();
 
-	// while (identifier_map[0] == 0 && self_addr != field_source)
-	// 	recv_serial();
+	while (identifier_map[0] == 0 && self_addr != field_source)
+		recv_serial();
 
-	send_confirmation();
+	//send_confirmation();
 	
 	if (self_addr == field_source)
 		source_device();
@@ -592,6 +592,8 @@ THD_FUNCTION(SS, arg)
 			run_consensus_centroid();
 		// else
 		// 	run_consensus_asc_dir();
+
+		send_centroid();
 
 		if (consensus_iter_n == SS_ITER_N-1)
 		{
