@@ -86,7 +86,12 @@ The project architecture is **layered**, providing different levels of abstracti
 3. #### Communication and networking (API for sending, receiving, broadcasting...)
 4. #### Application (Any application you wish to implement)
 \
+\
 The application layer can benefit from a complete API in which sending a message to a device or receiving data is as easy as calling a function.
+\
+\
+This project is a **WIP** so much of the functionality is still in development, any [contributions](#contributing) or suggestions are welcome.
+\
 \
 [Documentation](https://github.com/Swarm-Systems-Lab/Distributed_localization_DWM1001/tree/main/docs) WIP
 
@@ -105,11 +110,13 @@ This application provides **relative positioning** information regarding the nei
 
 ### Consensus protocols
 
+Many consensus algorithms such as **averaging** between devices require frequent information exchange, our platform provides an implementation opportunity to test and run these algorithms.
+
 ![centroid](docs/assets/centroid1.gif)
 
 _Centroid estimation consensus algorithm, EXECUTED ON SIMULATION [Source](https://github.com/jesusBV20/source_seeking_distr/tree/master)_
 
-Consensus algorithms, such as this centroid estimation, can be implemented on real hardware using the communication API and creating an application which implements the algorithm's calculations and information exchange between devices.
+This centroid estimation, can be implemented on real hardware using the communication API and creating an application which implements the algorithm's calculations and information exchange between devices.
 
 ## Anything you can think of
 
