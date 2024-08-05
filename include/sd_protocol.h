@@ -54,10 +54,10 @@ extern serial_packet_t uart1_recv_buff[UART1_Q_LENGTH];
 
 extern SerialConfig serial_cfg;
 
-static THD_WORKING_AREA(UART_CONTROLLER_THREAD, 512);
+static THD_WORKING_AREA(UART_RECEIVER_THREAD, 512);
 extern THD_FUNCTION(UART_RECEIVER, arg);
 
-static THD_WORKING_AREA(UART_CONTROLLER_THREAD, 512);
+static THD_WORKING_AREA(UART_SENDER_THREAD, 512);
 extern THD_FUNCTION(UART_SENDER, arg);
 
 void serial_init(void);

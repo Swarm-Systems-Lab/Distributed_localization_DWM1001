@@ -378,9 +378,9 @@
 // 	memcpy(send_buf+sizeof(peer->peer_addr), &euclidean_d_m, sizeof(euclidean_d_m));
 // }
 
-// void process_req(void)
+// void process_req(uint8_t* recvd)
 // {
-// 	euclidean_d_m_t* m = (euclidean_d_m_t*)(recv_buf+sizeof(panadr_own.short_addr));
+// 	euclidean_d_m_t* m = (euclidean_d_m_t*)(recvd+sizeof(panadr_own.short_addr));
 
 // 	for (uint8_t i = 0; i < NEIGHBOUR_NUM+1; i++)
 // 	{
@@ -501,9 +501,7 @@
 // 	float distance = 0.0;
 
 // 	if (twr_state != TWR_NO_TWR && peer != twr_peer)
-// 		recvd_type = 0;
-
-// 	loc_action = LOC_RESP_NOW;
+// 		return TWR_ERROR;
 
 // 	distance = MIN_DIST;
 // 	switch (recvd_type)
@@ -513,7 +511,7 @@
 // 			{
 // 				if (twr_state == TWR_REQ_SENT && peer->peer_addr < panadr_own.short_addr)
 // 				{
-// 					loc_action = LOC_NO_RESP;
+// 					return WAIT_RANDOM;
 // 				}
 // 				else
 // 				{
@@ -522,12 +520,12 @@
 // 					twr_peer = peer;
 // 					twr_peer_seq = peer->seq_ack_n;
 
-// 					send_d_req_ack(peer);
+// 					return SEND_ACK_TWR;
 // 				}
 // 			}
 // 			else
 // 			{
-// 				handle_twr_fail();
+// 				return TWR_ERROR;
 // 			}
 // 			break;
 // 		case MT_D_REQ_ACK:
@@ -540,14 +538,6 @@
 // 			{
 // 				handle_twr_fail();
 // 			}
-// 			break;
-// 		case MT_D_INIT:
-// 			if (!(peer == twr_peer && twr_state == TWR_REQ_RECVD))
-// 			{
-// 				handle_twr_fail();
-// 			}
-// 			twr_state = TWR_INIT_RECVD;
-// 			loc_action = LOC_NO_RESP;
 // 			break;
 // 		case MT_D_RESP:
 // 			if (peer == twr_peer && twr_state == TWR_REQ_ACK_RECVD)
@@ -564,14 +554,6 @@
 // 			{
 // 				handle_twr_fail();
 // 			}						
-// 			break;
-// 		case MT_D_FAIL:
-// 			loc_state = LOC_COMM;
-// 			twr_state = TWR_NO_TWR;
-// 			twr_peer->seq_ack_n = twr_peer_seq;
-// 			twr_fail_cnt++;
-// 			twr_peer = NULL;
-// 			send_d_req();
 // 			break;
 // 		case MT_D_RES:
 // 			// NO BREAK
@@ -893,13 +875,10 @@
 
 // 	if ((recvd_msg_type == MT_D_REQ || recvd_msg_type == MT_D_REQ_ACK))
 // 	{
-// 		process_req();
-// 		if (*((uint16_t*)recvd) != panadr_own.short_addr)
-// 		{
-// 			recv_tmo_usec = (rand()&0xF000)+40000;
-// 			loc_action = LOC_STOP;
-// 			send_msg_meta = send_msg_meta_def;
-// 		}
+// 		process_req(recvd);
+// 		// Address supposed to received on first to bytes of message
+// 		if (*((uint16_t*)(recvd+1)) != panadr_own.short_addr)
+// 			return LOC_WAIT_RANDOM;
 // 	}
 // 	if(loc_action != LOC_STOP)
 // 	{
@@ -930,9 +909,7 @@
 // 			{
 // 				loc_state = LOC_COMM;
 // 				twr_state = TWR_NO_TWR;
-// 				if ((recvd_msg_type&0xF0) == 0x10 /*|| some_peer_recv_ack_timeout*/)
-// 					conn_handle(peer);
-// 				else if ((recvd_msg_type&0xF0) == 0x30 && peer_valid)
+// 				if ((recvd_msg_type&0xF0) == 0x10 || ((recvd_msg_type&0xF0) == 0x30 && peer_valid) /*|| some_peer_recv_ack_timeout*/)
 // 					conn_handle(peer);
 // 				// else
 // 				// 	invalid_message_handle

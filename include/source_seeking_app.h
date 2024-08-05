@@ -37,6 +37,12 @@ typedef enum ss_packet_types
 	SS_P_FIELD_MEASURE
 } ss_packet_t;
 
+typedef enum ss_uwb_msg_types
+{
+	SS_M_CON_V			= 0x0,
+	SS_M_DEBUG
+} ss_uwb_msg_t;
+
 typedef struct ss_pos
 {
 	float x;
@@ -45,8 +51,8 @@ typedef struct ss_pos
 
 typedef struct ss_header
 {
-	uint8_t type;
-	uint8_t order;
+	ss_uwb_msg_t type;
+	uint16_t step;
 } ss_header_t;
 
 extern virtual_timer_t comm_slot_timer;
@@ -69,6 +75,8 @@ extern dw_addr_t self_addr;
 extern size_t self_id;
 
 extern uint16_t consensus_iter_n;
+
+extern uint16_t consensus_step;
 
 static const uint8_t COMM_GRAPH[SS_DEVICE_NUMBER][SS_DEVICE_NUMBER] =
 {

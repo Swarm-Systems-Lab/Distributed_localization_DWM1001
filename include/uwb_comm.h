@@ -44,3 +44,5 @@ dw_recv_info_t dw_send_w4r_tmo(dw_addr_t addr, uint8_t* send_data, size_t size, 
 dw_recv_info_t dw_sstwr(dw_addr_t addr, uint8_t* send_data, size_t size, uint8_t* recv_data, size_t recv_size);
 dw_recv_info_t dw_recv_tmo(dw_addr_t* addr, uint8_t* recv_data, size_t size, sysinterval_t tmo);
 void dw_reset_sys(void);
+
+void chThd_rand_wait(sysinterval_t min_us, sysinterval_t max_us);

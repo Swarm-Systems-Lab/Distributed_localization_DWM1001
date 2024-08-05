@@ -219,3 +219,12 @@ void dw_reset_sys(void)
 	chMBPostTimeout(&dw_controller, (msg_t)&dw_cmd, TIME_INFINITE);
 	chMBFetchTimeout(&dw_controller_resp, (msg_t*)&res, TIME_INFINITE);
 }
+
+void chThd_rand_wait(uint32_t min_us, uint32_t max_us)
+{
+	if (min_us < max_us) 
+	{
+		float scale = rand() / (double) RAND_MAX;
+		chThdSleepMicroseconds(min_us + (uint32_t)((max_us - min_us + 1) * scale));
+	}
+}
