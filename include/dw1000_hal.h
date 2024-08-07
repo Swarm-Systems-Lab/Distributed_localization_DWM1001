@@ -1661,6 +1661,8 @@ static const tx_power_t TX_POWER_REF[2][2][5] =
 	}
 };
 
+static const tx_power_t TX_POWER_MAX = {.mask=0x1F1F1F1F};
+
 static const agc_tune1_t AGC_TUNE1_16_REF = 0x8870;
 static const agc_tune1_t AGC_TUNE1_64_REF = 0x889B;
 static const agc_tune2_t AGC_TUNE2_REF = 0X2502A907;

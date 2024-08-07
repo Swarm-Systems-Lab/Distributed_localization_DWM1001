@@ -525,7 +525,9 @@ void default_config(void)
 
 void long_range_config(void)
 {
-	tx_power_t tx_power = TX_POWER_REF[0][0][0];
+	// CH 1 110 kbps 2048 preamble length 16 MHz PRF
+	//tx_power_t tx_power = TX_POWER_REF[0][0][0];
+	tx_power_t tx_power = TX_POWER_MAX;
 
 	chan_ctrl_t chan_ctrl;
 	chan_ctrl.RX_CHAN = 1;
@@ -559,6 +561,8 @@ void long_range_config(void)
 	sys_cfg.FFEN = 0b1;
 	sys_cfg.FFAD = 0b1;
 	sys_cfg.RXM110K = 0b1;
+	// MANUAL POWER
+	sys_cfg.DIS_STXP = 0b1;
 	//TODO can reeanble after err condition and not work
 	//sys_cfg.RXAUTR = 0b1;
 	dw_write(DW_REG_INFO.SYS_CFG, sys_cfg.reg, DW_REG_INFO.SYS_CFG.size, 0);

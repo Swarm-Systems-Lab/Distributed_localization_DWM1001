@@ -16,9 +16,10 @@
 
 #include "sd_protocol.h"
 #include "uwb_comm.h"
+#include "math.h"
 
 #define SS_DEVICE_NUMBER		3
-#define SS_CONSENSUS_FREQUENCY	10
+#define SS_CONSENSUS_FREQUENCY	2
 #define SS_COMM_PERIOD_SLICE	0.5
 #define SS_K_GAIN				0.9
 #define CONSENSUS_PERIOD_US		(1000000/SS_CONSENSUS_FREQUENCY)
