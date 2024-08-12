@@ -21,7 +21,7 @@
 #define SS_DEVICE_NUMBER		3
 #define SS_CONSENSUS_FREQUENCY	2
 #define SS_COMM_PERIOD_SLICE	0.5
-#define SS_K_GAIN				0.9
+#define SS_K_GAIN				1
 #define CONSENSUS_PERIOD_US		(1000000/SS_CONSENSUS_FREQUENCY)
 #define SS_RTOS_DELAY_US		100
 #define SS_ITER_N				5
@@ -41,6 +41,7 @@ typedef enum ss_packet_types
 typedef enum ss_uwb_msg_types
 {
 	SS_M_CON_V			= 0x0,
+	SS_M_CON_LV			= 0x1,
 	SS_M_DEBUG
 } ss_uwb_msg_t;
 
@@ -77,7 +78,7 @@ extern size_t self_id;
 
 extern uint16_t consensus_iter_n;
 
-extern uint16_t consensus_step;
+extern uint8_t consensus_step;
 
 static const uint8_t COMM_GRAPH[SS_DEVICE_NUMBER][SS_DEVICE_NUMBER] =
 {
