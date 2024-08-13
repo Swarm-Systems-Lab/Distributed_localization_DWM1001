@@ -416,10 +416,10 @@ void broad_consensus(ss_pos_t value)
 	memcpy(uwb_send_buff+sizeof(ss_header), &value, sizeof(value));
 
 	dw_send_tmo(0xFFFF, uwb_send_buff, sizeof(ss_header)+sizeof(value), DEF_TMO_MS);
-	// chprintf((BaseSequentialStream*)&SD1, "Sent Id: %d m_step: %u value: (%.3f,%.3f)\n\n", self_id, consensus_step, value.x , value.y);
+	// chprintf((BaseSequentialStream*)&SD1, "Sent Id: %d step %u \n\n", self_id, consensus_step);
 }
 
-void broad_consensus_last(ss_pos_t value)
+void broad_consensus_last(ss_pos_t value, dw_addr_t addr)
 {
 	ss_header_t ss_header;
 
@@ -429,8 +429,8 @@ void broad_consensus_last(ss_pos_t value)
 	memcpy(uwb_send_buff, &ss_header, sizeof(ss_header));
 	memcpy(uwb_send_buff+sizeof(ss_header), &value, sizeof(value));
 
-	dw_send_tmo(0xFFFF, uwb_send_buff, sizeof(ss_header)+sizeof(value), DEF_TMO_MS);
-	// chprintf((BaseSequentialStream*)&SD1, "Sent Id: %d m_step: %u value: (%.3f,%.3f)\n\n", self_id, consensus_step-1, value.x , value.y);
+	dw_send_tmo(addr, uwb_send_buff, sizeof(ss_header)+sizeof(value), DEF_TMO_MS);
+	// chprintf((BaseSequentialStream*)&SD1, "Sent Id: %d  step %u addr %u LAST\n\n", self_id, consensus_step-1, addr);
 }
 
 uint8_t is_consensus_device(dw_addr_t addr, uint8_t id)
@@ -456,7 +456,7 @@ void run_consensus_new(void)
 	memset(zero_row, 0, sizeof(zero_row));
 	static uint8_t comm_row[SS_DEVICE_NUMBER];
 	static ss_pos_t last_value = {.x=0, .y=0};
-	static uint8_t last_id = 255;
+	static dw_addr_t last_addr = 0;
 	static uint8_t send_cond = true;
 	dw_recv_info_t recvd;
 
@@ -464,7 +464,7 @@ void run_consensus_new(void)
 	{
 		reset_cnt++;
 		// chprintf((BaseSequentialStream*)&SD1, "FINAL Id: %d C: (%.3f,%.3f)\n\n", self_id, position[self_id].x - centroid[self_id].x , position[self_id].y - centroid[self_id].y);
-		// send_centroid();
+		send_centroid();
 
 		// NEW ITER
 		consensus_step = 0;
@@ -478,10 +478,10 @@ void run_consensus_new(void)
 	{
 		// chprintf((BaseSequentialStream*)&SD1, "Centroid ID %u 0 (%.3f,%.3f) 1 (%.3f,%.3f) 2(%.3f,%.3f)\n", self_id, centroid[0].x, centroid[0].y, centroid[1].x, centroid[1].y, centroid[2].x, centroid[2].y);
 		update_centroid();
-		chprintf((BaseSequentialStream*)&SD1, "UPDATE Id: %d Step: %u C: (%.3f,%.3f)\n\n", self_id, consensus_step, position[self_id].x - centroid[self_id].x , position[self_id].y - centroid[self_id].y);
+		// chprintf((BaseSequentialStream*)&SD1, "UPDATE Id: %d Step: %u C: (%.3f,%.3f)\n\n", self_id, consensus_step, position[self_id].x - centroid[self_id].x , position[self_id].y - centroid[self_id].y);
 
 		consensus_step++;
-		last_id = 255;
+		last_addr = 0;
 		last_value = centroid[self_id];
 		memcpy(comm_row, COMM_GRAPH[self_id], sizeof(comm_row));
 		send_cond = true;
@@ -492,12 +492,12 @@ void run_consensus_new(void)
 		//	Send broadcast of value
 		if (self_id == i && send_cond)
 		{
-			if (last_id == 255)
+			if (last_addr == 0)
 				broad_consensus(centroid[self_id]);
 			else
 			{
-				broad_consensus_last(last_value);
-				last_id = 255;
+				broad_consensus_last(last_value, last_addr);
+				last_addr = 0;
 			}
 			send_cond = false;
 		}
@@ -524,9 +524,9 @@ void run_consensus_new(void)
 					{
 						if (ss_header_p->type == SS_M_CON_V)
 						{
-							// When this happens the last vale should be sent instead of the current value until current iter is recvd frm recv_id
+							// When this happens the last value should be sent instead of the current value until current iter is recvd frm recv_id
 							if (ss_header_p->step == consensus_step-1)
-								last_id = recv_id;
+								last_addr = recv_addr;
 							else if (ss_header_p->step < consensus_step-1 && consensus_step == SS_ITER_N-1)
 								consensus_step++;
 						}
@@ -536,7 +536,10 @@ void run_consensus_new(void)
 				else //timeout or err or wrong device											
 				{
 					if (recvd.recvd_size == 0)
+					{
+						// chprintf((BaseSequentialStream*)&SD1, "TIMEOUT: %d \n\n", self_id);
 						send_cond = true;
+					}
 					
 					centroid[i] = centroid[self_id];
 					centroid[i].x -= position[self_id].x - position[i].x;
