@@ -21,7 +21,7 @@
 #define SS_DEVICE_NUMBER		3
 #define SS_CONSENSUS_FREQUENCY	2
 #define SS_COMM_PERIOD_SLICE	0.5
-#define SS_K_GAIN				0.8
+#define SS_K_GAIN				1
 #define CONSENSUS_PERIOD_US		(1000000/SS_CONSENSUS_FREQUENCY)
 #define SS_RTOS_DELAY_US		100
 #define SS_ITER_N				10
@@ -42,6 +42,7 @@ typedef enum ss_uwb_msg_types
 {
 	SS_M_CON_V			= 0x0,
 	SS_M_CON_LV			= 0x1,
+	SS_M_CON_POS		= 0x2,
 	SS_M_DEBUG
 } ss_uwb_msg_t;
 
