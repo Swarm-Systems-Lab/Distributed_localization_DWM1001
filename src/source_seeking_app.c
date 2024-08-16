@@ -21,7 +21,7 @@ serial_packet_t uart1_send_buff[UART1_Q_LENGTH];
 uint8_t uwb_send_buff[64];
 uint8_t uwb_recv_buff[64];
 
-dw_addr_t identifier_map[SS_DEVICE_NUMBER] = {1955, 18, 3213};
+dw_addr_t identifier_map[SS_DEVICE_NUMBER] = {0, 0, 0};
 
 dw_addr_t field_source = 9999;
 
@@ -482,11 +482,11 @@ void exchange_positions(void)
 	ss_header.step = 0;
 	ss_header.type = SS_M_CON_POS;
 
-	// while (positions_outdated[self_id])
-	// 	recv_serial();
+	while (positions_outdated[self_id])
+		recv_serial();
 	positions_outdated[self_id] = false;
-	position[self_id].x = 30+((40-30+1)*rand()/(float)RAND_MAX);
-	position[self_id].y = 30+((40-30+1)*rand()/(float)RAND_MAX);
+	// position[self_id].x = 30+((40-30+1)*rand()/(float)RAND_MAX);
+	// position[self_id].y = 30+((40-30+1)*rand()/(float)RAND_MAX);
 	// position[self_id].x = self_id+1;
 	// position[self_id].y = self_id+1;
 	chThdSleepMilliseconds(2);
@@ -561,8 +561,8 @@ void run_consensus_new(void)
 	if (consensus_step == SS_ITER_N)
 	{
 		reset_cnt++;
-		chprintf((BaseSequentialStream*)&SD1, "FINAL Id: %d C: (%.3f,%.3f)\n\n", self_id, position[self_id].x - centroid[self_id].x , position[self_id].y - centroid[self_id].y);
-		// send_centroid();
+		// chprintf((BaseSequentialStream*)&SD1, "FINAL Id: %d C: (%.3f,%.3f)\n\n", self_id, position[self_id].x - centroid[self_id].x , position[self_id].y - centroid[self_id].y);
+		send_centroid();
 
 		// NEW ITER
 		consensus_step = 0;
@@ -578,9 +578,9 @@ void run_consensus_new(void)
 
 	if (memcmp(false_row, comm_row, sizeof(comm_row)) == 0) // All required data received
 	{
-		chprintf((BaseSequentialStream*)&SD1, "Centroid ID %u 0 (%.3f,%.3f) 1 (%.3f,%.3f) 2(%.3f,%.3f)\n", self_id, centroid[0].x, centroid[0].y, centroid[1].x, centroid[1].y, centroid[2].x, centroid[2].y);
+		// chprintf((BaseSequentialStream*)&SD1, "Centroid ID %u 0 (%.3f,%.3f) 1 (%.3f,%.3f) 2(%.3f,%.3f)\n", self_id, centroid[0].x, centroid[0].y, centroid[1].x, centroid[1].y, centroid[2].x, centroid[2].y);
+		// chprintf((BaseSequentialStream*)&SD1, "UPDATE Id: %d Step: %u C: (%.3f,%.3f)\n\n", self_id, consensus_step, position[self_id].x - centroid[self_id].x , position[self_id].y - centroid[self_id].y);
 		update_centroid();
-		chprintf((BaseSequentialStream*)&SD1, "UPDATE Id: %d Step: %u C: (%.3f,%.3f)\n\n", self_id, consensus_step, position[self_id].x - centroid[self_id].x , position[self_id].y - centroid[self_id].y);
 
 		consensus_step++;
 		last_addr = 0;
