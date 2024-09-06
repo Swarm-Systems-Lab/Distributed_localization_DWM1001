@@ -92,8 +92,17 @@ void send_source_dist(float source_dist)
 	chMBPostTimeout(&uart1_send_queue, (msg_t)&(uart1_send_buff[0]), TIME_US2I(50));
 }
 
+void send_debug(void)
+{
+	uart1_send_buff[0].p_class = SS_P_DEBUG;
+	uart1_send_buff[0].p_length = 0;
+
+	chMBPostTimeout(&uart1_send_queue, (msg_t)&(uart1_send_buff[0]), TIME_US2I(50));
+}
+
 void send_centroid(void)
 {
+	send_debug();
 	uart1_send_buff[0].p_class = SS_P_CENTROID;
 	uart1_send_buff[0].p_length = sizeof(centroid[self_id]);
 
@@ -103,9 +112,13 @@ void send_centroid(void)
 
 void send_asc_dir(void)
 {
+	send_debug();
 	uart1_send_buff[0].p_class = SS_P_ASC_DIR;
 	uart1_send_buff[0].p_length = sizeof(position[self_id]);
+	
+	// char a[8] = {'a','a','a','a','a','a','a','a'};
 
+	// memcpy(uart1_send_buff[0].p_data, a, uart1_send_buff[0].p_length);
 	memcpy(uart1_send_buff[0].p_data, &(position[self_id]), uart1_send_buff[0].p_length);
 	chMBPostTimeout(&uart1_send_queue, (msg_t)&(uart1_send_buff[0]), TIME_US2I(50));
 }
@@ -116,16 +129,6 @@ void send_confirmation(void)
 	uart1_send_buff[0].p_length = sizeof(identifier_map);
 
 	memcpy(uart1_send_buff[0].p_data, identifier_map, uart1_send_buff[0].p_length);
-	chMBPostTimeout(&uart1_send_queue, (msg_t)&(uart1_send_buff[0]), TIME_US2I(50));
-}
-
-void send_debug(void)
-{
-	uart1_send_buff[0].p_class = SS_P_DEBUG;
-	uart1_send_buff[0].p_length = sizeof(consensus_iter_n) + sizeof(consensus_value[self_id]);
-
-	memcpy(uart1_send_buff[0].p_data, &consensus_iter_n, sizeof(consensus_iter_n));
-	memcpy(uart1_send_buff[0].p_data+sizeof(consensus_iter_n), consensus_value+self_id, sizeof(consensus_value[self_id]));
 	chMBPostTimeout(&uart1_send_queue, (msg_t)&(uart1_send_buff[0]), TIME_US2I(50));
 }
 
@@ -322,8 +325,8 @@ void calculate_centroid(void)
 	centroid_c.x /= SS_DEVICE_NUMBER;
 	centroid_c.y /= SS_DEVICE_NUMBER;
 
-	chprintf((BaseSequentialStream*)&SD1, "POS Id: %d C: (%.3f,%.3f)\n\n", self_id, position[self_id].x, position[self_id].y);
-	chprintf((BaseSequentialStream*)&SD1, "Real Id: %d C: (%.3f,%.3f)\n\n", self_id, centroid_c.x, centroid_c.y);
+	// chprintf((BaseSequentialStream*)&SD1, "POS Id: %d C: (%.3f,%.3f)\n\n", self_id, position[self_id].x, position[self_id].y);
+	// chprintf((BaseSequentialStream*)&SD1, "Real Id: %d C: (%.3f,%.3f)\n\n", self_id, centroid_c.x, centroid_c.y);
 }
 
 void run_consensus_centroid(void)
@@ -424,9 +427,9 @@ void broad_consensus(ss_pos_t value)
 
 	memcpy(uwb_send_buff, &ss_header, sizeof(ss_header));
 	memcpy(uwb_send_buff+sizeof(ss_header), &value, sizeof(value));
-
+	
 	dw_send_tmo(0xFFFF, uwb_send_buff, sizeof(ss_header)+sizeof(value), DEF_TMO_MS);
-	// chprintf((BaseSequentialStream*)&SD1, "Sent Id: %d step %u \n\n", self_id, consensus_step);
+	// chprintf((BaseSequentialStream*)&SD1, "Sent Id:		 %d step %u \n\n", self_id, consensus_step);
 }
 
 void broad_consensus_last(ss_pos_t value, dw_addr_t addr)
@@ -495,6 +498,7 @@ void exchange_positions(void)
 
 	while (memcmp(true_row, positions_recvd, sizeof(positions_recvd)) != 0 && !skip_exch)
 	{
+		send_source_dist(-1);
 		memcpy(uwb_send_buff+sizeof(ss_header), position, sizeof(position));
 		dw_send_tmo(0xFFFF, uwb_send_buff, sizeof(ss_header)+sizeof(position), DEF_TMO_MS);
 		// chprintf((BaseSequentialStream*)&SD1, "Positions sent ID %u 0 (%.3f,%.3f) 1 (%.3f,%.3f) 2(%.3f,%.3f)\n", self_id, position[0].x, position[0].y, position[1].x, position[1].y, position[2].x, position[2].y);
@@ -513,6 +517,8 @@ void exchange_positions(void)
 					// chprintf((BaseSequentialStream*)&SD1, "Positions recv ID %u recvid %u 0 (%.3f,%.3f) 1 (%.3f,%.3f) 2(%.3f,%.3f)\n", self_id, recv_id, pos_recvd_p[0].x, pos_recvd_p[0].y, pos_recvd_p[1].x, pos_recvd_p[1].y, pos_recvd_p[2].x, pos_recvd_p[2].y);
 					for (size_t j = 0; j < SS_DEVICE_NUMBER; j++)
 					{
+						// TODO if all pos values (including 0) must be accepted 3 dirty bits must be added on message for positions
+						// This condition means some pos was received (0 is unknown)
 						if (fabs(pos_recvd_p[j].x) > 1e-4 && fabs(pos_recvd_p[j].y) > 1e-4)
 						{
 							pos_cnt++;
@@ -557,11 +563,19 @@ void run_consensus_new(void)
 	static dw_addr_t last_addr = 0;
 	static uint8_t send_cond = true;
 	dw_recv_info_t recvd;
+	static uint8_t failed_iter_cnt = 0;
+
+	if (failed_iter_cnt > 100)
+	{
+		consensus_step = SS_ITER_N;
+		failed_iter_cnt = 0;
+	}
 
 	if (consensus_step == SS_ITER_N)
 	{
 		reset_cnt++;
-		// chprintf((BaseSequentialStream*)&SD1, "FINAL Id: %d C: (%.3f,%.3f)\n\n", self_id, position[self_id].x - centroid[self_id].x , position[self_id].y - centroid[self_id].y);
+		consensus_iter_n++;
+		//chprintf((BaseSequentialStream*)&SD1, "FINAL %d Id: %d C: (%.3f,%.3f)\n\n", consensus_iter_n, self_id, position[self_id].x - centroid[self_id].x , position[self_id].y - centroid[self_id].y);
 		send_centroid();
 
 		// NEW ITER
@@ -570,11 +584,12 @@ void run_consensus_new(void)
 
 		// Get positions or other data
 		exchange_positions();
-		// chprintf((BaseSequentialStream*)&SD1, "positions ID %u 0 (%.3f,%.3f) 1 (%.3f,%.3f) 2(%.3f,%.3f)\n", self_id, position[0].x, position[0].y, position[1].x, position[1].y, position[2].x, position[2].y);
+		//chprintf((BaseSequentialStream*)&SD1, "positions ID %u 0 (%.3f,%.3f) 1 (%.3f,%.3f) 2(%.3f,%.3f)\n", self_id, position[0].x, position[0].y, position[1].x, position[1].y, position[2].x, position[2].y);
 
 		calculate_centroid();
 		update_centroid();
-	}
+	}		// send_asc_dir();
+
 
 	if (memcmp(false_row, comm_row, sizeof(comm_row)) == 0) // All required data received
 	{
@@ -614,7 +629,7 @@ void run_consensus_new(void)
 				{
 					ss_header_p = (ss_header_t*)uwb_recv_buff;
 					// chThdSleepMilliseconds(5);
-					// chprintf((BaseSequentialStream*)&SD1, "Id: %d recvid: %u m_step: %u recv_step: %u value: (%.3f,%.3f)\n\n", self_id, recv_id, consensus_step, ss_header_p->step, ((ss_pos_t*)(uwb_recv_buff+sizeof(ss_header_t)))->x , ((ss_pos_t*)(uwb_recv_buff+sizeof(ss_header_t)))->y);
+					// chprintf((BaseSequential	Stream*)&SD1, "Id: %d recvid: %u m_step: %u recv_step: %u value: (%.3f,%.3f)\n\n", self_id, recv_id, consensus_step, ss_header_p->step, ((ss_pos_t*)(uwb_recv_buff+sizeof(ss_header_t)))->x , ((ss_pos_t*)(uwb_recv_buff+sizeof(ss_header_t)))->y);
 					if (ss_header_p->step == consensus_step && ss_header_p->type != SS_M_CON_POS) 
 					{
 						centroid[recv_id] = *((ss_pos_t*)(uwb_recv_buff+sizeof(ss_header_t)));					
@@ -628,6 +643,7 @@ void run_consensus_new(void)
 						if (ss_header_p->type != SS_M_CON_LV)
 						{
 							// When this happens the last value should be sent instead of the current value until current iter is recvd frm recv_id
+							// chprintf((BaseSequentialStream*)&SD1, "Wrong iter\n\n");
 							if (ss_header_p->step == consensus_step-1)
 								last_addr = recv_addr;
 							else if (ss_header_p->step < consensus_step-1 && consensus_step == SS_ITER_N-1)
@@ -660,6 +676,8 @@ void run_consensus_new(void)
 			} 
 		}
 	}
+
+	failed_iter_cnt++;
 }
 
 // void consens_new()
@@ -845,7 +863,8 @@ THD_FUNCTION(SS, arg)
 			// chVTSetContinuous(&comm_slot_timer, TIME_US2I(CONSENSUS_PERIOD_US/SS_DEVICE_NUMBER), comm_slot_cb, NULL);
 		}
 	}
-}
+}		// chprintf((BaseSequentialStream*)&SD1, "UPDATE Id: %d Step: %u C: (%.3f,%.3f)\n\n", self_id, consensus_step, position[self_id].x - centroid[self_id].x , position[self_id].y - centroid[self_id].y);
+
 
 THD_FUNCTION(DISTANCE_FIELD, arg)
 {
@@ -889,7 +908,8 @@ THD_FUNCTION(DISTANCE_FIELD, arg)
 				chBSemWait(&slot_free);
 				// time_now = chVTGetSystemTime();
 				// chprintf((BaseSequentialStream*)&SD1, "iter: %u, time: %u\n", iter_cnt, time_now);
-				chThdSleepMicroseconds(CONSENSUS_PERIOD_US/SS_DEVICE_NUMBER/10-SS_RTOS_DELAY_US);
+				chThdSleepMicroseconds(CONSENSUS_PERIOD_US/SS_DEVICE_NUMBER/10-SS_RTOS_DELAY_US);		// chprintf((BaseSequentialStream*)&SD1, "UPDATE Id: %d Step: %u C: (%.3f,%.3f)\n\n", self_id, consensus_step, position[self_id].x - centroid[self_id].x , position[self_id].y - centroid[self_id].y);
+
 				dw_send_w4r_tmo(identifier_map[i], send_data, sizeof(send_data), 0, NULL, NULL, 0, TIME_US2I(CONSENSUS_PERIOD_US/SS_DEVICE_NUMBER-SS_RTOS_DELAY_US));
 			}
 

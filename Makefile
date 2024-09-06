@@ -244,6 +244,14 @@ include $(CHIBIOS_CONTRIB)/os/various/gdb.mk
 pin-reset: jlink-pin-reset
 flash: all jlink-flash
 
+# Gets the serial numbers of all DWM1001 boards and resets each board
+openocd-reset:
+	$(shell export SERIAL_NUMBERS=`lsusb -v | grep -C 20 'SEGGER J-Link' | grep "iSerial" | awk '{print $$NF}'` ; \
+	for serial_number in $$SERIAL_NUMBERS ; do \
+		sed -i "s/adapter serial .*/adapter serial $$serial_number/g" openocd/reset_dwm1001.cfg ; \
+		openocd -f openocd/reset_dwm1001.cfg ; \
+	done)
+
 # Gets the serial numbers of all DWM1001 boards and flashes each board
 openocd-flash:
 	$(shell export SERIAL_NUMBERS=`lsusb -v | grep -C 20 'SEGGER J-Link' | grep "iSerial" | awk '{print $$NF}'` ; \
