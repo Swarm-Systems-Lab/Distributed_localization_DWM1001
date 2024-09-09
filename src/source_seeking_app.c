@@ -21,9 +21,9 @@ serial_packet_t uart1_send_buff[UART1_Q_LENGTH];
 uint8_t uwb_send_buff[64];
 uint8_t uwb_recv_buff[64];
 
-dw_addr_t identifier_map[SS_DEVICE_NUMBER] = {0, 0, 0};
+dw_addr_t identifier_map[SS_DEVICE_NUMBER] = {18, 3213, 1955};
 
-dw_addr_t field_source = 9999;
+dw_addr_t field_source = 2177;
 
 virtual_timer_t comm_slot_timer;
 
@@ -37,7 +37,8 @@ ss_pos_t centroid_c;
 ss_pos_t pos_v_sum;
 
 ss_pos_t centroid[SS_DEVICE_NUMBER] = {{.x=0, .y=0}, {.x=0, .y=0}, {.x=0, .y=0}};
-ss_pos_t asc_dir[SS_DEVICE_NUMBER];
+ss_pos_t last_centroid[SS_DEVICE_NUMBER] = {{.x=0, .y=0}, {.x=0, .y=0}, {.x=0, .y=0}};
+ss_pos_t asc_dir[SS_DEVICE_NUMBER] = {{.x=0, .y=0}, {.x=0, .y=0}, {.x=0, .y=0}};
 ss_pos_t position[SS_DEVICE_NUMBER] = {{.x=0, .y=0}, {.x=0, .y=0}, {.x=0, .y=0}};
 uint8_t positions_outdated[SS_DEVICE_NUMBER];
 
@@ -200,6 +201,23 @@ void update_centroid(void)
 
 	centroid[self_id].x += -SS_K_GAIN*(centr_x_sum - pos_v_sum.x)/SS_DEVICE_NUMBER;
 	centroid[self_id].y += -SS_K_GAIN*(centr_y_sum - pos_v_sum.y)/SS_DEVICE_NUMBER;
+}
+
+void update_asc_dir(float field_value)
+{
+	float asc_dir_x_sum = 0;
+	float asc_dir_y_sum = 0;
+	float p_x_sum = 0;
+	float p_y_sum = 0;
+
+	for (size_t i = 0; i < SS_DEVICE_NUMBER; i++)
+	{
+		asc_dir_x_sum += asc_dir[i].x;
+		asc_dir_x_sum += asc_dir[i].y;
+	}
+
+	asc_dir[self_id].x += -SS_K_GAIN*(asc_dir_x_sum)/SS_DEVICE_NUMBER;
+	asc_dir[self_id].y += -SS_K_GAIN*(asc_dir_y_sum)/SS_DEVICE_NUMBER;
 }
 
 void get_id_from_ap(uint8_t* data, size_t size)
@@ -418,7 +436,7 @@ void run_consensus_centroid(void)
 	}
 }
 
-void broad_consensus(ss_pos_t value)
+void broad_consensus(void)
 {
 	ss_header_t ss_header;
 
@@ -426,13 +444,14 @@ void broad_consensus(ss_pos_t value)
 	ss_header.type = SS_M_CON_V;
 
 	memcpy(uwb_send_buff, &ss_header, sizeof(ss_header));
-	memcpy(uwb_send_buff+sizeof(ss_header), &value, sizeof(value));
+	memcpy(uwb_send_buff+sizeof(ss_header), &(centroid[self_id]), sizeof(centroid[self_id]));
+	memcpy(uwb_send_buff+sizeof(ss_header)+sizeof(centroid[self_id]), &(asc_dir[self_id]), sizeof(asc_dir[self_id]));
 	
-	dw_send_tmo(0xFFFF, uwb_send_buff, sizeof(ss_header)+sizeof(value), DEF_TMO_MS);
+	dw_send_tmo(0xFFFF, uwb_send_buff, sizeof(ss_header)+sizeof(centroid[self_id])+sizeof(asc_dir[self_id]), DEF_TMO_MS);
 	// chprintf((BaseSequentialStream*)&SD1, "Sent Id:		 %d step %u \n\n", self_id, consensus_step);
 }
 
-void broad_consensus_last(ss_pos_t value, dw_addr_t addr)
+void broad_consensus_last(ss_pos_t last_cen, ss_pos_t last_asc_dir, dw_addr_t addr)
 {
 	ss_header_t ss_header;
 
@@ -440,9 +459,10 @@ void broad_consensus_last(ss_pos_t value, dw_addr_t addr)
 	ss_header.type = SS_M_CON_LV;
 
 	memcpy(uwb_send_buff, &ss_header, sizeof(ss_header));
-	memcpy(uwb_send_buff+sizeof(ss_header), &value, sizeof(value));
+	memcpy(uwb_send_buff+sizeof(ss_header), &last_cen, sizeof(last_cen));
+	memcpy(uwb_send_buff+sizeof(ss_header)+sizeof(last_cen), &(last_asc_dir), sizeof(last_asc_dir));
 
-	dw_send_tmo(addr, uwb_send_buff, sizeof(ss_header)+sizeof(value), DEF_TMO_MS);
+	dw_send_tmo(addr, uwb_send_buff, sizeof(ss_header)+sizeof(ss_header)+sizeof(last_cen), DEF_TMO_MS);
 	// chprintf((BaseSequentialStream*)&SD1, "Sent Id: %d  step %u addr %u LAST\n\n", self_id, consensus_step-1, addr);
 }
 
@@ -468,6 +488,22 @@ uint8_t is_consensus_device(dw_addr_t addr, uint8_t id)
 	return 255;
 }
 
+float get_field(void)
+{
+	dw_recv_info_t dw_recv_info;
+	float distance = 0.0;
+	uint8_t iter_cnt = 0;
+
+	while ((distance < 0.1 || distance > 300) && iter_cnt < 20)
+	{
+		chThd_rand_wait(20000,100000); 
+		dw_recv_info = dw_sstwr(field_source, NULL, 0, (uint8_t*)(&distance), sizeof(distance));
+	}
+
+	send_source_dist(distance);
+	return distance;
+}
+
 void exchange_positions(void)
 {
 	ss_header_t ss_header;
@@ -478,6 +514,7 @@ void exchange_positions(void)
 	uint8_t skip_exch = false;
 	uint8_t other_message_cnt = 0;
 	ss_pos_t* pos_recvd_p;
+	uint8_t* outdated_recvd_p;
 	uint8_t positions_recvd[SS_DEVICE_NUMBER];
 	memset(positions_recvd, false, sizeof(positions_recvd));
 	memset(positions_outdated, true, sizeof(positions_outdated));
@@ -485,23 +522,29 @@ void exchange_positions(void)
 	ss_header.step = 0;
 	ss_header.type = SS_M_CON_POS;
 
-	while (positions_outdated[self_id])
-		recv_serial();
+	// while (positions_outdated[self_id])
+	// 	recv_serial();
 	positions_outdated[self_id] = false;
 	// position[self_id].x = 30+((40-30+1)*rand()/(float)RAND_MAX);
 	// position[self_id].y = 30+((40-30+1)*rand()/(float)RAND_MAX);
-	// position[self_id].x = self_id+1;
-	// position[self_id].y = self_id+1;
+	position[self_id].x = self_id+1;
+	position[self_id].y = self_id+1;
 	chThdSleepMilliseconds(2);
 
 	memcpy(uwb_send_buff, &ss_header, sizeof(ss_header));
 
+	/*
+	*	MESSAGE FORMAT
+	*	[HEADER][N_positions][N_bools]
+	*
+	*/
+
 	while (memcmp(true_row, positions_recvd, sizeof(positions_recvd)) != 0 && !skip_exch)
 	{
-		send_source_dist(-1);
 		memcpy(uwb_send_buff+sizeof(ss_header), position, sizeof(position));
+		memcpy(uwb_send_buff+sizeof(ss_header)+sizeof(position), positions_outdated, sizeof(positions_outdated));
 		dw_send_tmo(0xFFFF, uwb_send_buff, sizeof(ss_header)+sizeof(position), DEF_TMO_MS);
-		// chprintf((BaseSequentialStream*)&SD1, "Positions sent ID %u 0 (%.3f,%.3f) 1 (%.3f,%.3f) 2(%.3f,%.3f)\n", self_id, position[0].x, position[0].y, position[1].x, position[1].y, position[2].x, position[2].y);
+		chprintf((BaseSequentialStream*)&SD1, "Positions sent ID %u 0 (%.3f,%.3f) 1 (%.3f,%.3f) 2(%.3f,%.3f)\n", self_id, position[0].x, position[0].y, position[1].x, position[1].y, position[2].x, position[2].y);
 
 		for (size_t i = 0; i < SS_DEVICE_NUMBER-1; i++)
 		{
@@ -513,13 +556,12 @@ void exchange_positions(void)
 				if (!positions_recvd[recv_id] && ss_header_recv_p->type == SS_M_CON_POS)
 				{
 					pos_recvd_p = (ss_pos_t*)(uwb_recv_buff+sizeof(ss_header_t));
+					outdated_recvd_p = (uwb_recv_buff+sizeof(ss_header_t)+sizeof(position));
 					uint8_t pos_cnt = 0;
 					// chprintf((BaseSequentialStream*)&SD1, "Positions recv ID %u recvid %u 0 (%.3f,%.3f) 1 (%.3f,%.3f) 2(%.3f,%.3f)\n", self_id, recv_id, pos_recvd_p[0].x, pos_recvd_p[0].y, pos_recvd_p[1].x, pos_recvd_p[1].y, pos_recvd_p[2].x, pos_recvd_p[2].y);
 					for (size_t j = 0; j < SS_DEVICE_NUMBER; j++)
 					{
-						// TODO if all pos values (including 0) must be accepted 3 dirty bits must be added on message for positions
-						// This condition means some pos was received (0 is unknown)
-						if (fabs(pos_recvd_p[j].x) > 1e-4 && fabs(pos_recvd_p[j].y) > 1e-4)
+						if (outdated_recvd_p[j] == false)
 						{
 							pos_cnt++;
 							if (positions_outdated[j])
@@ -559,10 +601,12 @@ void run_consensus_new(void)
 	uint8_t recv_id;
 	ss_header_t* ss_header_p;
 	static uint8_t comm_row[SS_DEVICE_NUMBER];
-	static ss_pos_t last_value = {.x=0, .y=0};
+	static ss_pos_t last_cen = {.x=0, .y=0};
+	static ss_pos_t last_asc_dir = {.x=0, .y=0};
 	static dw_addr_t last_addr = 0;
 	static uint8_t send_cond = true;
 	dw_recv_info_t recvd;
+	static float field_value = 0.0;
 	static uint8_t failed_iter_cnt = 0;
 
 	if (failed_iter_cnt > 100)
@@ -576,30 +620,39 @@ void run_consensus_new(void)
 		reset_cnt++;
 		consensus_iter_n++;
 		//chprintf((BaseSequentialStream*)&SD1, "FINAL %d Id: %d C: (%.3f,%.3f)\n\n", consensus_iter_n, self_id, position[self_id].x - centroid[self_id].x , position[self_id].y - centroid[self_id].y);
-		send_centroid();
+		memcpy(last_centroid, centroid, sizeof(centroid));
+		// send_centroid();
 
 		// NEW ITER
 		consensus_step = 0;
 		memcpy(comm_row, COMM_GRAPH[self_id], sizeof(comm_row));
 
 		// Get positions or other data
+		field_value = get_field();
+		chprintf((BaseSequentialStream*)&SD1, "Distance %.3f\n", self_id, field_value);
 		exchange_positions();
-		//chprintf((BaseSequentialStream*)&SD1, "positions ID %u 0 (%.3f,%.3f) 1 (%.3f,%.3f) 2(%.3f,%.3f)\n", self_id, position[0].x, position[0].y, position[1].x, position[1].y, position[2].x, position[2].y);
+		chprintf((BaseSequentialStream*)&SD1, "positions ID %u 0 (%.3f,%.3f) 1 (%.3f,%.3f) 2(%.3f,%.3f)\n", self_id, position[0].x, position[0].y, position[1].x, position[1].y, position[2].x, position[2].y);
 
 		calculate_centroid();
 		update_centroid();
-	}		// send_asc_dir();
+		asc_dir[self_id].x = field_value*last_centroid[self_id].x;
+		asc_dir[self_id].y = field_value*last_centroid[self_id].y;
+		update_asc_dir(field_value);
+	}
 
 
 	if (memcmp(false_row, comm_row, sizeof(comm_row)) == 0) // All required data received
 	{
 		// chprintf((BaseSequentialStream*)&SD1, "Centroid ID %u 0 (%.3f,%.3f) 1 (%.3f,%.3f) 2(%.3f,%.3f)\n", self_id, centroid[0].x, centroid[0].y, centroid[1].x, centroid[1].y, centroid[2].x, centroid[2].y);
-		// chprintf((BaseSequentialStream*)&SD1, "UPDATE Id: %d Step: %u C: (%.3f,%.3f)\n\n", self_id, consensus_step, position[self_id].x - centroid[self_id].x , position[self_id].y - centroid[self_id].y);
+		chprintf((BaseSequentialStream*)&SD1, "CENTROID Id: %d Step: %u C: (%.3f,%.3f)\n\n", self_id, consensus_step, position[self_id].x - centroid[self_id].x , position[self_id].y - centroid[self_id].y);
+		chprintf((BaseSequentialStream*)&SD1, "ASC_DIR Id: %d Step: %u C: (%.3f,%.3f)\n\n", self_id, consensus_step, asc_dir[self_id].x, asc_dir[self_id].y);
 		update_centroid();
+		update_asc_dir(field_value);
 
 		consensus_step++;
 		last_addr = 0;
-		last_value = centroid[self_id];
+		last_cen = centroid[self_id];
+		last_asc_dir = asc_dir[self_id];
 		memcpy(comm_row, COMM_GRAPH[self_id], sizeof(comm_row));
 		send_cond = true;
 	}
@@ -609,11 +662,12 @@ void run_consensus_new(void)
 		//	Send broadcast of value
 		if (self_id == i && send_cond)
 		{
+
 			if (last_addr == 0)
-				broad_consensus(centroid[self_id]);
+				broad_consensus();
 			else
 			{
-				broad_consensus_last(last_value, last_addr);
+				broad_consensus_last(last_cen, last_asc_dir, last_addr);
 				last_addr = 0;
 			}
 			send_cond = false;
@@ -622,7 +676,7 @@ void run_consensus_new(void)
 		{
 			if (COMM_GRAPH[i][self_id] > 0)
 			{
-				recvd = dw_recv_tmo(&recv_addr, uwb_recv_buff, sizeof(ss_header_t)+sizeof(*centroid), TIME_MS2I(60));
+				recvd = dw_recv_tmo(&recv_addr, uwb_recv_buff, sizeof(ss_header_t)+sizeof(*centroid)+sizeof(*asc_dir), TIME_MS2I(60));
 				recv_id = is_consensus_device(recv_addr, self_id);
 
 				if (recv_id != 255) // right device
@@ -632,7 +686,8 @@ void run_consensus_new(void)
 					// chprintf((BaseSequential	Stream*)&SD1, "Id: %d recvid: %u m_step: %u recv_step: %u value: (%.3f,%.3f)\n\n", self_id, recv_id, consensus_step, ss_header_p->step, ((ss_pos_t*)(uwb_recv_buff+sizeof(ss_header_t)))->x , ((ss_pos_t*)(uwb_recv_buff+sizeof(ss_header_t)))->y);
 					if (ss_header_p->step == consensus_step && ss_header_p->type != SS_M_CON_POS) 
 					{
-						centroid[recv_id] = *((ss_pos_t*)(uwb_recv_buff+sizeof(ss_header_t)));					
+						centroid[recv_id] = *((ss_pos_t*)(uwb_recv_buff+sizeof(ss_header_t)));
+						asc_dir[recv_id] = *((ss_pos_t*)(uwb_recv_buff+sizeof(ss_header_t)+sizeof(*centroid)));			
 						if (comm_row[recv_id] > 0)
 							comm_row[recv_id] = 0;
 						else
@@ -748,65 +803,14 @@ void run_consensus_new(void)
 // 	}
 // }
 
-// void source_device(void)
-// {
-// 	dw_addr_t recv_addr = 0;
-// 	uint8_t recv_sync[1] = {0};
-// 	uint8_t correct[SS_DEVICE_NUMBER];
-// 	uint8_t all_ready = 0;
-// 	uint8_t synced = 0;
-// 	systime_t time_cnt = 0; 
-// 	systime_t start_time = chVTGetSystemTime();
-
-// 	while (true)
-// 	{
-// 		dw_recv_tmo(NULL, NULL, 0, TIME_MS2I(100));
-
-// 		time_cnt = chVTGetSystemTime();
-
-// 		if (TIME_I2MS(time_cnt-start_time) >= 1500)
-// 		{
-// 			synced = 0;
-// 			all_ready = 0;
-// 			for (size_t i = 0; i < SS_DEVICE_NUMBER; i++)
-// 				correct[i] = 0;
-
-// 			while (!synced)
-// 			{
-// 				for (size_t i = 0; i < SS_DEVICE_NUMBER; i++)
-// 				{
-// 					dw_recv_tmo(&recv_addr, recv_sync, sizeof(sync_message1), TIME_MS2I(20));
-					
-// 					if (recv_addr == identifier_map[i] && recv_sync[0] == sync_message1)
-// 					{
-// 						chThdSleepMilliseconds(2);
-// 						dw_send_tmo(identifier_map[i], &sync_message1, sizeof(sync_message1), DEF_TMO_MS);
-// 						correct[i] = 1; 
-// 					}
-
-// 					recv_addr = 0;
-// 					recv_sync[0] = 0;
-// 				}
-
-// 				for (size_t i = 0; i < SS_DEVICE_NUMBER; i++)
-// 				{
-// 					if (correct[i] > 0)
-// 						all_ready++;
-// 				}
-
-// 				if (all_ready >= SS_DEVICE_NUMBER)
-// 				{
-// 					chThdSleepMilliseconds(20);
-// 					dw_send_tmo(0xFFFF, &sync_message2, sizeof(sync_message2), TIME_MS2I(10));
-// 					synced = 1;
-// 				}
-// 				else
-// 					all_ready = 0;
-// 			}
-// 			start_time = chVTGetSystemTime();
-// 		}
-// 	}
-// }
+void source_device(void)
+{
+	while (true)
+	{
+		chThdSleepMilliseconds(1);
+		dw_recv_tmo(NULL, NULL, 0, 200);
+	}
+}
 
 void reload_consensus(void)
 {
@@ -822,8 +826,8 @@ THD_FUNCTION(SS, arg)
 
 	self_addr = dw_get_addr();
 
-	// if (self_addr == field_source)
-	// 	source_device();
+	if (self_addr == field_source)
+		source_device();
 
 	while (identifier_map[0] == 0)
 		recv_serial();
