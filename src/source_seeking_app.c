@@ -21,6 +21,7 @@ serial_packet_t uart1_send_buff[UART1_Q_LENGTH];
 uint8_t uwb_send_buff[64];
 uint8_t uwb_recv_buff[64];
 
+// DEBUGGING CHANGE POSITION ID MAP
 dw_addr_t identifier_map[SS_DEVICE_NUMBER] = {18, 3213, 1955};
 
 dw_addr_t field_source = 2177;
@@ -115,12 +116,18 @@ void send_asc_dir(void)
 {
 	send_debug();
 	uart1_send_buff[0].p_class = SS_P_ASC_DIR;
-	uart1_send_buff[0].p_length = sizeof(position[self_id]);
+	uart1_send_buff[0].p_length = sizeof(asc_dir[self_id]);
 	
 	// char a[8] = {'a','a','a','a','a','a','a','a'};
 
 	// memcpy(uart1_send_buff[0].p_data, a, uart1_send_buff[0].p_length);
-	memcpy(uart1_send_buff[0].p_data, &(position[self_id]), uart1_send_buff[0].p_length);
+	
+	// Send normalized ascension direction
+	ss_pos_t norm_asc_dir;
+	float asc_dir_size = sqrt(asc_dir[self_id].x*asc_dir[self_id].x + asc_dir[self_id].y*asc_dir[self_id].y);
+	norm_asc_dir.x = asc_dir[self_id].x/asc_dir_size;
+	norm_asc_dir.y = asc_dir[self_id].y/asc_dir_size;
+	memcpy(uart1_send_buff[0].p_data, &(norm_asc_dir), uart1_send_buff[0].p_length);
 	chMBPostTimeout(&uart1_send_queue, (msg_t)&(uart1_send_buff[0]), TIME_US2I(50));
 }
 
@@ -522,6 +529,8 @@ void exchange_positions(void)
 	ss_header.step = 0;
 	ss_header.type = SS_M_CON_POS;
 
+	// DEBUGGING CHANGE POSITION READ
+
 	// while (positions_outdated[self_id])
 	// 	recv_serial();
 	positions_outdated[self_id] = false;
@@ -645,7 +654,11 @@ void run_consensus_new(void)
 	{
 		// chprintf((BaseSequentialStream*)&SD1, "Centroid ID %u 0 (%.3f,%.3f) 1 (%.3f,%.3f) 2(%.3f,%.3f)\n", self_id, centroid[0].x, centroid[0].y, centroid[1].x, centroid[1].y, centroid[2].x, centroid[2].y);
 		chprintf((BaseSequentialStream*)&SD1, "CENTROID Id: %d Step: %u C: (%.3f,%.3f)\n\n", self_id, consensus_step, position[self_id].x - centroid[self_id].x , position[self_id].y - centroid[self_id].y);
-		chprintf((BaseSequentialStream*)&SD1, "ASC_DIR Id: %d Step: %u C: (%.3f,%.3f)\n\n", self_id, consensus_step, asc_dir[self_id].x, asc_dir[self_id].y);
+		ss_pos_t norm_asc_dir;
+		float asc_dir_size = sqrt(asc_dir[self_id].x*asc_dir[self_id].x + asc_dir[self_id].y*asc_dir[self_id].y);
+		norm_asc_dir.x = asc_dir[self_id].x/asc_dir_size;
+		norm_asc_dir.y = asc_dir[self_id].y/asc_dir_size;
+		chprintf((BaseSequentialStream*)&SD1, "ASC_DIR Id: %d Step: %u C: (%.3f,%.3f)\n\n", self_id, consensus_step, norm_asc_dir.x, norm_asc_dir.y);
 		update_centroid();
 		update_asc_dir(field_value);
 
