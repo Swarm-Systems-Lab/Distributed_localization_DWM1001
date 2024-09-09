@@ -718,13 +718,15 @@ void run_consensus_new(void)
 					centroid[i] = centroid[self_id];
 					centroid[i].x -= position[self_id].x - position[i].x;
 					centroid[i].y -= position[self_id].y - position[i].y;
+					asc_dir[i] = asc_dir[self_id];
 				}
 			}
 			else
 			{
 				centroid[i] = centroid[self_id];
 				centroid[i].x -= position[self_id].x - position[i].x;
-				centroid[i].y -= position[self_id].y - position[i].y;	
+				centroid[i].y -= position[self_id].y - position[i].y;
+				asc_dir[i] = asc_dir[self_id];
 				
 				if (self_id == i+1)
 					chThd_rand_wait(50000, 60000);
@@ -734,74 +736,6 @@ void run_consensus_new(void)
 
 	failed_iter_cnt++;
 }
-
-// void consens_new()
-// {
-// 	for (size_t i = 0; i < SS_DEVICE_NUMBER; i++)
-// 	{
-// 		if (COMM_GRAPH[self_id][i] > 0)
-// 		{
-// 			while (!received(recv_addr))
-// 			{
-// 				recvd = dw_recv_tmo(&recv_addr, uwb_recv_buff, sizeof(ss_header_t)+sizeof(*centroid), TIME_MS2I(60));
-// 				recv_id = is_consensus_device(recv_addr, self_id);
-
-// 				if (recv_id != 255) // right device
-// 				{
-// 					ss_header_p = (ss_header_t*)uwb_recv_buff;
-// 					// chprintf((BaseSequentialStream*)&SD1, "Id: %d recvid: %u m_step: %u recv_step: %u value: (%.3f,%.3f)\n\n", self_id, recv_id, consensus_step, ss_header_p->step, ((ss_pos_t*)(uwb_recv_buff+sizeof(ss_header_t)))->x , ((ss_pos_t*)(uwb_recv_buff+sizeof(ss_header_t)))->y);
-// 					if (ss_header_p->step == consensus_step) 
-// 						centroid[recv_id] = *((ss_pos_t*)(uwb_recv_buff+sizeof(ss_header_t)));					
-// 					else // right device wrong iter
-// 					{
-// 						if (ss_header_p->type == SS_M_CON_V)
-// 						{
-// 							// When this happens the last value should be sent instead of the current value until current iter is recvd frm recv_id
-// 							if (ss_header_p->step == consensus_step-1)
-// 								last_addr = recv_addr;
-// 							else if (ss_header_p->step < consensus_step-1 && consensus_step == SS_ITER_N-1)
-// 								consensus_step++;
-// 						}
-// 						send = true;
-// 					}
-// 				}
-// 				else //timeout or err or unknown device											
-// 				{
-// 					if (recvd.recvd_size == 0)
-// 					{
-// 						// chprintf((BaseSequentialStream*)&SD1, "TIMEOUT: %d \n\n", self_id);
-// 						tmo_cnt++
-// 					}
-// 				}
-
-// 				if (tmo_cnt > 5)
-// 					send = true;
-
-// 				if (send)
-// 				{
-
-// 				}
-// 			}
-
-// 			tmo_cnt = 0;
-// 		}
-// 		else if (COMM_GRAPH[self_id][i] <= 0 && i != self_id)
-// 		{
-// 			centroid[i] = centroid[self_id];
-// 			centroid[i].x -= position[self_id].x - position[i].x;
-// 			centroid[i].y -= position[self_id].y - position[i].y;
-// 		}
-// 	}
-
-// 	consensus_step++;
-// 	update_centroid();
-// 	recv_addrs
-
-// 	if (consensus_step == SS_ITER_N)
-// 	{
-
-// 	}
-// }
 
 void source_device(void)
 {
