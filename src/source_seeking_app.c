@@ -22,7 +22,7 @@ uint8_t uwb_send_buff[64];
 uint8_t uwb_recv_buff[64];
 
 // DEBUGGING CHANGE POSITION ID MAP
-dw_addr_t identifier_map[SS_DEVICE_NUMBER] = {18, 3213, 1955};
+dw_addr_t identifier_map[SS_DEVICE_NUMBER] = {0, 0, 0};
 
 dw_addr_t field_source = 2177;
 
@@ -123,10 +123,15 @@ void send_asc_dir(void)
 	// memcpy(uart1_send_buff[0].p_data, a, uart1_send_buff[0].p_length);
 	
 	// Send normalized ascension direction
-	ss_pos_t norm_asc_dir;
+	ss_pos_t norm_asc_dir = {.x = 0, .y = 0};
 	float asc_dir_size = sqrt(asc_dir[self_id].x*asc_dir[self_id].x + asc_dir[self_id].y*asc_dir[self_id].y);
-	norm_asc_dir.x = asc_dir[self_id].x/asc_dir_size;
-	norm_asc_dir.y = asc_dir[self_id].y/asc_dir_size;
+	
+	if (fabs(asc_dir_size) > 1e-6)
+	{
+		norm_asc_dir.x = asc_dir[self_id].x/asc_dir_size;
+		norm_asc_dir.y = asc_dir[self_id].y/asc_dir_size;
+	}
+
 	memcpy(uart1_send_buff[0].p_data, &(norm_asc_dir), uart1_send_buff[0].p_length);
 	chMBPostTimeout(&uart1_send_queue, (msg_t)&(uart1_send_buff[0]), TIME_US2I(50));
 }
@@ -329,13 +334,13 @@ void exchange_positions(void)
 
 	// DEBUGGING CHANGE POSITION READ
 
-	// while (positions_outdated[self_id])
-	// 	recv_serial();
+	while (positions_outdated[self_id])
+		recv_serial();
 	positions_outdated[self_id] = false;
 	// position[self_id].x = 30+((40-30+1)*rand()/(float)RAND_MAX);
 	// position[self_id].y = 30+((40-30+1)*rand()/(float)RAND_MAX);
-	position[self_id].x = self_id+1;
-	position[self_id].y = self_id+1;
+	// position[self_id].x = self_id+1;
+	// position[self_id].y = self_id+1;
 	chThdSleepMilliseconds(2);
 
 	memcpy(uwb_send_buff, &ss_header, sizeof(ss_header));
@@ -426,14 +431,15 @@ void run_consensus_new(void)
 	{
 		reset_cnt++;
 		consensus_iter_n++;
-		chprintf((BaseSequentialStream*)&SD1, "FINAL %d Id: %d C: (%.3f,%.3f)\n\n", consensus_iter_n, self_id, position[self_id].x - centroid[self_id].x , position[self_id].y - centroid[self_id].y);
-		ss_pos_t norm_asc_dir = asc_dir[self_id];
-		float asc_dir_size = sqrt(asc_dir[self_id].x*asc_dir[self_id].x + asc_dir[self_id].y*asc_dir[self_id].y);
-		norm_asc_dir.x = asc_dir[self_id].x/asc_dir_size;
-		norm_asc_dir.y = asc_dir[self_id].y/asc_dir_size;
-		chprintf((BaseSequentialStream*)&SD1, "FINAL %d Id: %d A: (%.3f,%.3f)\n\n", consensus_iter_n, self_id, norm_asc_dir.x, norm_asc_dir.y);
+		// chprintf((BaseSequentialStream*)&SD1, "FINAL %d Id: %d C: (%.3f,%.3f)\n\n", consensus_iter_n, self_id, position[self_id].x - centroid[self_id].x , position[self_id].y - centroid[self_id].y);
+		// ss_pos_t norm_asc_dir = asc_dir[self_id];
+		// float asc_dir_size = sqrt(asc_dir[self_id].x*asc_dir[self_id].x + asc_dir[self_id].y*asc_dir[self_id].y);
+		// norm_asc_dir.x = asc_dir[self_id].x/asc_dir_size;
+		// norm_asc_dir.y = asc_dir[self_id].y/asc_dir_size;
+		// chprintf((BaseSequentialStream*)&SD1, "FINAL %d Id: %d A: (%.3f,%.3f)\n\n", consensus_iter_n, self_id, norm_asc_dir.x, norm_asc_dir.y);
 		memcpy(last_centroid, centroid, sizeof(centroid));
-		// send_centroid();
+		send_centroid();
+		send_asc_dir();
 
 		// NEW ITER
 		consensus_step = 0;
@@ -441,9 +447,10 @@ void run_consensus_new(void)
 
 		// Get positions or other data
 		field_value = get_field();
-		chprintf((BaseSequentialStream*)&SD1, "Distance %.3f\n", self_id, field_value);
+		// chprintf((BaseSequentialStream*)&SD1, "Distance %.3f\n", self_id, field_value);
+		send_source_dist(field_value);
 		exchange_positions();
-		chprintf((BaseSequentialStream*)&SD1, "positions ID %u 0 (%.3f,%.3f) 1 (%.3f,%.3f) 2(%.3f,%.3f)\n", self_id, position[0].x, position[0].y, position[1].x, position[1].y, position[2].x, position[2].y);
+		// chprintf((BaseSequentialStream*)&SD1, "positions ID %u 0 (%.3f,%.3f) 1 (%.3f,%.3f) 2(%.3f,%.3f)\n", self_id, position[0].x, position[0].y, position[1].x, position[1].y, position[2].x, position[2].y);
 
 		prepare_consensus();
 		update_centroid();

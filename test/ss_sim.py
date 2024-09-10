@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def potential_at_point(x_point, y_point, k=1):
+def potential_at_point(x_point, y_point, k=100):
     # Calculate the distance r from the center to the point
     r = np.sqrt((x_point - 10) ** 2 + (y_point - 10) ** 2)
     
