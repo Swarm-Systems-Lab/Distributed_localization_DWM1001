@@ -196,17 +196,15 @@ void update_asc_dir(void)
 {
 	float asc_dir_x_sum = 0;
 	float asc_dir_y_sum = 0;
-	float p_x_sum = 0;
-	float p_y_sum = 0;
 
 	for (size_t i = 0; i < SS_DEVICE_NUMBER; i++)
 	{
-		asc_dir_x_sum += asc_dir[i].x;
-		asc_dir_y_sum += asc_dir[i].y;
+		asc_dir_x_sum += asc_dir[self_id].x - asc_dir[i].x;
+		asc_dir_y_sum += asc_dir[self_id].y - asc_dir[i].y;
 	}
 
-	asc_dir[self_id].x = SS_K_GAIN*(asc_dir_x_sum)/SS_DEVICE_NUMBER;
-	asc_dir[self_id].y = SS_K_GAIN*(asc_dir_y_sum)/SS_DEVICE_NUMBER;
+	asc_dir[self_id].x += -SS_K_GAIN*(asc_dir_x_sum)/SS_DEVICE_NUMBER;
+	asc_dir[self_id].y += -SS_K_GAIN*(asc_dir_y_sum)/SS_DEVICE_NUMBER;
 }
 
 void get_id_from_ap(uint8_t* data, size_t size)
@@ -258,7 +256,7 @@ void broad_consensus(void)
 	memcpy(uwb_send_buff+sizeof(ss_header)+sizeof(centroid[self_id]), &(asc_dir[self_id]), sizeof(asc_dir[self_id]));
 	
 	dw_send_tmo(0xFFFF, uwb_send_buff, sizeof(ss_header)+sizeof(centroid[self_id])+sizeof(asc_dir[self_id]), DEF_TMO_MS);
-	// chprintf((BaseSequentialStream*)&SD1, "Sent Id:		 %d step %u \n\n", self_id, consensus_step);
+	// chprintf((BaseSequentialStream*)&SD1, "SENT Id: %d step: %u  CENT: (%.3f,%.3f) ASC: (%.3f,%.3f)\n\n", self_id, consensus_step, centroid[self_id].x, centroid[self_id].y, asc_dir[self_id].x, asc_dir[self_id].y);
 }
 
 void broad_consensus_last(ss_pos_t last_cen, ss_pos_t last_asc_dir, dw_addr_t addr)
@@ -272,8 +270,8 @@ void broad_consensus_last(ss_pos_t last_cen, ss_pos_t last_asc_dir, dw_addr_t ad
 	memcpy(uwb_send_buff+sizeof(ss_header), &last_cen, sizeof(last_cen));
 	memcpy(uwb_send_buff+sizeof(ss_header)+sizeof(last_cen), &(last_asc_dir), sizeof(last_asc_dir));
 
-	dw_send_tmo(addr, uwb_send_buff, sizeof(ss_header)+sizeof(ss_header)+sizeof(last_cen), DEF_TMO_MS);
-	// chprintf((BaseSequentialStream*)&SD1, "Sent Id: %d  step %u addr %u LAST\n\n", self_id, consensus_step-1, addr);
+	dw_send_tmo(addr, uwb_send_buff, sizeof(ss_header)+sizeof(last_cen)+sizeof(last_asc_dir), DEF_TMO_MS);
+	// chprintf((BaseSequentialStream*)&SD1, "SENT LAST Id: %d step: %u  CENT: (%.3f,%.3f) ASC: (%.3f,%.3f)\n\n", self_id, consensus_step-1, last_cen.x, last_cen.y, last_asc_dir.x, last_asc_dir.y);
 }
 
 uint8_t ss_dev_id(dw_addr_t addr)
@@ -339,8 +337,24 @@ void exchange_positions(void)
 	positions_outdated[self_id] = false;
 	// position[self_id].x = 30+((40-30+1)*rand()/(float)RAND_MAX);
 	// position[self_id].y = 30+((40-30+1)*rand()/(float)RAND_MAX);
-	// position[self_id].x = self_id+1;
-	// position[self_id].y = self_id+1;
+	// switch (self_id)
+	// {
+	// 	case 0:
+	// 		position[self_id].x = 1;
+	// 		position[self_id].y = 1;
+	// 		break;
+	// 	case 1:
+	// 		position[self_id].x = 1;
+	// 		position[self_id].y = 2;
+	// 		break;
+	// 	case 2:
+	// 		position[self_id].x = 2;
+	// 		position[self_id].y = 1;
+	// 		break;
+	// 	default:
+	// 		break;
+	// }
+
 	chThdSleepMilliseconds(2);
 
 	memcpy(uwb_send_buff, &ss_header, sizeof(ss_header));
@@ -432,10 +446,10 @@ void run_consensus_new(void)
 		reset_cnt++;
 		consensus_iter_n++;
 		// chprintf((BaseSequentialStream*)&SD1, "FINAL %d Id: %d C: (%.3f,%.3f)\n\n", consensus_iter_n, self_id, position[self_id].x - centroid[self_id].x , position[self_id].y - centroid[self_id].y);
-		// ss_pos_t norm_asc_dir = asc_dir[self_id];
-		// float asc_dir_size = sqrt(asc_dir[self_id].x*asc_dir[self_id].x + asc_dir[self_id].y*asc_dir[self_id].y);
-		// norm_asc_dir.x = asc_dir[self_id].x/asc_dir_size;
-		// norm_asc_dir.y = asc_dir[self_id].y/asc_dir_size;
+		ss_pos_t norm_asc_dir = asc_dir[self_id];
+		float asc_dir_size = sqrt(asc_dir[self_id].x*asc_dir[self_id].x + asc_dir[self_id].y*asc_dir[self_id].y);
+		norm_asc_dir.x = asc_dir[self_id].x/asc_dir_size;
+		norm_asc_dir.y = asc_dir[self_id].y/asc_dir_size;
 		// chprintf((BaseSequentialStream*)&SD1, "FINAL %d Id: %d A: (%.3f,%.3f)\n\n", consensus_iter_n, self_id, norm_asc_dir.x, norm_asc_dir.y);
 		memcpy(last_centroid, centroid, sizeof(centroid));
 		send_centroid();
@@ -447,6 +461,20 @@ void run_consensus_new(void)
 
 		// Get positions or other data
 		field_value = get_field();
+		// switch (self_id)
+		// {
+		// 	case 0:
+		// 		field_value = 6.42824346533225;
+		// 		break;
+		// 	case 1:
+		// 		field_value = 6.142951168339512;
+		// 		break;
+		// 	case 2:
+		// 		field_value = 6.142951168339512;
+		// 		break;
+		// 	default:
+		// 		break;
+		// }
 		// chprintf((BaseSequentialStream*)&SD1, "Distance %.3f\n", self_id, field_value);
 		send_source_dist(field_value);
 		exchange_positions();
@@ -456,12 +484,15 @@ void run_consensus_new(void)
 		update_centroid();
 		asc_dir[self_id].x = field_value*last_centroid[self_id].x;
 		asc_dir[self_id].y = field_value*last_centroid[self_id].y;
-		update_asc_dir();
+		// chprintf((BaseSequentialStream*)&SD1, "First asc dir ID %u 0 (%.3f,%.3f) 1 (%.3f,%.3f) 2(%.3f,%.3f)\n", self_id, asc_dir[0].x, asc_dir[0].y, asc_dir[1].x, asc_dir[1].y, asc_dir[2].x, asc_dir[2].y);
 	}
 
 
 	if (memcmp(false_row, comm_row, sizeof(comm_row)) == 0) // All required data received
 	{
+		last_cen = centroid[self_id];
+		last_asc_dir = asc_dir[self_id];
+
 		// chprintf((BaseSequentialStream*)&SD1, "Centroid ID %u 0 (%.3f,%.3f) 1 (%.3f,%.3f) 2(%.3f,%.3f)\n", self_id, centroid[0].x, centroid[0].y, centroid[1].x, centroid[1].y, centroid[2].x, centroid[2].y);
 		// chprintf((BaseSequentialStream*)&SD1, "CENTROID Id: %d Step: %u C: (%.3f,%.3f)\n\n", self_id, consensus_step, position[self_id].x - centroid[self_id].x , position[self_id].y - centroid[self_id].y);
 		ss_pos_t norm_asc_dir = asc_dir[self_id];
@@ -469,15 +500,16 @@ void run_consensus_new(void)
 		// norm_asc_dir.x = asc_dir[self_id].x/asc_dir_size;
 		// norm_asc_dir.y = asc_dir[self_id].y/asc_dir_size;
 		// chprintf((BaseSequentialStream*)&SD1, "ASC_DIR Id: %d Step: %u C: (%.3f,%.3f)\n\n", self_id, consensus_step, norm_asc_dir.x, norm_asc_dir.y);
+		// chprintf((BaseSequentialStream*)&SD1, "asc dir ID %u step %u 0 (%.3f,%.3f) 1 (%.3f,%.3f) 2(%.3f,%.3f)\n", self_id, consensus_step, asc_dir[0].x, asc_dir[0].y, asc_dir[1].x, asc_dir[1].y, asc_dir[2].x, asc_dir[2].y);
 		update_centroid();
 		update_asc_dir();
 
 		consensus_step++;
 		last_addr = 0;
-		last_cen = centroid[self_id];
-		last_asc_dir = asc_dir[self_id];
+
 		memcpy(comm_row, COMM_GRAPH[self_id], sizeof(comm_row));
 		send_cond = true;
+		failed_iter_cnt = 0;
 	}
 
 	for (size_t i = 0; i < SS_DEVICE_NUMBER; i++)
@@ -510,7 +542,8 @@ void run_consensus_new(void)
 					if (ss_header_p->step == consensus_step && ss_header_p->type != SS_M_CON_POS) 
 					{
 						centroid[recv_id] = *((ss_pos_t*)(uwb_recv_buff+sizeof(ss_header_t)));
-						asc_dir[recv_id] = *((ss_pos_t*)(uwb_recv_buff+sizeof(ss_header_t)+sizeof(*centroid)));			
+						asc_dir[recv_id] = *((ss_pos_t*)(uwb_recv_buff+sizeof(ss_header_t)+sizeof(*centroid)));
+						// chprintf((BaseSequentialStream*)&SD1, "Id: %d recvid: %u step: %u  CENT: (%.3f,%.3f) ASC: (%.3f,%.3f)\n\n", self_id, recv_id, consensus_step, centroid[recv_id].x, centroid[recv_id].y, asc_dir[recv_id].x, asc_dir[recv_id].y);
 						if (comm_row[recv_id] > 0)
 							comm_row[recv_id] = 0;
 						else

@@ -21,10 +21,10 @@
 #define SS_DEVICE_NUMBER		3
 #define SS_CONSENSUS_FREQUENCY	2
 #define SS_COMM_PERIOD_SLICE	0.5
-#define SS_K_GAIN				0.9
+#define SS_K_GAIN				1
 #define CONSENSUS_PERIOD_US		(1000000/SS_CONSENSUS_FREQUENCY)
 #define SS_RTOS_DELAY_US		100
-#define SS_ITER_N				8
+#define SS_ITER_N				30
 
 typedef enum ss_packet_types
 {
