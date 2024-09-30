@@ -120,6 +120,9 @@ include $(CHIBIOS)/test/rt/rt_test.mk
 include $(CHIBIOS)/test/oslib/oslib_test.mk
 include $(CHIBIOS)/os/various/shell/shell.mk
 
+# Testing
+include ./test/test.mk
+
 # Define linker script file here
 LDSCRIPT= $(STARTUPLD_CONTRIB)/NRF52832.ld
 
