@@ -14,6 +14,9 @@
 //  *
 //  */
 
+#ifndef DIST_LOC_H
+#define DIST_LOC_H
+
 // #include <stdint.h>
 // #include <stdlib.h>
 // #include <string.h>
@@ -370,3 +373,5 @@
 //  * 
 //  */
 // void compute_distance(void);
+
+#endif /* DIST_LOC_H */

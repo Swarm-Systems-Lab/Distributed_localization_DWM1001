@@ -14,6 +14,9 @@
  *
  */
 
+#ifndef SD_PROTOCOL_H
+#define SD_PROTOCOL_H
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -61,3 +64,5 @@ static THD_WORKING_AREA(UART_SENDER_THREAD, 512);
 extern THD_FUNCTION(UART_SENDER, arg);
 
 void serial_init(void);
+
+#endif /* SD_PROTOCOL_H */

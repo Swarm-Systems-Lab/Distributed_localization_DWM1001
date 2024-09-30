@@ -14,6 +14,9 @@
  *
  */
 
+#ifndef UWB_COMM_H
+#define UWB_COMM_H
+
 #include "dw1000_ch.h"
 
 #define DEF_TMO_MS			TIME_MS2I(50)
@@ -46,3 +49,5 @@ dw_recv_info_t dw_recv_tmo(dw_addr_t* addr, uint8_t* recv_data, size_t size, sys
 void dw_reset_sys(void);
 
 void chThd_rand_wait(sysinterval_t min_us, sysinterval_t max_us);
+
+#endif /* UWB_COMM_H */

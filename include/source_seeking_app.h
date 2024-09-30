@@ -14,6 +14,9 @@
  *
  */
 
+#ifndef SOURCE_SEEKING_APP_H
+#define SOURCE_SEEKING_APP_H
+
 #include "sd_protocol.h"
 #include "uwb_comm.h"
 #include "math.h"
@@ -96,3 +99,5 @@ void update_centroid(void);
 void run_consensus_new(void);
 
 void ss_sync(void);
+
+#endif /* SOURCE_SEEKING_APP_H */

@@ -6,9 +6,10 @@
 #include "ch.h"
 #include "hal.h"
 #include "button.h"
+#include "dw1000_ch.h"
 
 #include "source_seeking_app.h"
-//#include "test_app.h"
+#include "debug_listener.h"
 
 uint8_t switch_app_toggle = 0;
 uint8_t app_toggle = 0;
@@ -21,6 +22,8 @@ void switch_app(void* args)
 static THD_WORKING_AREA(APP_THREAD, 512);
 
 int main(void) {
+	thread_t* app_thread_p = NULL;
+
     halInit();
     chSysInit();
 
@@ -41,7 +44,11 @@ int main(void) {
 	chThdCreateStatic(DW_CONTROLLER_THREAD, sizeof(DW_CONTROLLER_THREAD), NORMALPRIO, DW_CONTROLLER, NULL);
 	chThdCreateStatic(UART_RECEIVER_THREAD, sizeof(UART_RECEIVER_THREAD), NORMALPRIO, UART_RECEIVER, NULL);
 	chThdCreateStatic(UART_SENDER_THREAD, sizeof(UART_SENDER_THREAD), NORMALPRIO, UART_SENDER, NULL);
-	thread_t* app_thread_p = chThdCreateStatic(APP_THREAD, sizeof(APP_THREAD), NORMALPRIO, SS, NULL);
+
+	if (dw_get_addr() == 2177)
+		app_thread_p= chThdCreateStatic(APP_THREAD, sizeof(APP_THREAD), NORMALPRIO, DEBUG_LISTNR, NULL);
+	else
+		app_thread_p = chThdCreateStatic(APP_THREAD, sizeof(APP_THREAD), NORMALPRIO, SS, NULL);
 
 	while (true) {	
 		toggle_led(red1);

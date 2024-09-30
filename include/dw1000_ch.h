@@ -14,6 +14,9 @@
  *
  */
 
+#ifndef DW_1000_CH_H
+#define DW_1000_CH_H
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -248,3 +251,5 @@ void RXSFDTO_handler(void);
 void HPDWARN_handler(void);
 void TXBERR_handler(void);
 void AFFREJ_handler(void);
+
+#endif /* DW_1000_CH_H */

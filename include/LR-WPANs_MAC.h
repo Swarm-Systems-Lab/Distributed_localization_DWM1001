@@ -14,6 +14,9 @@
  *
  */
 
+#ifndef LR_WPANS_MAC_H
+#define LR_WPANS_MAC_H
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -81,3 +84,5 @@ size_t encode_MHR(frame_control_t frame_control, uint8_t* MHR, uint8_t seq_num, 
 MHR_16_t decode_MHR(uint8_t* MHR);
 
 // TODO Version should be 0x1 for deca only 0x0 and 0x1 are valid
+
+#endif /* LR_WPANS_MAC_H */

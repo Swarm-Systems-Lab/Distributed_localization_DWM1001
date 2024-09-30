@@ -14,12 +14,12 @@
  *
  */
 
-#ifndef TEST_APP_H
-#define TEST_APP_H
+#ifndef DEBUG_LISTENER_H
+#define DEBUG_LISTENER_H
 
-#include "sd_protocol.h"
 #include "uwb_comm.h"
+#include "sd_protocol.h"
 
-extern THD_FUNCTION(TEST_APP, arg);
+extern THD_FUNCTION(DEBUG_LISTNR, arg);
 
-#endif /* TEST_APP_H */
+#endif /* DEBUG_LISTENER_H */

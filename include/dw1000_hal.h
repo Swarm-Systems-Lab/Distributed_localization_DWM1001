@@ -14,6 +14,9 @@
  *
  */
 
+#ifndef DW1000_HAL_H
+#define DW1000_HAL_H
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -2113,3 +2116,5 @@ void dw_get_tc_pg_config(tc_pg_conf_t* tc_pg_conf);
 void default_config(void);
 
 void long_range_config(void);
+
+#endif /* DW1000_HAL_H */
