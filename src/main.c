@@ -19,7 +19,7 @@ void switch_app(void* args)
 	switch_app_toggle = 1;
 }
 
-static THD_WORKING_AREA(APP_THREAD, 512);
+static THD_WORKING_AREA(APP_THREAD, 1024);
 
 int main(void) {
 	thread_t* app_thread_p = NULL;
@@ -44,9 +44,12 @@ int main(void) {
 	chThdCreateStatic(DW_CONTROLLER_THREAD, sizeof(DW_CONTROLLER_THREAD), NORMALPRIO, DW_CONTROLLER, NULL);
 	chThdCreateStatic(UART_RECEIVER_THREAD, sizeof(UART_RECEIVER_THREAD), NORMALPRIO, UART_RECEIVER, NULL);
 	chThdCreateStatic(UART_SENDER_THREAD, sizeof(UART_SENDER_THREAD), NORMALPRIO, UART_SENDER, NULL);
+	chThdCreateStatic(DEBUG_PRINTER_THREAD, sizeof(DEBUG_PRINTER_THREAD), NORMALPRIO, DEBUG_PRINTER, NULL);
+
+	chThdSleepMilliseconds(100);
 
 	if (dw_get_addr() == 2177)
-		app_thread_p= chThdCreateStatic(APP_THREAD, sizeof(APP_THREAD), NORMALPRIO, DEBUG_LISTNR, NULL);
+		app_thread_p = chThdCreateStatic(APP_THREAD, sizeof(APP_THREAD), NORMALPRIO, DEBUG_LISTNR, NULL);
 	else
 		app_thread_p = chThdCreateStatic(APP_THREAD, sizeof(APP_THREAD), NORMALPRIO, SS, NULL);
 

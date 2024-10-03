@@ -17,8 +17,11 @@
 #ifndef DEBUG_LISTENER_H
 #define DEBUG_LISTENER_H
 
+#include <stdarg.h>
 #include "uwb_comm.h"
-#include "sd_protocol.h"
+#include "debug_printer.h"
+
+#define DL_MAX_MESSAGE_SIZE 128
 
 extern THD_FUNCTION(DEBUG_LISTNR, arg);
 
