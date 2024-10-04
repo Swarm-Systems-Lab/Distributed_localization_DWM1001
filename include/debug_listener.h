@@ -22,6 +22,13 @@
 #include "debug_printer.h"
 
 #define DL_MAX_MESSAGE_SIZE 128
+#define DL_DEBUG_APP		DLA_SS
+
+typedef enum dw_debug_apps
+{
+	DLA_SS		= 0x0,
+	DLA_DEF
+} dw_debug_apps_t;
 
 extern THD_FUNCTION(DEBUG_LISTNR, arg);
 

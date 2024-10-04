@@ -11,6 +11,8 @@
 #include "source_seeking_app.h"
 #include "debug_listener.h"
 
+#define DEBUG_ADDR		2177
+
 uint8_t switch_app_toggle = 0;
 uint8_t app_toggle = 0;
 
@@ -46,9 +48,9 @@ int main(void) {
 	chThdCreateStatic(UART_SENDER_THREAD, sizeof(UART_SENDER_THREAD), NORMALPRIO, UART_SENDER, NULL);
 	chThdCreateStatic(DEBUG_PRINTER_THREAD, sizeof(DEBUG_PRINTER_THREAD), NORMALPRIO, DEBUG_PRINTER, NULL);
 
-	chThdSleepMilliseconds(100);
+	chThdSleepMilliseconds(100); 
 
-	if (dw_get_addr() == 2177)
+	if (dw_get_addr() == DEBUG_ADDR)
 		app_thread_p = chThdCreateStatic(APP_THREAD, sizeof(APP_THREAD), NORMALPRIO, DEBUG_LISTNR, NULL);
 	else
 		app_thread_p = chThdCreateStatic(APP_THREAD, sizeof(APP_THREAD), NORMALPRIO, SS, NULL);
