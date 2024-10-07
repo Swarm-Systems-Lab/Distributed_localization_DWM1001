@@ -21,6 +21,8 @@
 #include "uwb_comm.h"
 #include "debug_printer.h"
 
+#include "source_seeking_app.h"
+
 #define DL_MAX_MESSAGE_SIZE 128
 #define DL_DEBUG_APP		DLA_SS
 

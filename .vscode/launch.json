@@ -1,0 +1,22 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "NRF52 Debug",
+			"cwd": "${workspaceRoot}",
+			"executable": "${workspaceRoot}/build/dis_loc_dwm1001.elf",
+			"svdFile": "${workspaceRoot}/cfg/nrf52.svd",
+			"serverpath": "/run/media/jose/AC0A70F60A70BEC0/Data/UniLocal/Curso4_23-24/Semestre_2/TFG/SwarmSystemsLab_JHH/JLink_Linux_V794j_x86_64/JLinkGDBServerCLExe",
+			"request": "launch",
+			"type": "cortex-debug",
+			"device": "nrf52",
+			"serialNumber": "760103035", // 2177
+			// "serialNumber": "760103309", // 18
+			// "serialNumber": "760103703", // 1955
+			// "serialNumber": "760103268", // 3213
+			"servertype": "jlink",
+			"interface": "swd",
+			"runToEntryPoint": "main"
+		}
+	]
+}

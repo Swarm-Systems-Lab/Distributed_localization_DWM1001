@@ -34,7 +34,7 @@ int dp_print(dw_log_type_t type, uint8_t prio, const char *format, ...)
 
 	if (chMBFetchTimeout(&free_debug_print_queue, (msg_t*)(&free_dw_debug_log_p), TIME_US2I(5000)) == MSG_OK)
 	{
-		chvsnprintf(free_dw_debug_log_p->log, sizeof(free_dw_debug_log_p->log), format, args);
+		chvsnprintf(free_dw_debug_log_p->log, DP_MAX_STRING_SIZE, format, args);
 		free_dw_debug_log_p->type = type;
 		free_dw_debug_log_p->prio = prio;
 		post_status = chMBPostTimeout(&filled_debug_print_queue, (msg_t)free_dw_debug_log_p, TIME_US2I(5000));

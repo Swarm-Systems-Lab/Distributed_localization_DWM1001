@@ -62,7 +62,19 @@ typedef struct ss_header
 	uint16_t step;
 } ss_header_t;
 
-extern serial_packet_t uart1_send_buff[UART1_Q_LENGTH];
+typedef struct ss_con_frame
+{
+	ss_header_t header;
+	ss_pos_t centroid;
+	ss_pos_t asc_dir;
+} ss_con_frame_t;
+
+typedef struct ss_pos_frame
+{
+	ss_header_t header;
+	ss_pos_t positions[SS_DEVICE_NUMBER];
+	uint8_t position_status[SS_DEVICE_NUMBER];
+} ss_pos_frame_t;
 
 extern dw_addr_t identifier_map[SS_DEVICE_NUMBER];
 
@@ -97,7 +109,5 @@ void update_consensus(void);
 void update_centroid(void);
 
 void run_consensus_new(void);
-
-void ss_sync(void);
 
 #endif /* SOURCE_SEEKING_APP_H */
